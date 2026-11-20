@@ -1,0 +1,205 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/psql/databases.html -->
+{{$running := eq .ContainerState "running"}}
+<div class="op-content" aria-label="{{.T.Get "Databases Table"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">PostgreSQL · {{.T.Get "port"}} 5432</div>
+            <h1 class="op-title">{{.T.Get "PostgreSQL Databases"}}</h1>
+            <p class="op-meta">{{.T.Get "Create databases, assign users and import or export dumps."}}</p>
+        </div>
+        <div class="op-actions">
+            {{if $running}}
+            <a href="/postgresql/wizard" class="op-btn op-btn-secondary">{{template "op_icon" "wand"}} {{.T.Get "Database Wizard"}}</a>
+            <a href="/postgresql/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Database"}}</a>
+            {{else}}
+            <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-secondary">{{template "op_icon" "wand"}} {{.T.Get "Database Wizard"}}</span>
+            <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Database"}}</span>
+            {{end}}
+        </div>
+    </div>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "db"}} {{.T.Get "Databases"}}</div><div class="op-kpi-value">{{.UserDatabaseCount}}{{if .DBLimit}} <small>/ {{.DBLimit}}</small>{{end}}</div>{{if .DBLimit}}<div class="op-progress{{if ge .DBQuotaPct 90}} is-danger{{else if ge .DBQuotaPct 70}} is-warning{{end}}"><span style="width:{{.DBQuotaPct}}%"></span></div>{{else}}<div class="op-kpi-note">{{if .ShowAll}}{{.T.Get "System databases shown"}}{{else}}{{.T.Get "System databases hidden"}}{{end}}</div>{{end}}</div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "user"}} {{.T.Get "Users"}}</div><div class="op-kpi-value">{{.UserCount}}</div><div class="op-kpi-note">{{.T.Get "Assigned to your databases"}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{.T.Get "Total size"}}</div><div class="op-kpi-value" id="kpi-total-size">…</div><div class="op-kpi-note" id="kpi-largest">&nbsp;</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "info"}} {{.T.Get "Service"}}</div><div class="op-kpi-value">{{if and $running (eq .HealthStatus "healthy")}}{{.T.Get "Running"}}{{else if $running}}{{.T.Get "Starting"}}{{else}}{{.T.Get "Stopped"}}{{end}}</div><div class="op-kpi-note">{{if .HasInfo}}PostgreSQL {{.ServerVersion}} · {{.Connections}} {{if eq .Connections 1}}{{.T.Get "connection"}}{{else}}{{.T.Get "connections"}}{{end}}{{else}}PostgreSQL · {{.T.Get "server"}} <span class="op-mono">postgres</span>{{end}}</div></div>
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Databases"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search databases"}}" aria-label="{{.T.Get "Search databases"}}"></label>
+            <span class="op-pill-toggle"><input class="form-check-input" type="checkbox" role="switch" id="showAllCheckbox" {{if .ShowAll}}checked{{end}}><label class="form-check-label" for="showAllCheckbox">{{.T.Get "System databases"}}</label></span>
+            <span class="op-pill-toggle" style="white-space:nowrap">{{.T.Get "Size in"}}
+                <select id="display-size" class="op-select op-select-sm w-auto" aria-label="{{.T.Get "Size unit"}}">
+                    <option value="bytes" {{if eq .Unit "bytes"}}selected{{end}}> B</option>
+                    <option value="kb" {{if eq .Unit "kb"}}selected{{end}}>KB</option>
+                    <option value="mb" {{if eq .Unit "mb"}}selected{{end}}>MB</option>
+                    <option value="gb" {{if eq .Unit "gb"}}selected{{end}}>GB</option>
+                </select>
+            </span>
+        </div>
+{{template "bulk_open" (dict "T" .T "Table" "#databases-table" "Endpoint" "/postgresql/bulk")}}
+        <div class="op-table-wrap">
+            <table id="databases-table" class="op-table">
+                <thead>
+                    <tr>
+{{template "bulk_head_checkbox" .}}
+                        <th scope="col">{{.T.Get "Database Name"}}</th>
+                        <th scope="col" class="is-num">{{.T.Get "Size"}} <span id="size_unit">({{upper .Unit}})</span></th>
+                        <th scope="col">{{.T.Get "Assigned Users"}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{if and $running (eq .HealthStatus "healthy")}}
+                    {{range .Databases}}
+                    {{$db := .}}
+                    <tr x-show="searchQuery === '' || {{toJSON $db.Database}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON $db.AssignedUsers}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row" data-db="{{$db.Database}}">
+{{$skip := ""}}{{if $db.IsSystem}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" $db.Database "Label" $db.Database "Skip" $skip)}}
+                        <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:{{if $db.IsSystem}}var(--color-faint){{else}}var(--color-hue-indigo){{end}}">{{template "op_icon" "db"}}</span><div><b><span class="op-mono select-text" style="font-size:13px">{{$db.Database}}</span></b></div></div></td>
+                        <td class="db_size is-num op-mono" data-label="{{$.T.Get "Size"}}">—</td>
+                        <td data-label="{{$.T.Get "Assigned Users"}}"><span style="display:flex;gap:4px;flex-wrap:wrap">
+                            {{if $db.IsSystem}}<span class="op-tag">{{$.T.Get "System Database"}}</span>{{end}}
+                            {{if $db.AssignedUsers}}{{range split $db.AssignedUsers ","}}<span class="op-tag op-mono">{{trimSpace .}}</span>{{end}}{{else if not $db.IsSystem}}<span class="op-faint">—</span>{{end}}
+                        </span></td>
+                        <td class="is-shrink op-cell-menu" style="position:relative">
+                        {{if not $db.IsSystem}}
+                        <div x-data="exportModal({{toJSON $db.Database}})" @db-export="open = true">
+                            <form method="POST" action="/postgresql/delete" hidden>
+                                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                                <input type="hidden" name="database_name" value="{{$db.Database}}">
+                            </form>
+                            <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                                <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions for"}} {{$db.Database}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                                <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                    <a href="/postgresql/assign?database_name={{$db.Database}}">{{template "op_icon" "user"}} {{$.T.Get "Assign user"}}</a>
+                                    {{if $.UserAllowed.postgresql_import}}<a href="/postgresql/import/{{$db.Database}}">{{template "op_icon" "upload"}} {{$.T.Get "Import"}}</a>{{end}}
+                                    <button type="button" @click="open = false; setTimeout(() => $dispatch('db-export'), 0)">{{template "op_icon" "download"}} {{$.T.Get "Export"}}</button>
+                                    <hr>
+                                    <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Delete this database?")}} + ' ' + {{toJSON $db.Database}})) $root.parentElement.querySelector('form').submit()">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</button>
+                                </div>
+                            </div>
+                            <template x-teleport="body">
+                                <div x-show="open" x-cloak>
+                                    <div class="op-scrim" @click="open = false"></div>
+                                    <div class="op-sheet" role="dialog" aria-label="{{$.T.Get "Export"}}" @keydown.escape.window="open = false">
+                                        <h2>{{$.T.Get "Export"}} <span class="op-mono" x-text="database"></span></h2>
+                                        <form method="POST" action="/postgresql/export" @submit="handleSubmit" class="op-col" style="gap:14px;margin-top:16px">
+                                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                                            <input type="hidden" name="database_name" :value="database">
+                                            <input type="hidden" name="local_path" :value="fullPath">
+                                            <div class="op-field"><span class="op-label">{{$.T.Get "Format:"}}</span>
+                                                <div class="op-segmented" role="group"><button type="button" :aria-pressed="(format === 'sql').toString()" @click="format = 'sql'">SQL (.sql)</button><button type="button" :aria-pressed="(format === 'gzip').toString()" @click="format = 'gzip'">GZIP (.sql.gz)</button></div>
+                                                <input type="hidden" name="export_format" :value="format">
+                                            </div>
+                                            <div class="op-field"><span class="op-label">{{$.T.Get "Destination:"}}</span>
+                                                <div class="op-segmented" role="group"><button type="button" :aria-pressed="(mode === 'browser').toString()" @click="mode = 'browser'">{{$.T.Get "Browser"}}</button><button type="button" :aria-pressed="(mode === 'files').toString()" @click="mode = 'files'">{{$.T.Get "Files"}}</button></div>
+                                                <input type="hidden" name="export_destination" :value="mode">
+                                            </div>
+                                            <label class="op-field" x-show="mode === 'files'" x-cloak><span class="op-label">{{$.T.Get "Folder"}}</span><span class="op-affix"><span class="op-affix-addon op-mono">/var/www/html/</span><input type="text" x-model="relativePath" placeholder="backups" class="op-input op-mono"></span></label>
+                                            <div class="op-actions" style="justify-content:flex-end"><button type="button" class="op-btn op-btn-secondary" @click="open = false">{{$.T.Get "Cancel"}}</button><button type="submit" class="op-btn op-btn-primary">{{template "op_icon" "download"}} {{$.T.Get "Export"}}</button></div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        {{end}}
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr><td colspan="5"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "db"}}</span><b>{{.T.Get "No databases yet."}}</b><a href="/postgresql/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Create your first database"}}</a></div></td></tr>
+                    {{end}}
+                {{else}}
+                    <tr><td colspan="5"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "info"}}</span><b>{{$.T.Get .StatusDetail}}</b><span id="refresh-message" class="op-hint"></span></div></td></tr>
+                {{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="op-tfoot"><span>{{.T.Get "Total databases:"}} <span id="total_records_count">{{len .Databases}}</span></span></div>
+{{template "bulk_bar" .}}
+</div>
+    </section>
+</div>
+
+{{if ne .HealthStatus "healthy"}}
+<script>
+    let countdown = 5;
+    const messageEl = document.getElementById('refresh-message');
+    const interval = setInterval(() => {
+        if (countdown > 0) {
+            messageEl.textContent = `{{.T.Get "The page will refresh in"}} ${countdown} {{.T.Get "seconds"}}`;
+            countdown--;
+        } else {
+            clearInterval(interval);
+            window.location.reload();
+        }
+    }, 1000);
+</script>
+{{end}}
+
+<script>
+    const showAllCheckbox = document.getElementById('showAllCheckbox');
+    const displaySizeSelect = document.getElementById('display-size');
+
+    function updateURL() {
+        const q = new URLSearchParams(window.location.search);
+        if (showAllCheckbox.checked) { q.set('show_all', 'true'); sessionStorage.setItem('show_all', 'true'); }
+        else { q.delete('show_all'); sessionStorage.removeItem('show_all'); }
+        const unit = displaySizeSelect.value;
+        if (unit) { q.set('unit', unit); sessionStorage.setItem('unit', unit); }
+        else { q.delete('unit'); sessionStorage.removeItem('unit'); }
+        window.location.search = q.toString();
+    }
+    displaySizeSelect.addEventListener('change', updateURL);
+    showAllCheckbox.addEventListener('change', updateURL);
+
+    // sizes come from a separate call, the KPI tile sums them
+    function populateDatabasesTable() {
+        const unit = displaySizeSelect.value || 'mb';
+        const url = `/json/postgresql-size?unit=${unit}${showAllCheckbox.checked ? '&show_all' : ''}`;
+        fetch(url, { method: 'GET', headers: { 'X-CSRF-Token': csrf_token } })
+            .then(res => res.json())
+            .then(rows => {
+                let total = 0, largest = null, largestSize = -1;
+                document.querySelectorAll('#databases-table tbody tr[data-db]').forEach(row => {
+                    const info = rows.find(item => item.Database === row.dataset.db);
+                    let size = null;
+                    if (info) for (const key in info) if (key.toLowerCase().includes('size')) { size = info[key]; break; }
+                    const cell = row.querySelector('.db_size');
+                    if (cell) cell.textContent = size === null ? '–' : size + ' ' + unit.toUpperCase().replace('BYTES', 'B');
+                    const n = parseFloat(size);
+                    if (!isNaN(n)) { total += n; if (n > largestSize) { largestSize = n; largest = row.dataset.db; } }
+                });
+                document.getElementById('kpi-total-size').innerHTML = (Math.round(total * 100) / 100) + ' <small>' + unit.toUpperCase().replace('BYTES', 'B') + '</small>';
+                if (largest) document.getElementById('kpi-largest').textContent = {{toJSON (.T.Get "Largest:")}} + ' ' + largest;
+            })
+            .catch(() => {
+                document.querySelectorAll('#databases-table tbody td.db_size').forEach(cell => { cell.textContent = '–'; });
+                document.getElementById('kpi-total-size').textContent = '—';
+            });
+    }
+    populateDatabasesTable();
+
+    function exportModal(dbName) {
+        return {
+            open: false,
+            mode: 'browser',
+            format: 'sql',
+            database: dbName,
+            basePath: '/var/www/html/',
+            relativePath: '',
+            get fullPath() { return this.basePath + this.relativePath.replace(/^\/+/, ''); },
+            handleSubmit(event) {
+                if (this.mode === 'files' && !this.fullPath.startsWith(this.basePath)) event.preventDefault();
+            }
+        };
+    }
+</script>
+
+<!-- END templates/psql/databases.html -->
+{{end}}

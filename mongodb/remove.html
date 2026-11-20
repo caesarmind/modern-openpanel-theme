@@ -1,0 +1,100 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mongodb/remove.html -->
+<div class="op-content">
+
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Remove User access from Database"}}</h1>
+        <p class="op-meta">{{.T.Get "Revoke a role from a MongoDB user on a database, removing their access to it."}}</p>
+    </div>
+</div>
+
+<section class="op-card" id="toAddActive">
+    <form method="POST" action="/mongodb/remove_user" id="userDbForm2">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-section">
+        <div><h3>{{.T.Get "Revoke access"}}</h3><p>{{.T.Get "The user stays; only its privileges on the selected database are revoked."}}</p></div>
+        <div class="op-col" style="gap:14px;min-width:0">
+
+  <div class="op-field-wrap">
+    <label for="db_user" class="op-label">{{.T.Get "Select user:"}}</label>
+    <div class="op-join">
+  <select name="db_user" class="op-input" required>
+    <option value="" disabled>{{.T.Get "Select a Username"}}</option>
+  </select>
+    </div>
+  </div>
+
+  <div class="op-field-wrap">
+    <label for="database_name" class="op-label">{{.T.Get "Select database:"}} <span class="is-danger">*</span></label>
+    <div class="op-join">
+  <select name="database_name" class="op-input" required>
+    <option value="" disabled>{{.T.Get "Select a Database"}}</option>
+  </select>
+    </div>
+  </div>
+
+  <div class="op-field-wrap">
+    <label for="role" class="op-label">{{.T.Get "Select role:"}} <span class="is-danger">*</span></label>
+    <div class="op-join">
+      <select name="role" class="op-input" required>
+        {{range .Roles}}<option value="{{.}}"{{if eq . "readWrite"}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+  </div>
+
+      
+
+        </div>
+    </div>
+
+
+<div class="op-form-foot">
+    <a href="/mongodb" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Databases"}}
+    </a>
+    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Remove User from Database"}}
+    </button>
+</div>
+
+    </form>
+</section>
+
+<script>
+function refreshData() {
+    fetch('/mongodb/info', { headers: { 'X-CSRF-TOKEN': csrf_token } })
+        .then(res => res.json())
+        .then(data => {
+            var userSelect = document.querySelector("select[name='db_user']");
+            var databaseSelect = document.querySelector("select[name='database_name']");
+
+            data.users.forEach(function(user) {
+                var opt = document.createElement('option');
+                opt.value = user;
+                opt.text = user;
+                userSelect.appendChild(opt);
+            });
+
+            data.databases.forEach(function(database) {
+                var opt = document.createElement('option');
+                opt.value = database.database;
+                opt.text = database.database;
+                databaseSelect.appendChild(opt);
+            });
+        })
+        .catch(function (error) {
+            console.error('Error fetching data:', error);
+        });
+}
+
+refreshData();
+</script>
+</div>
+
+<!-- END templates/mongodb/remove.html -->
+{{end}}

@@ -1,0 +1,79 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/user/active_sessions.html -->
+
+<!-- page header -->
+<section class="op-content" aria-label="{{.T.Get "SSH Header"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+        <h1 class="op-title">{{.T.Get "Active Sessions"}}</h1>
+        <p class="op-meta">{{.T.Get "View all currently active sessions for your account."}}</p>
+    </div>
+    </div>
+<!-- END page header -->
+
+<section class="op-card" aria-label="{{.T.Get "Records Table"}}" x-data="{ searchQuery: '' }">
+    <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Search"}}" x-model="searchQuery" aria-label="{{.T.Get "Search"}}"></label></div>
+
+   {{template "bulk_open" (dict "T" .T "Table" "#sessions-table" "Endpoint" "/account/sessions/bulk")}}
+   <div class="op-table-wrap">
+            <table id="sessions-table" class="op-table">
+                <thead>
+                    <tr>
+                        {{template "bulk_head_checkbox" .}}
+                        <th scope="col">
+                            <button type="button" class="op-th-sort" data-sort-key="ip" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "IP Address"}}<i aria-hidden="true"></i></button>
+                        </th>
+                        <th scope="col">
+                            <button type="button" class="op-th-sort" data-sort-key="created" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Created On"}}<i aria-hidden="true"></i></button>
+                        </th>
+                        <th scope="col">
+                            {{.T.Get "Status"}}
+                        </th>
+                        <th scope="col" class="w-10 op-th">
+                            <span class="sr-only">{{.T.Get "Actions"}}</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{$root := .}}
+                    {{range .Sessions}}
+                    <tr x-show="searchQuery === '' || '{{.IPAddress}}'.toLowerCase().includes(searchQuery.toLowerCase())">
+
+                        {{$skip := ""}}{{if .Current}}{{$skip = "terminate"}}{{end}}
+                        {{template "bulk_row_checkbox" (dict "T" $root.T "Key" .SessionToken "Label" .IPAddress "Skip" $skip)}}
+                        <td class="op-cell-title" data-sort-col="ip" data-sort-value="{{.IPAddress}}">
+                            <div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "device"}}</span><div style="min-width:0">
+                                <b class="op-mono" style="font-size:13px">{{.IPAddress}}{{if .Current}} <span class="op-badge is-accent">{{$root.T.Get "This session"}}</span>{{end}}</b>
+                                {{if index $root.UserAllowed "activity"}}<a class="op-sub" href="/account/activity?search={{.IPAddress}}" style="color:var(--color-accent-text)">{{$root.T.Get "View activity logs"}}</a>{{end}}
+                            </div></div>
+                        </td>
+
+                        <td data-label="{{$root.T.Get "Created On"}}" data-sort-col="created"><span class="op-mono" style="font-size:12px" title="{{.CreatedAt}}">{{truncate (replace .CreatedAt "T" " ") 19}}</span></td>
+
+                        <td data-label="{{$root.T.Get "Status"}}"><span class="op-status is-success">{{$.T.Get "Online"}}</span> <span class="op-hint">({{.ExpiresIn}})</span></td>
+
+                        <td class="is-shrink">
+                            {{if not .Current}}<form action="/account/sessions/terminate/{{.SessionToken}}" method="post">
+                                <input type="hidden" name="csrf_token" value="{{$root.CSRFToken}}"/>
+                                <button type="submit" class="op-btn op-btn-secondary op-btn-sm op-btn-dangertext">{{$root.T.Get "Terminate"}}</button>
+                            </form>{{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    <div class="op-tfoot"><span>{{len .Sessions}} {{.T.Get "sessions"}}</span><span>{{.T.Get "Online shows the time left before a session expires."}}</span></div>
+    {{template "bulk_bar" .}}
+    </div>
+</section>
+
+<script src="{{static "js/table-sort.js"}}"></script>
+
+</section>
+<!-- END templates/user/active_sessions.html -->
+{{end}}

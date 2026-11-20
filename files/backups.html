@@ -1,0 +1,110 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/backups.html -->
+<div class="op-content">
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Backups"}}</h1>
+        <p class="op-meta">{{.T.Get "Manage backups."}}</p>
+    </div>
+    <div class="op-actions">
+        <a href="/backups/list" class="op-btn op-btn-secondary">{{template "op_icon" "menu"}} {{.T.Get "List Backups"}}</a>
+        <a href="/backups/list?tab=logs" class="op-btn op-btn-secondary">{{template "op_icon" "history"}} {{.T.Get "Restore Logs"}}</a>
+    </div>
+</div>
+
+{{with .Summary}}
+<section class="op-kpis" aria-label="{{$.T.Get "Summary"}}">
+    <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "archive"}} {{$.T.Get "Backups"}}</div><div class="op-kpi-value">{{.Count}}</div><div class="op-kpi-note">{{$.T.Get "on the destination"}}</div></div>
+    <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "clock"}} {{$.T.Get "Latest backup"}}</div>
+        {{if .Latest}}<div class="op-kpi-value">{{.Latest.Day}}</div><div class="op-kpi-note">{{.Latest.Clock}}{{if .Latest.SizeText}}, {{.Latest.SizeText}}{{end}}</div>
+        {{else}}<div class="op-kpi-value">&ndash;</div><div class="op-kpi-note">{{$.T.Get "No backups yet."}}</div>{{end}}</div>
+    <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "server"}} {{$.T.Get "Stored"}}</div><div class="op-kpi-value">{{if .TotalSize}}{{.TotalSize}}{{else}}&ndash;{{end}}</div><div class="op-kpi-note">{{$.T.Get "all"}} {{.Count}} {{$.T.Get "archives"}}</div></div>
+    <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "refresh"}} {{$.T.Get "Schedule"}}</div>
+        <div class="op-kpi-value">{{if eq .Schedule "@daily" "@midnight"}}{{$.T.Get "Daily"}}{{else if eq .Schedule "@hourly"}}{{$.T.Get "Hourly"}}{{else if eq .Schedule "@weekly"}}{{$.T.Get "Weekly"}}{{else if eq .Schedule "@monthly"}}{{$.T.Get "Monthly"}}{{else if .Schedule}}{{$.T.Get "Custom"}}{{else}}&ndash;{{end}}</div>
+        <div class="op-kpi-note op-mono">{{if .Schedule}}{{.Schedule}}, {{end}}{{if or (eq .Retention "") (eq .Retention "-1") (eq .Retention "0")}}{{$.T.Get "keeps every copy"}}{{else}}{{$.T.Get "keeps"}} {{.Retention}} {{$.T.Get "days"}}{{end}}</div></div>
+</section>
+{{end}}
+
+{{if .AdminManaged}}
+<div class="op-alert" role="status">{{template "op_icon" "info"}}<span><b>{{.T.Get "Backups are managed by your administrator"}}</b><br>{{.T.Get "The backup destination and settings for this account are configured by your administrator. You can still list and restore backups."}} <a href="/backups/list">{{.T.Get "Restore a backup"}}</a></span></div>
+{{else}}
+<section class="op-card" id="backups-steps">
+    <div class="op-card-head"><h2>{{.T.Get "Backup setup"}}</h2>
+        {{if and .Target .HasCredentials .ServiceActive}}<span class="op-status is-success">{{.T.Get "3 of 3 done"}}</span>{{else if and .Target .HasCredentials}}<span class="op-status is-warning">{{.T.Get "2 of 3 done"}}</span>{{else if .Target}}<span class="op-status is-warning">{{.T.Get "1 of 3 done"}}</span>{{else}}<span class="op-status is-muted">{{.T.Get "Not set up"}}</span>{{end}}
+    </div>
+    <ol class="op-setup">
+        <li class="op-setup-step{{if .Target}} is-done{{end}}"><span class="op-setup-mark">{{if .Target}}{{template "op_icon" "check"}}{{else}}1{{end}}</span><div>
+            <b class="op-setup-title"><span class="op-ico-tile is-xs">{{template "op_icon" "server"}}</span>{{.T.Get "Connect a Destination"}}</b>
+            {{if .Target}}
+            <p>{{.T.Get "Current destination"}}: <span class="op-mono">{{.Target}}</span>{{if .Summary.Destination}}, <span class="op-mono" style="overflow-wrap:anywhere">{{.Summary.Destination}}</span>{{end}}</p>
+            <a class="op-btn op-btn-secondary op-btn-sm" href="/backups/destination">{{.T.Get "Change destination"}}</a>
+            {{else}}
+            <p>{{.T.Get "To get started, choose a destination type for backups: S3, WebDAV, Azure, Dropbox or SSH."}}</p>
+            <a class="op-btn op-btn-primary op-btn-sm" href="/backups/destination">{{.T.Get "Select Destination"}}</a>
+            {{end}}
+        </div></li>
+        <li class="op-setup-step{{if and .Target .HasCredentials}} is-done{{end}}"><span class="op-setup-mark">{{if and .Target .HasCredentials}}{{template "op_icon" "check"}}{{else}}2{{end}}</span><div>
+            <b class="op-setup-title"><span class="op-ico-tile is-xs">{{template "op_icon" "settings"}}</span>{{.T.Get "Configure Settings"}}</b>
+            {{if and .Target .HasCredentials}}
+            <p>{{.T.Get "Credentials for the remote destination are added."}}</p>
+            <a class="op-btn op-btn-secondary op-btn-sm" href="/backups/settings">{{.T.Get "Edit Configuration"}}</a>
+            {{else}}
+            <p>{{.T.Get "Configure credentials to use for the remote destination and set what to backup."}}</p>
+            {{if .Target}}<a class="op-btn op-btn-primary op-btn-sm" href="/backups/settings">{{.T.Get "Edit Configuration"}}</a>{{end}}
+            {{end}}
+        </div></li>
+        <li class="op-setup-step{{if and .Target .HasCredentials .ServiceActive}} is-done{{end}}"><span class="op-setup-mark">{{if and .Target .HasCredentials .ServiceActive}}{{template "op_icon" "check"}}{{else}}3{{end}}</span><div>
+            <b class="op-setup-title"><span class="op-ico-tile is-xs">{{template "op_icon" "cpu"}}</span>{{if and .Target .HasCredentials .ServiceActive}}{{.T.Get "Backup service is active"}}{{else}}{{.T.Get "Set limits and enable service"}}{{end}}</b>
+            {{if and .Target .HasCredentials .ServiceActive}}
+            <p>{{.T.Get "CPU and Memory limits for the backup task are set and backup service is active."}}{{if .Summary.CPU}} {{.T.Get "Limits now"}}: <span class="op-mono">{{.Summary.CPU}}</span> CPU{{if .Summary.RAM}}, <span class="op-mono">{{.Summary.RAM}}</span> {{.T.Get "memory"}}{{end}}.{{end}}</p>
+            <a class="op-btn op-btn-secondary op-btn-sm" href="/containers">{{.T.Get "Edit Backup Limits"}}</a>
+            {{else}}
+            <p>{{.T.Get "Set CPU and Memory limits for the backup task and enable service."}}{{if .Summary.CPU}} {{.T.Get "Limits now"}}: <span class="op-mono">{{.Summary.CPU}}</span> CPU{{if .Summary.RAM}}, <span class="op-mono">{{.Summary.RAM}}</span> {{.T.Get "memory"}}{{end}}.{{end}}</p>
+            {{if and .Target .HasCredentials}}<a class="op-btn op-btn-primary op-btn-sm" href="/containers">{{template "op_icon" "settings"}} {{.T.Get "Edit Backup Limits"}}</a>{{end}}
+            {{end}}
+        </div></li>
+    </ol>
+</section>
+{{end}}
+
+{{with .Summary}}
+<section class="op-card" aria-label="{{$.T.Get "Recent backups"}}" x-data="{ bq: '' }">
+    <div class="op-card-head"><div><h2>{{$.T.Get "Recent backups"}}</h2><p class="op-meta">{{if .Count}}{{.Count}} {{$.T.Get "copies on the destination, newest first. Restore everything from here, or open Restore for files, databases and domains."}}{{else}}{{$.T.Get "Backups show up here once the destination has been indexed."}}{{end}}</p></div>
+        {{if .Count}}<a class="op-btn op-btn-secondary op-btn-sm" href="/backups/list?tab=full">{{$.T.Get "See all"}} {{.Count}}</a>{{end}}</div>
+    {{if .IndexError}}<div class="op-alert is-danger" role="alert">{{template "op_icon" "alert"}}<span>{{.IndexError}}</span></div>{{end}}
+    {{if .Recent}}
+    <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{$.T.Get "Search backups"}}" x-model="bq" aria-label="{{$.T.Get "Search backups"}}"></label></div>
+    <div class="op-table-wrap"><table class="op-table">
+        <thead><tr><th>{{$.T.Get "Backup"}}</th><th class="op-col-wide">{{$.T.Get "Contents"}}</th><th class="is-num">{{$.T.Get "Size"}}</th><th class="is-shrink"><span class="sr-only">{{$.T.Get "Restore"}}</span></th><th class="is-shrink"><span class="sr-only">{{$.T.Get "More"}}</span></th></tr></thead>
+        <tbody>
+        {{range $i, $b := .Recent}}
+        <tr x-show="!bq || $el.textContent.toLowerCase().includes(bq.toLowerCase())">
+            <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "archive"}}</span><div style="min-width:0"><b>{{if $b.When}}{{$b.When}}{{else}}{{$b.File}}{{end}}{{if eq $i 0}} <span class="op-badge is-accent">{{$.T.Get "Latest"}}</span>{{end}}</b><span class="op-sub op-mono" style="overflow-wrap:anywhere">{{$b.File}}</span></div></div></td>
+            <td data-label="{{$.T.Get "Contents"}}" class="op-col-wide"><span class="op-chips" style="gap:4px">{{if $b.Has "html"}}<span class="op-tag">{{$.T.Get "Files"}}</span>{{end}}{{with $b.Databases}}<span class="op-tag">{{len .}} DB</span>{{end}}{{if $b.Has "vhosts"}}<span class="op-tag">{{$.T.Get "Domains"}}</span>{{end}}{{if $b.Has "dns"}}<span class="op-tag">DNS</span>{{end}}{{if $b.Has "mail"}}<span class="op-tag">{{$.T.Get "Email"}}</span>{{end}}{{if $b.Has "crons"}}<span class="op-tag">{{$.T.Get "Cron"}}</span>{{end}}</span></td>
+            <td data-label="{{$.T.Get "Size"}}" class="is-num"><span class="op-mono">{{if $b.SizeText}}{{$b.SizeText}}{{else}}&ndash;{{end}}</span></td>
+            <td class="is-shrink"><a class="op-btn op-btn-secondary op-btn-sm" href="/backups/list?tab=full">{{template "op_icon" "refresh"}} {{$.T.Get "Restore"}}</a></td>
+            <td class="is-shrink op-cell-menu" style="position:relative" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "More actions"}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                    <a href="/backups/list?tab=html">{{template "op_icon" "folder"}} {{$.T.Get "Choose files"}}</a>
+                    {{if $b.Databases}}<a href="/backups/list?tab=databases">{{template "op_icon" "db"}} {{$.T.Get "Restore a database"}}</a>{{end}}
+                    <a href="/backups/list?tab=full">{{template "op_icon" "download"}} {{$.T.Get "Download"}}</a>
+                </div>
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table></div>
+    <div class="op-tfoot"><span>{{$.T.Get "Showing"}} {{len .Recent}} {{$.T.Get "of"}} {{.Count}} {{$.T.Get "copies"}}</span><a href="/backups/list" style="color:var(--color-accent-text)">{{$.T.Get "Open Restore & Download"}}</a></div>
+    {{else if not .IndexError}}
+    <div class="op-empty">{{template "op_icon" "archive"}}<b>{{$.T.Get "No backups found"}}</b><p>{{$.T.Get "Once the first backup runs, it shows up here."}} <a href="/backups/list">{{$.T.Get "Reindex the destination"}}</a></p></div>
+    {{end}}
+</section>
+{{end}}
+</div>
+<!-- END templates/files/backups.html -->
+{{end}}

@@ -1,0 +1,38 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/backup_destinations.html -->
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Backup Destination"}}</h1>
+            <p class="op-meta">{{.T.Get "Select a backup destination."}}</p>
+        </div>
+        <div class="op-actions"><span class="op-meta">{{if .Active}}{{.T.Get "Current destination:"}} <b class="op-mono">{{.Active}}</b>{{else}}{{.T.Get "No destination configured yet."}}{{end}}</span></div>
+    </div>
+
+    <form method="post" class="op-card" x-data="{ target: '{{.Active}}', current: '{{.Active}}' }">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+        <div class="op-options" style="--cols:3">
+            {{range .Cards}}
+            <label class="op-option">
+                <input type="radio" name="target" value="{{.Target}}" x-model="target" {{if .Active}}checked{{end}}>
+                <div style="flex:1;min-width:0">
+                    <b>{{.Title}}</b>
+                    <span style="display:block">{{.Description}}</span>
+                    {{if .DocLink}}<a href="{{.DocLink}}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:13px;color:var(--color-accent-text)">{{$.T.Get "Learn more"}} <span class="op-menu-ext">{{template "op_icon" "out"}}</span></a>{{end}}
+                </div>
+                <span class="op-ico-tile">{{if eq .Target "ssh"}}{{template "op_icon" "terminal"}}{{else if eq .Target "webdav"}}{{template "op_icon" "globe"}}{{else if eq .Target "dropbox"}}{{template "op_icon" "archive"}}{{else}}{{template "op_icon" "cloud"}}{{end}}</span>
+            </label>
+            {{end}}
+        </div>
+        <div class="op-actions" style="justify-content:flex-end;margin-top:16px">
+            <a class="op-btn op-btn-secondary" href="/backups">{{.T.Get "Cancel"}}</a>
+            <button class="op-btn op-btn-primary" type="submit" :disabled="!target || target === current">{{.T.Get "Save destination"}}</button>
+        </div>
+    </form>
+</div>
+<!-- END templates/files/backup_destinations.html -->
+{{end}}

@@ -1,0 +1,16 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/alias_new.html -->
+<!-- the modern theme creates aliases from the sheet on /emails/aliases, GET /emails/aliases/new only renders this under ui_theme=classic -->
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Create an Alias"}}</h1>
+        <p class="op-meta">{{.T.Get "Forward mail from an alias address to any destination."}}</p>
+    </div>
+</div>
+<section class="op-card"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "forward"}}</span><b>{{.T.Get "Aliases are created from the Aliases page."}}</b><a href="/emails/aliases?new=1" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Alias"}}</a></div></section>
+<!-- END templates/emails/alias_new.html -->
+{{end}}

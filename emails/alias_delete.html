@@ -1,0 +1,111 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/alias_delete.html -->
+
+{{if .Email}}
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Delete"}} <span class="punycode">{{.Email}}</span></h1>
+        <p class="op-meta">{{.T.Get "Permanently delete this alias and all its destinations."}}</p>
+    </header>
+</div>
+
+<div class="op-card op-block-card CrawlerStatusCard">
+    <div class="op-form-grid">
+        <div class="op-field-wrap">
+            <h6 class="font-bold">{{.T.Get "Click the button below to permanently delete the alias. Mail sent to this address will no longer be forwarded."}}</h6>
+        </div>
+    </div>
+
+    <div class="op-sep">
+        <div class="op-divider"></div>
+    </div>
+
+    <div class="op-actions op-actions-end">
+        <a href="/emails/aliases/{{.Email}}" class="op-btn op-btn-secondary">{{.T.Get "Cancel"}}</a>
+
+        <input type="hidden" id="csrf_token" value="{{.CSRFToken}}"/>
+        <button type="button" id="confirm-delete-btn" onclick="deleteAlias({{toJSON .Email}})" class="op-btn op-btn-danger">
+            <i class="bi bi-trash3"></i> {{.T.Get "Confirm Delete"}}
+        </button>
+    </div>
+</div>
+
+<script>
+function deleteAlias(email) {
+    const btn = document.getElementById('confirm-delete-btn');
+    btn.disabled = true;
+
+    const csrfToken = document.getElementById('csrf_token').value;
+
+    fetch(`/emails/aliases/${email}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-Token': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ delete_all: true })
+    })
+    .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else if (response.ok) {
+            window.location.href = '/emails/aliases';
+        } else {
+            return response.json().then(data => {
+                btn.disabled = false;
+                alert(data.error || {{toJSON (.T.Get "Failed to delete alias.")}});
+            });
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        console.error('Error:', error);
+    });
+}
+</script>
+
+{{else}}
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Select Alias"}}</h1>
+        <p class="op-meta">{{.T.Get "Select an alias to delete."}}</p>
+    </header>
+</div>
+
+<div class="op-card op-block-card CrawlerStatusCard">
+    <div class="op-form-grid">
+        <div class="op-field-wrap">
+            <select
+                class="op-input"
+                onchange="redirectToAlias(this)"
+            >
+                <option value="" disabled selected>{{.T.Get "Select alias"}}</option>
+                {{range .AliasList}}
+                <option class="punycode" value="{{.Source}}">
+                    {{.Source}} → {{join .Targets ", "}}
+                </option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+</div>
+
+<script>
+function redirectToAlias(selectElement) {
+    const selected = selectElement.value;
+    if (selected) {
+        window.location.href = `/emails/aliases/delete/${selected}`;
+    }
+}
+</script>
+
+{{end}}
+
+<!-- END templates/emails/alias_delete.html -->
+{{end}}

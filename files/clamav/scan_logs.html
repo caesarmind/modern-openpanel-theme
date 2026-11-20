@@ -1,0 +1,114 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/clamav/scan_logs.html -->
+
+<!-- page header -->
+<section class="op-content" aria-label="{{.T.Get "Scan Logs Header"}}">
+    <div class="op-page-head">
+        <div>
+        <div class="op-eyebrow">{{.T.Get "Malware Scanner"}}</div>
+        <h1 class="op-title">{{.T.Get "Scan Logs"}}</h1>
+        <p class="op-meta">{{.T.Get "Past malware scans started from this page, the API or run automatically by the server, and what they found."}}</p>
+    </div>
+    <div class="op-actions">
+        <a href="/malware-scanner/quarantine" class="op-btn op-btn-secondary">{{template "op_icon" "lock"}} {{.T.Get "View Quarantine"}}</a>
+        <a href="/malware-scanner" class="op-btn op-btn-primary">{{template "op_icon" "bug"}} {{.T.Get "Run Scan"}}</a>
+    </div>
+</div>
+
+
+{{if not .Logs}}
+<!-- no logs -->
+<div class="op-card op-empty">
+    <span class="op-ico-tile">{{template "op_icon" "bug"}}</span>
+    <b>{{.T.Get "No scans yet"}}</b>
+    <p class="op-hint">{{.T.Get "Finished scans will show up here."}} <a href="/malware-scanner" style="color:var(--color-accent-text)">{{.T.Get "Click here to start a new scan"}} <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" aria-hidden="true" class="remixicon size-4 shrink-0"><path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path></svg></a></p>
+</div>
+<!-- END no logs -->
+{{else}}
+
+<!-- logs table -->
+<section class="op-card" aria-label="{{.T.Get "Scan Logs"}}">
+        <div class="op-table-wrap">
+            <table id="scan-logs-table" class="op-table">
+                <thead>
+                    <tr>
+                        <th scope="col">{{.T.Get "Started"}}</th>
+                        <th scope="col">{{.T.Get "Source"}}</th>
+                        <th scope="col">{{.T.Get "Directory"}}</th>
+                        <th scope="col" class="is-num">{{.T.Get "Files"}}</th>
+                        <th scope="col">{{.T.Get "Result"}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Details"}}</span></th>
+                    </tr>
+                </thead>
+                {{range .Logs}}
+                <tbody x-data="{ open: false }" class="">
+                    <tr>
+                        <td class="op-cell-title">
+                            <b class="op-mono" style="font-size:13px">{{.StartedAt}}</b>
+                            {{with .Duration}}<span class="op-sub">{{$.T.Get "took"}} {{.}}</span>{{end}}
+                        </td>
+                        <td data-label="{{$.T.Get "Source"}}">
+                            {{if eq .Source "cron"}}
+                            <span class="op-tag">{{$.T.Get "Scheduled"}}</span>
+                            {{else if eq .Source "api"}}
+                            <span class="op-tag">API</span>
+                            {{else}}
+                            <span class="op-tag">{{$.T.Get "Manual"}}</span>
+                            {{end}}
+                        </td>
+                        <td data-label="{{$.T.Get "Directory"}}" class="op-mono" style="word-break: break-all;font-size:12px">{{.Path}}</td>
+                        <td data-label="{{$.T.Get "Files"}}" class="is-num"><span class="op-mono">{{.Scanned}}</span></td>
+                        <td data-label="{{$.T.Get "Result"}}">
+                            {{if eq .Status "failed"}}
+                            <span class="op-status is-danger">{{$.T.Get "Failed"}}</span>
+                            {{else if .Infected}}
+                            <span class="op-status is-danger">{{.Infected}} {{$.T.Get "infected"}}</span>
+                            {{else}}
+                            <span class="op-status is-success">{{$.T.Get "Clean"}}</span>
+                            {{end}}
+                            {{if .Errors}}<span class="ml-1 op-badge is-warning">{{.Errors}} {{$.T.Get "errors"}}</span>{{end}}
+                            {{if eq .Status "aborted"}}<span class="ml-1 op-badge">{{$.T.Get "Stopped early"}}</span>{{end}}
+                        </td>
+                        <td class="is-shrink">
+                            {{if or .Findings .Message}}
+                            <button type="button" @click="open = !open" class="relative op-btn op-btn-sm op-btn-secondary">
+                                <span x-show="!open">{{$.T.Get "Details"}}</span><span x-show="open" x-cloak>{{$.T.Get "Hide"}}</span>
+                            </button>
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{if or .Findings .Message}}
+                    <tr x-show="open" x-cloak>
+                        <td colspan="6">
+                            {{if .Message}}<p class="mb-2 text-sm is-danger">{{.Message}}</p>{{end}}
+                            {{if .Findings}}
+                            <ul style="max-height: 20rem;" class="overflow-y-auto">
+                                {{range .Findings}}
+                                <li class="op-scan-finding">
+                                    <span style="word-break: break-all;" class="block font-mono op-strong">{{.Path}}</span>
+                                    <span class="{{if hasPrefix .Result "Malware detected"}}is-danger{{else}}is-warning{{end}}">{{.Result}}</span>
+                                </li>
+                                {{end}}
+                            </ul>
+                            {{if .Truncated}}<p class="mt-1 text-xs op-muted">{{$.T.Get "Only the first 500 files are listed."}}</p>{{end}}
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+                {{end}}
+            </table>
+        </div>
+</section>
+<!-- END logs table -->
+
+{{end}}
+
+</section>
+<!-- END templates/files/clamav/scan_logs.html -->
+{{end}}

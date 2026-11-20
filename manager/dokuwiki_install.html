@@ -1,0 +1,22 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* dokuwiki's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from dokuwiki/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "File-based wiki software with versioned releases and no database required.")}},
+  adminPath: '/doku.php?do=login',
+  php: { min: '7.4', block: true },
+  note: {{toJSON (.T.Get "No database: the admin account and site settings are written straight into DokuWiki's config, so the wiki is ready right after the install.")}},
+  steps: [K.steps.where, K.step('site', { title: {{toJSON (.T.Get "Wiki and admin account")}} }), K.steps.review],
+  summary: ['site_title', 'admin_user'],
+  fields: [
+    K.text('site_title', {{toJSON (.T.Get "Site title")}}, { auto: function (d) { return d; }, placeholder: {{toJSON (.T.Get "My Wiki")}}, half: false }),
+    K.user({ name: 'admin_user', lower: true }),
+    K.email({ required: false }),
+    K.pass({ required: false, hint: {{toJSON (.T.Get "Leave it empty to get a generated one.")}} })
+  ],
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Downloading and extracting DokuWiki")}}, ['Downloading and extracting DokuWiki']), K.run.step({{toJSON (.T.Get "Writing the admin account and configuration")}}, ['Hashing admin password', 'Writing DokuWiki configuration', 'Setting files permissions']), K.run.save()],
+  creds: [{ label: {{toJSON (.T.Get "Username")}}, field: 'admin_user', from: 'user' }, { label: {{toJSON (.T.Get "Password")}}, field: 'admin_password', from: 'pass', secret: true }]
+}{{end}}

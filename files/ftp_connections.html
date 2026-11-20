@@ -1,0 +1,34 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/ftp_connections.html -->
+
+<section aria-label="{{.T.Get "FTP Connections Header"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head op-cms-head">
+        <div>
+            <div class="op-wp-title"><h1 class="op-title">{{.T.Get "FTP Connections"}}</h1></div>
+            <p class="op-meta">{{.T.Get "Current FTP sessions of all sub-accounts."}}</p>
+        </div>
+        <div class="op-actions">
+        <a href="/ftp" class="op-btn op-btn-secondary">{{.T.Get "Back to Accounts"}}</a>
+        </div>
+    </div>
+
+<section aria-label="{{.T.Get "Records Table"}}" x-data="{ searchQuery: '' }">
+    <div class="op-content">
+        {{if .HasConnections}}
+            <pre class="overflow-auto op-pre">{{.ConnectionsOutput}}</pre>
+        {{else}}
+            <div class="op-card op-empty">
+                <span class="op-ico-tile">{{template "op_icon" "link"}}</span>
+                <b>{{.T.Get "No active connections"}}</b>
+                <p class="op-muted">{{.T.Get "There are no active FTP sessions at this time."}}</p>
+            </div>
+        {{end}}
+    </div>
+</section>
+
+<!-- END templates/files/ftp_connections.html -->
+{{end}}

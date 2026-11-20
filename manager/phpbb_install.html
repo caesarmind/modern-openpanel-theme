@@ -1,0 +1,20 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* phpbb's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from phpbb/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "phpBB forum software.")}},
+  adminPath: '/ucp.php?mode=login',
+  steps: [K.steps.where, K.step('site', { title: {{toJSON (.T.Get "Board and admin account")}} }), K.steps.db, K.steps.review],
+  summary: ['board_name', 'phpbb_version', 'admin_username', 'db_name'],
+  fields: [
+    K.text('board_name', {{toJSON (.T.Get "Board name")}}, { value: {{toJSON (.T.Get "My Board")}}, required: true }),
+    K.text('board_description', {{toJSON (.T.Get "Board description")}}, { value: {{toJSON (.T.Get "Powered by phpBB")}} }),
+    K.version('phpbb_version', function () { return K.gh('https://api.github.com/repos/phpbb/phpbb/tags?per_page=100', /^\d+\.\d+\.\d+$/, function (t) { return (t.name.match(/^release-(\d+\.\d+\.\d+)$/) || [])[1]; }); }),
+    K.email(), K.user(), K.pass()
+  ].concat(K.db('phpbb')),
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Downloading and extracting phpBB")}}, ['Downloading and extracting phpBB', 'Setting files permissions']), K.run.db, K.run.step({{toJSON (.T.Get "Running the phpBB installer")}}, ['Running phpBB installer', 'Removing install/']), K.run.save()],
+  creds: K.creds()
+}{{end}}

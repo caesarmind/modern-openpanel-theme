@@ -1,0 +1,16 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* tinyphotogallery's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from tinyphotogallery/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Single-file photo gallery, no database required.")}},
+  php: { min: '8.1' },
+  note: {{toJSON (.T.Get "No database and no admin account: this downloads index.php and creates an empty photos/ folder. Needs PHP 8.1+ with the GD extension.")}},
+  doneNote: {{toJSON (.T.Get "Open the site to start uploading photos.")}},
+  steps: [K.steps.where, K.steps.review],
+  fields: [],
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Downloading TinyPhotoGallery")}}, ['Downloading TinyPhotoGallery', 'Setting files permissions']), K.run.save()],
+  creds: []
+}{{end}}

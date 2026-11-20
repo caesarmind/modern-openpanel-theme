@@ -1,0 +1,237 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/accounts.html -->
+<script>
+// the "Connect a mail app" card: opens for the mailbox the create form just made, or from a row's Connect Devices
+function opEmailAccounts(c) {
+    return {
+        searchQuery: '', statusFilter: 'all', sheet: false, connect: c.created, fresh: c.created, welcome: c.welcome, tls: c.secure ? 'ssl' : 'starttls',
+        init() { if (this.fresh) this.$nextTick(() => { const tr = document.querySelector('tr.op-em-new'); if (tr && tr.getBoundingClientRect().bottom > innerHeight) tr.scrollIntoView({ block: 'center' }); }); },
+        openConnect(a) { this.connect = a; this.welcome = false; this.$nextTick(() => document.getElementById('connect').scrollIntoView({ block: 'start', behavior: 'smooth' })); },
+        port(kind) { return { imap: this.tls === 'ssl' ? 993 : 143, smtp: this.tls === 'ssl' ? 465 : 587 }[kind]; },
+        sec() { return this.tls === 'ssl' ? 'SSL/TLS' : 'STARTTLS'; },
+        cfg(type) { return '/emails/configuration/' + type + '/' + this.connect + '?ssl=' + (this.tls === 'ssl'); },
+    };
+}
+</script>
+<div class="op-content" x-data="opEmailAccounts({ created: {{toJSON .Connect.Created}}, welcome: {{.Connect.Welcome}}, secure: {{.Connect.Secure}} })">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{if .EmailLimit}}{{.TotalCount}} {{.T.Get "of"}} {{.EmailLimit}} {{.T.Get "accounts"}}{{else}}{{.TotalCount}} {{.T.Get "total"}}{{end}}</div>
+            <h1 class="op-title">{{.T.Get "Emails"}}</h1>
+            <p class="op-meta">{{.T.Get "Mailboxes for your domains, with quotas, filters and webmail."}}</p>
+        </div>
+        <div class="op-actions">
+            <a href="/emails/export" id="export_emails_csv" class="op-btn op-btn-secondary">{{template "op_icon" "download"}} {{.T.Get "Export"}}</a>
+            {{if .Full}}
+            <span class="op-em-newbtn"><a id="showAddEmailFormBtn" class="op-btn op-btn-primary" role="link" aria-disabled="true" aria-describedby="em-limit" tabindex="0">{{template "op_icon" "plus"}} {{.T.Get "New Email"}}</a><span class="op-em-tip" role="tooltip">{{.T.Get "Plan limit reached: %(used)s of %(limit)s email accounts used." "used" (print .TotalCount) "limit" (print .EmailLimit)}}</span></span>
+            {{else}}
+            <a href="/emails/new" id="showAddEmailFormBtn" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Email"}}</a>
+            {{end}}
+        </div>
+    </div>
+
+    {{if .Full}}
+    <div class="op-alert is-warning" id="em-limit">{{template "op_icon" "alert"}}<span><b>{{.T.Get "You've used all %(n)s email accounts on your plan" "n" (print .EmailLimit)}}</b><br>{{if .HostingPlanName}}{{.T.Get "New Email stays off until you delete an account you no longer need, or your hosting provider moves you to a bigger plan than %(plan)s." "plan" .HostingPlanName}}{{else}}{{.T.Get "New Email stays off until you delete an account you no longer need, or your hosting provider moves you to a bigger plan."}}{{end}}</span></div>
+    {{end}}
+
+    <section class="op-card" id="connect" x-show="connect" {{if not .Connect.Created}}x-cloak {{end}}aria-labelledby="connect-title" style="scroll-margin-top:80px">
+        <div class="op-em-chead">
+            <span class="op-ico-tile" :style="{ '--hue': fresh === connect ? 'var(--color-success)' : 'var(--color-accent)' }"><span x-show="fresh === connect" style="display:inline-flex">{{template "op_icon" "circlecheck"}}</span><span x-show="fresh !== connect" style="display:inline-flex">{{template "op_icon" "devices"}}</span></span>
+            <div style="flex:1 1 300px;min-width:0">
+                <h2 id="connect-title" x-text="fresh === connect ? {{toJSON (.T.Get "Your mailbox is ready. Connect a mail app")}} : {{toJSON (.T.Get "Connect a mail app")}}">{{.T.Get "Your mailbox is ready. Connect a mail app"}}</h2>
+                <p class="op-meta"><span class="op-mono" style="color:var(--color-heading)" x-text="connect">{{.Connect.Created}}</span><span x-text="welcome && fresh === connect ? {{toJSON (.T.Get ". A welcome email with these settings went to the new mailbox.")}} : {{toJSON (.T.Get ". Use these in Outlook, Apple Mail, Thunderbird or your phone.")}}"></span></p>
+            </div>
+            <div class="op-em-chead-r">
+                <div class="op-segmented" role="group" aria-label="{{.T.Get "Connection security"}}"><button type="button" :aria-pressed="(tls === 'ssl').toString()" @click="tls = 'ssl'" title="{{.T.Get "Recommended. Encrypted from the first byte."}}">SSL/TLS</button><button type="button" :aria-pressed="(tls === 'starttls').toString()" @click="tls = 'starttls'" title="{{.T.Get "For apps that can't use the SSL/TLS ports. Switches to encryption after connecting."}}">STARTTLS</button></div>
+                <button class="op-icon-btn" type="button" @click="connect = ''" aria-label="{{.T.Get "Close mail app settings"}}">{{template "op_icon" "x"}}</button>
+            </div>
+        </div>
+        <template x-if="connect"><div class="op-col" style="gap:14px">
+            <div class="op-em-set">
+                <div class="op-em-box"><h3>{{template "op_icon" "user"}} {{.T.Get "Sign in"}}</h3>
+                    <div class="op-em-kv"><span>{{.T.Get "Username"}}</span><span class="op-em-val"><b x-text="connect"></b><button class="op-icon-btn" type="button" :data-op-copy="connect" data-op-copied="{{.T.Get "Copied username."}}" aria-label="{{.T.Get "Copy username"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span>
+                        <span>{{.T.Get "Password"}}</span><span class="op-em-note">{{.T.Get "Use the email account's password."}}</span></div></div>
+                <div class="op-em-box"><h3>{{template "op_icon" "inbox"}} {{.T.Get "Incoming (IMAP)"}} <span class="op-tag" x-text="sec()"></span></h3>
+                    <div class="op-em-kv"><span>{{.T.Get "Server"}}</span><span class="op-em-val"><b>{{.Connect.Host}}</b><button class="op-icon-btn" type="button" data-op-copy="{{.Connect.Host}}" data-op-copied="{{.T.Get "Copied incoming server."}}" aria-label="{{.T.Get "Copy incoming server"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span>
+                        <span>{{.T.Get "Port"}}</span><span class="op-em-val"><b x-text="port('imap')"></b><button class="op-icon-btn" type="button" :data-op-copy="port('imap')" data-op-copied="{{.T.Get "Copied IMAP port."}}" aria-label="{{.T.Get "Copy IMAP port"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span></div></div>
+                <div class="op-em-box"><h3>{{template "op_icon" "send"}} {{.T.Get "Outgoing (SMTP)"}} <span class="op-tag" x-text="sec()"></span></h3>
+                    <div class="op-em-kv"><span>{{.T.Get "Server"}}</span><span class="op-em-val"><b>{{.Connect.Host}}</b><button class="op-icon-btn" type="button" data-op-copy="{{.Connect.Host}}" data-op-copied="{{.T.Get "Copied outgoing server."}}" aria-label="{{.T.Get "Copy outgoing server"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span>
+                        <span>{{.T.Get "Port"}}</span><span class="op-em-val"><b x-text="port('smtp')"></b><button class="op-icon-btn" type="button" :data-op-copy="port('smtp')" data-op-copied="{{.T.Get "Copied SMTP port."}}" aria-label="{{.T.Get "Copy SMTP port"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span></div></div>
+            </div>
+            <p class="op-hint" style="margin:0">{{.T.Get "IMAP and SMTP require authentication. Outgoing mail signs in with the same username and password."}}</p>
+            <div class="op-em-dl"><span>{{.T.Get "Set up automatically"}}</span>
+                <a class="op-btn op-btn-secondary op-btn-sm" :href="cfg('apple')" download>{{template "op_icon" "download"}} {{.T.Get "Apple Mail & iPhone"}}</a>
+                <a class="op-btn op-btn-secondary op-btn-sm" :href="cfg('outlook')" download>{{template "op_icon" "download"}} Outlook</a>
+                <a class="op-btn op-btn-secondary op-btn-sm" :href="cfg('thunderbird')" download>{{template "op_icon" "download"}} Thunderbird</a>
+                <span class="op-em-dl-end">{{if .UserAllowed.webmail}}<a class="op-btn op-btn-primary op-btn-sm" :href="'/webmail/' + connect" target="_blank" rel="noopener">{{.T.Get "Open Webmail"}} {{template "op_icon" "out"}}</a>{{end}}<a class="op-link" href="https://openpanel.com/docs/articles/email/how-to-setup-your-email-client" target="_blank" rel="noopener">{{.T.Get "Setup guide"}} {{template "op_icon" "out"}}</a></span>
+            </div>
+        </div></template>
+    </section>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "mail"}} {{.T.Get "Accounts"}}</div>
+            <div class="op-kpi-value">{{.TotalCount}}{{if .EmailLimit}} <small>/ {{.EmailLimit}}</small>{{end}}</div>
+            {{if .EmailLimit}}<div class="op-progress{{if ge .LimitPercent 90}} is-warning{{end}}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.LimitPercent}}" aria-label="{{.T.Get "Accounts"}}"><span style="width: {{.LimitPercent}}%"></span></div>{{else}}<div class="op-kpi-note">{{.T.Get "No limit on your plan"}}</div>{{end}}
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "db"}} {{.T.Get "Storage used"}}</div>
+            <div class="op-kpi-value">{{.StorageValue}} <small>{{.StorageUnit}}</small></div>
+            {{if .NearQuotaCount}}<div class="op-kpi-note is-warning">{{.NearQuotaCount}} {{if eq .NearQuotaCount 1}}{{.T.Get "mailbox near quota"}}{{else}}{{.T.Get "mailboxes near quota"}}{{end}}</div>{{else}}<div class="op-kpi-note">{{.T.Get "Across all mailboxes"}}</div>{{end}}
+        </div>
+        {{if .UserAllowed.email_deliverability}}
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "shield"}} {{.T.Get "Deliverability"}}</div>
+            <div class="op-kpi-value">{{.MailDomains}} <small>{{if eq .MailDomains 1}}{{.T.Get "domain"}}{{else}}{{.T.Get "domains"}}{{end}}</small></div>
+            <div class="op-kpi-note"><a href="/emails/deliverability">{{.T.Get "Check SPF, DKIM and DMARC"}}</a></div>
+        </div>
+        {{end}}
+        {{if .UserAllowed.email_aliases}}
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "link"}} {{.T.Get "Aliases"}}</div>
+            <div class="op-kpi-value">{{.AliasCount}}</div>
+            <div class="op-kpi-note">{{if .AliasCount}}{{.T.Get "Forwarding to"}} {{.AliasInboxes}} {{if eq .AliasInboxes 1}}{{.T.Get "inbox"}}{{else}}{{.T.Get "inboxes"}}{{end}}{{else}}<a href="/emails/aliases/new">{{.T.Get "Add an alias"}}</a>{{end}}</div>
+        </div>
+        {{end}}
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Email accounts"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input id="emails-search-input" class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search emails"}}" aria-label="{{.T.Get "Search emails"}}"></label>
+            <div class="op-md-only">
+                <button type="button" class="op-filter" :class="statusFilter === 'all' && 'is-set'" @click="statusFilter = 'all'">{{.T.Get "All"}}</button>
+                <button type="button" class="op-filter" :class="statusFilter === 'suspended' && 'is-set'" @click="statusFilter = 'suspended'">{{.T.Get "Suspended"}}</button>
+                <button type="button" class="op-filter" :class="statusFilter === 'filter' && 'is-set'" @click="statusFilter = 'filter'">{{.T.Get "Has filter"}}</button>
+                <button type="button" class="op-filter" :class="statusFilter === 'quota' && 'is-set'" @click="statusFilter = 'quota'">{{.T.Get "Near quota"}}</button>
+            </div>
+            <button type="button" class="op-filter op-md-hide" :class="statusFilter !== 'all' && 'is-set'" @click="sheet = true">{{template "op_icon" "filter"}} {{.T.Get "Filters"}}</button>
+        </div>
+
+{{template "bulk_open" (dict "T" .T "Table" "#email-accounts" "Endpoint" "/emails/bulk")}}
+        <div class="op-table-wrap"{{if not .Rows}} hidden{{end}}>
+        <table id="email-accounts" class="op-table">
+            <thead>
+                <tr>
+                    <th class="is-shrink"><input type="checkbox" class="op-check" :checked="bulkAllChecked" :indeterminate="bulkSomeChecked" @change="bulkToggleAll($event.target.checked)" aria-label="{{.T.Get "Select all"}}"></th>
+                    <th>{{template "op_sort_header" (dict "Label" (.T.Get "Account @ Domain") "Key" "address" "Type" "string")}}</th>
+                    <th>{{template "op_sort_header" (dict "Label" (.T.Get "Storage used") "Key" "quota" "Type" "number")}}</th>
+                    <th>{{.T.Get "Status"}}</th>
+                    {{if .UserAllowed.webmail}}<th class="is-shrink">{{.T.Get "Webmail"}}</th>{{end}}
+                    <th class="is-shrink"><span class="op-sr">{{.T.Get "Actions"}}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Rows}}
+            {{$row := .}}
+                <tr{{if $row.IsNew}} class="op-em-new"{{end}} data-href="/emails/edit/{{$row.Address}}" x-show="(searchQuery === '' || {{toJSON $row.Address}}.toLowerCase().includes(searchQuery.toLowerCase())) && (statusFilter === 'all' || (statusFilter === 'suspended' && {{$row.Suspended}}) || (statusFilter === 'filter' && {{$row.HasFilter}}) || (statusFilter === 'quota' && {{$row.NearQuota}}))" :aria-selected="(!!bulkSelected[{{toJSON $row.Address}}]).toString()">
+                    <td class="is-shrink"><input type="checkbox" class="op-check bulk-select-box" value="{{$row.Address}}" data-bulk-skip="" :checked="!!bulkSelected[{{toJSON $row.Address}}]" @change="bulkToggle($event.target)" aria-label="{{$.T.Get "Select"}} {{$row.Address}}"></td>
+                    <td data-sort-col="address" data-sort-value="{{$row.Address}}">
+                        <div class="op-row-title">
+                            <div><b class="punycode">{{$row.Address}}</b>{{if or $row.IsNew $row.NearQuota $row.HasFilter}}<span class="op-em-tags">{{if $row.IsNew}}<span class="op-tag op-em-tag-new">{{$.T.Get "New"}}</span>{{end}}{{if $row.NearQuota}}<span class="op-tag">{{$.T.Get "Near quota"}}</span>{{end}}{{if $row.HasFilter}}<span class="op-tag">{{$.T.Get "Has filter"}}</span>{{end}}</span>{{end}}</div>
+                        </div>
+                    </td>
+                    <td data-label="{{$.T.Get "Storage used"}}" data-sort-col="quota" data-sort-value="{{$row.PercentVal}}">
+                        <div class="op-meter">
+                            <span class="op-meter-text" title="{{$row.QuotaDisplay}}">{{if $row.Limit}}{{$row.Used}} / {{$row.Limit}}{{else}}{{$row.QuotaDisplay}}{{end}}</span>
+                            <div class="op-progress{{if gt $row.PercentVal 90}} is-danger{{else if gt $row.PercentVal 80}} is-warning{{end}}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{$row.PercentVal}}" aria-label="{{$.T.Get "Storage used"}}"><span style="width: {{$row.CappedVal}}%"></span></div>
+                        </div>
+                    </td>
+                    <td data-label="{{$.T.Get "Status"}}">{{if $row.Suspended}}<span class="op-status is-danger">{{$.T.Get "Suspended"}}</span>{{else}}<span class="op-status is-success">{{$.T.Get "Active"}}</span>{{end}}</td>
+                    {{if $.UserAllowed.webmail}}<td data-label="{{$.T.Get "Webmail"}}" class="is-shrink"><a href="/webmail/{{$row.Address}}" target="_blank" rel="noopener" data-email="{{$row.Address}}" class="op-btn op-btn-ghost op-btn-sm webmail-link">{{$.T.Get "Webmail"}} {{template "op_icon" "out"}}</a></td>{{end}}
+                    <td class="is-shrink op-cell-menu" style="position:relative" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                        <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions"}} {{$row.Address}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                        <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                            <a href="/emails/edit/{{$row.Address}}">{{template "op_icon" "pencil"}} {{$.T.Get "Manage"}}</a>
+                            <a href="/emails/edit/{{$row.Address}}">{{template "op_icon" "key"}} {{$.T.Get "Change password"}}</a>
+                            <a href="/emails/info/{{$row.Address}}" @click.prevent="open = false; openConnect({{toJSON $row.Address}})">{{template "op_icon" "devices"}} {{$.T.Get "Connect Devices"}}</a>
+                            <a href="/emails/filter/{{$row.Address}}">{{template "op_icon" "filter"}} {{$.T.Get "Filters"}}</a>
+                            <hr>
+                            <a href="/emails/edit/{{$row.Address}}">{{template "op_icon" "ban"}} {{if $row.Suspended}}{{$.T.Get "Unsuspend"}}{{else}}{{$.T.Get "Suspend"}}{{end}}</a>
+                            <a href="/emails/delete/{{$row.Address}}" class="is-danger">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</a>
+                        </div>
+                    </td>
+                </tr>
+            {{end}}
+            </tbody>
+        </table>
+        </div>
+{{if .Rows}}
+        <div class="op-empty" x-show="![{{range .Rows}}[{{toJSON .Address}}, {{.Suspended}}, {{.HasFilter}}, {{.NearQuota}}], {{end}}].some(r => (searchQuery === '' || r[0].toLowerCase().includes(searchQuery.toLowerCase())) && (statusFilter === 'all' || (statusFilter === 'suspended' && r[1]) || (statusFilter === 'filter' && r[2]) || (statusFilter === 'quota' && r[3])))" x-cloak>
+            <b>{{.T.Get "Nothing matches"}}</b>
+            <span class="op-hint">{{.T.Get "Try another search or filter."}}</span>
+        </div>
+        <div class="op-tfoot"><span>{{.T.Get "Showing"}} 1 {{.T.Get "to"}} {{.TotalCount}} {{.T.Get "of"}} {{.TotalCount}}</span></div>
+{{else}}
+        <div class="op-empty">
+            <span class="op-ico-tile">{{template "op_icon" "mail"}}</span>
+            <b>{{.T.Get "No emails yet."}}</b>
+            <span class="op-hint">{{.T.Get "Create a mailbox on one of your domains to start sending and receiving mail."}}</span>
+            <a href="/emails/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Add your first email"}}</a>
+        </div>
+{{end}}
+{{template "bulk_bar" .}}
+</div>
+        <div class="op-scrim" x-show="sheet" x-cloak @click="sheet = false"></div>
+        <div class="op-sheet" role="dialog" aria-label="{{.T.Get "Filters"}}" x-show="sheet" x-cloak @keydown.escape="sheet = false">
+            <h2>{{.T.Get "Filters"}}</h2>
+            <div style="display:flex;flex-direction:column;gap:14px;margin:16px 0 20px">
+                <label class="op-field"><span class="op-label">{{.T.Get "Status"}}</span>
+                    <select class="op-select" x-model="statusFilter">
+                        <option value="all">{{.T.Get "All"}}</option>
+                        <option value="suspended">{{.T.Get "Suspended"}}</option>
+                        <option value="filter">{{.T.Get "Has filter"}}</option>
+                        <option value="quota">{{.T.Get "Near quota"}}</option>
+                    </select>
+                </label>
+            </div>
+            <div class="op-actions">
+                <button class="op-btn op-btn-secondary" type="button" @click="statusFilter = 'all'; sheet = false">{{.T.Get "Reset"}}</button>
+                <button class="op-btn op-btn-primary" type="button" style="flex:1" @click="sheet = false">{{.T.Get "Show results"}}</button>
+            </div>
+        </div>
+    </section>
+</div>
+
+{{if .QuotaToastMsg}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof reportHealthIssues === 'function') {
+        reportHealthIssues('emails', [{id: {{toJSON .QuotaToastID}}, severity: 'warning', message: {{toJSON .QuotaToastMsg}}}], 24);
+    }
+});
+</script>
+{{end}}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('.webmail-link').forEach(function(link) {
+            link.addEventListener('click', function() {
+                const email = this.dataset.email;
+                showToast({{toJSON (.T.Get "Webmail for ")}} + email + {{toJSON (.T.Get " opened in new window.")}}, 'success');
+            });
+        });
+    });
+</script>
+
+<script>
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = document.activeElement.tagName.toLowerCase();
+    const isInputFocused = ['input', 'textarea', 'select'].includes(tag) || document.activeElement.isContentEditable;
+    if (isInputFocused) return;
+    e.preventDefault();
+    document.getElementById('showAddEmailFormBtn')?.click();
+});
+if (window.registerShortcut) registerShortcut(['N'], {{toJSON (.T.Get "Add new email account")}});
+</script>
+<script src="{{static "js/table-sort.js"}}"></script>
+<!-- END templates/emails/accounts.html -->
+{{end}}
+
+{{define "op_sort_header"}}
+<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="{{.Type}}" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>
+{{end}}

@@ -1,0 +1,46 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mongodb/assign.html -->
+<div class="op-content">
+{{template "db_assign_head" .}}
+
+<div class="op-wiz-grid" x-data="mongoAssign()">
+<section class="op-card" id="toAddActive" aria-label="{{.T.Get "Assign User to Database"}}">
+  <form autocomplete="off" method="POST" @submit="if (!ready()) { $event.preventDefault(); return } busy = true">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+    <ol class="op-wiz-steps">
+      {{template "db_assign_pick" .}}
+      <li class="op-section">
+        <span class="op-step-mark" :class="ready() &amp;&amp; 'is-ok'"><span x-show="!ready()">3</span><span x-show="ready()" x-cloak style="display:inline-flex">{{template "op_icon" "check"}}</span></span>
+        <div class="op-col" style="gap:12px;min-width:0">
+          <div><h3>{{.T.Get "Choose a role"}}</h3><p class="op-meta">{{.T.Get "The role applies to this database only."}}</p></div>
+          {{template "db_mongo_roles" .}}
+          <div class="op-field"><span class="op-label">{{.T.Get "Runs as"}}</span><div class="op-copybox"><span class="op-mono" x-text="preview()"></span><button class="op-icon-btn" type="button" :data-op-copy="preview()" aria-label="{{.T.Get "Copy statement"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></div></div>
+        </div>
+      </li>
+    </ol>
+    <div class="op-form-foot">
+      <a href="/mongodb/users" class="op-btn op-btn-secondary">{{template "op_icon" "arrowleft"}} {{.T.Get "Back to Users"}}</a>
+      <button type="submit" class="op-btn op-btn-primary" :disabled="!ready() || busy" x-text="busy ? {{toJSON (.T.Get "Saving...")}} : {{toJSON (.T.Get "Assign")}}">{{.T.Get "Assign"}}</button>
+    </div>
+  </form>
+</section>
+{{template "db_assign_aside" .}}
+</div>
+
+<script>
+  function mongoAssign() {
+    return Object.assign(dbAssignBase(), {
+      role: 'readWrite',
+      ready() { return !!this.user && !!this.db && !!this.role; },
+      preview() { return 'db.getSiblingDB("admin").grantRolesToUser("' + (this.user || '[user]') + '", [{ role: "' + this.role + '", db: "' + (this.db || '[database]') + '" }])'; }
+    });
+  }
+</script>
+</div>
+
+<!-- END templates/mongodb/assign.html -->
+{{end}}

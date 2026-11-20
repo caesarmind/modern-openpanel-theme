@@ -1,0 +1,89 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/user/loginlog.html -->
+
+<!-- page header -->
+<section class="op-content" aria-label="{{.T.Get "Login Log"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+        <h1 class="op-title">{{.T.Get "Login History"}}</h1>
+        <p class="op-meta">{{.T.Get "Overview of successful logins on your account."}}</p>
+    </div>
+    </div>
+<!-- END page header -->
+
+
+
+<section class="op-card" aria-label="{{.T.Get "Logins Table"}}" x-data="{ searchQuery: '' }">
+    <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Search"}}" x-model="searchQuery" aria-label="{{.T.Get "Search"}}"></label></div>
+
+   <div class="op-table-wrap">
+            <table id="login-log-table" class="op-table">
+                <thead>
+                    <tr>
+                        <th scope="col">
+                            <button type="button" class="op-th-sort" data-sort-key="ip" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Country and IP address"}}<i aria-hidden="true"></i></button>
+                        </th>
+                        <th scope="col">
+                            <button type="button" class="op-th-sort" data-sort-key="login_time" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Login Time"}}<i aria-hidden="true"></i></button>
+                        </th>
+                        <th scope="col">{{.T.Get "Action"}}</th>
+                    </tr>
+                </thead>
+        <tbody>
+            {{$root := .}}
+            {{range .LastLoginData}}
+<tr x-show="searchQuery === '' || '{{.IP}}'.toLowerCase().includes(searchQuery.toLowerCase()) || '{{.CountryCode}}'.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
+
+                    <td data-sort-col="ip" data-sort-value="{{.IP}}">
+                        <div class="op-login-ip">
+                            {{if and .CountryCode (ne (lower .CountryCode) "unknown")}}<img src="/static/flags/{{lower .CountryCode}}.png" alt="{{.CountryCode}}" title="{{.CountryCode}}" class="op-login-flag">{{end}}
+                            <b class="op-mono">{{.IP}}</b>
+                            <button type="button" class="op-icon-btn op-login-copy" data-ip="{{.IP}}" title="{{$root.T.Get "Click to copy IP"}}" aria-label="{{$root.T.Get "Click to copy IP"}}" onclick="copyIPToClipboard(this)">{{template "op_icon" "copy"}}</button>
+                            {{if and .CountryCode (ne (lower .CountryCode) "unknown")}}<span class="op-hint" x-data x-text="opRegion('{{.CountryCode}}')">{{.CountryCode}}</span>{{end}}
+                        </div>
+                    </td>
+
+                    <td data-label="{{$root.T.Get "Login Time"}}" data-sort-col="login_time"><span class="op-mono" style="font-size:12px">{{.LoginTime}}</span></td>
+
+                    <td data-label="{{$root.T.Get "Action"}}">
+                        {{if index $root.UserAllowed "activity"}}
+                        <a href="/account/activity?search={{.IP}}" title="{{$root.T.Get "View activity log for IP "}} {{.IP}}" style="color:var(--color-accent-text)">{{$root.T.Get "View activity log"}}</a>
+                        {{end}}
+                    </td>
+                </tr>
+            {{end}}
+        </tbody>
+            </table>
+        </div>
+    <div class="op-tfoot"><span>{{.T.Get "Last"}} {{len .LastLoginData}} {{.T.Get "logins"}}</span></div>
+</section>
+
+
+    <script>
+        // country name from the two-letter code, in the panel's language
+        function opRegion(code) {
+            try { return new Intl.DisplayNames([document.documentElement.lang || 'en'], { type: 'region' }).of(code.toUpperCase()); } catch (e) { return code; }
+        }
+        function copyIPToClipboard(btn) {
+            const ip = btn.getAttribute('data-ip');
+            const done = () => { if (typeof showToast === 'function') showToast({{toJSON (.T.Get "Copied")}} + ' ' + ip, 'success'); };
+            if (navigator.clipboard) { navigator.clipboard.writeText(ip).then(done); return; }
+            const textarea = document.createElement('textarea');
+            textarea.value = ip;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            done();
+        }
+    </script>
+
+<script src="{{static "js/table-sort.js"}}"></script>
+
+</section>
+<!-- END templates/user/loginlog.html -->
+{{end}}

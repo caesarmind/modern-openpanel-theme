@@ -1,0 +1,149 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mongodb/databases.html -->
+{{$running := eq .ContainerState "running"}}
+<div class="op-content" aria-label="{{.T.Get "Databases Table"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">MongoDB · {{.T.Get "port"}} 27017</div>
+            <h1 class="op-title">{{.T.Get "MongoDB Databases"}}</h1>
+            <p class="op-meta">{{.T.Get "Create databases, assign users and import or export archives."}}</p>
+        </div>
+        <div class="op-actions">
+            {{if $running}}
+            <a href="/mongodb/wizard" class="op-btn op-btn-secondary">{{template "op_icon" "wand"}} {{.T.Get "Database Wizard"}}</a>
+            <a href="/mongodb/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Database"}}</a>
+            {{else}}
+            <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-secondary">{{template "op_icon" "wand"}} {{.T.Get "Database Wizard"}}</span>
+            <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New Database"}}</span>
+            {{end}}
+        </div>
+    </div>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "db"}} {{.T.Get "Databases"}}</div><div class="op-kpi-value">{{.UserDatabaseCount}}</div><div class="op-kpi-note">{{.T.Get "Your databases"}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "user"}} {{.T.Get "Users"}}</div><div class="op-kpi-value">{{if .HasUsers}}{{.UserCount}}{{else}}—{{end}}</div><div class="op-kpi-note">{{.T.Get "Database users"}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{.T.Get "Total size"}}</div><div class="op-kpi-value">{{if .UserDatabaseCount}}{{.TotalSize}}{{else}}—{{end}}</div><div class="op-kpi-note">{{with .LargestDatabase}}{{$.T.Get "Largest:"}} {{.}}{{else}}&nbsp;{{end}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "info"}} {{.T.Get "Service"}}</div><div class="op-kpi-value">{{if and $running (eq .HealthStatus "healthy")}}{{.T.Get "Running"}}{{else if $running}}{{.T.Get "Starting"}}{{else}}{{.T.Get "Stopped"}}{{end}}</div><div class="op-kpi-note">MongoDB · {{.T.Get "server"}} <span class="op-mono">mongodb</span></div></div>
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Databases"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search databases"}}" aria-label="{{.T.Get "Search databases"}}"></label>
+        </div>
+{{template "bulk_open" (dict "T" .T "Table" "#databases-table" "Endpoint" "/mongodb/bulk")}}
+        <div class="op-table-wrap">
+            <table id="databases-table" class="op-table">
+                <thead>
+                    <tr>
+{{template "bulk_head_checkbox" .}}
+                        <th scope="col">{{.T.Get "Database Name"}}</th>
+                        <th scope="col" class="is-num">{{.T.Get "Size"}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{if and $running (eq .HealthStatus "healthy")}}
+                    {{range .Databases}}
+                    {{$db := .}}
+                    <tr x-show="searchQuery === '' || {{toJSON $db.Database}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row" data-db="{{$db.Database}}">
+{{$skip := ""}}{{if $db.IsSystem}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" $db.Database "Label" $db.Database "Skip" $skip)}}
+                        <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:{{if $db.IsSystem}}var(--color-faint){{else}}var(--color-hue-indigo){{end}}">{{template "op_icon" "db"}}</span><div><b><span class="op-mono select-text" style="font-size:13px">{{$db.Database}}</span></b></div></div></td>
+                        <td class="is-num op-mono" data-label="{{$.T.Get "Size"}}">{{if $db.SizeDisplay}}{{$db.SizeDisplay}}{{else}}—{{end}}</td>
+                        <td class="is-shrink op-cell-menu" style="position:relative">
+                        {{if not $db.IsSystem}}
+                        <div x-data="exportModal({{toJSON $db.Database}})" @db-export="open = true">
+                            <form method="POST" action="/mongodb/delete" hidden>
+                                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                                <input type="hidden" name="database_name" value="{{$db.Database}}">
+                            </form>
+                            <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                                <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions for"}} {{$db.Database}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                                <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                    <a href="/mongodb/assign">{{template "op_icon" "user"}} {{$.T.Get "Assign user"}}</a>
+                                    {{if $.UserAllowed.mongodb_import}}<a href="/mongodb/import/{{$db.Database}}">{{template "op_icon" "upload"}} {{$.T.Get "Import"}}</a>{{end}}
+                                    <button type="button" @click="open = false; setTimeout(() => $dispatch('db-export'), 0)">{{template "op_icon" "download"}} {{$.T.Get "Export"}}</button>
+                                    <hr>
+                                    <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Delete this database?")}} + ' ' + {{toJSON $db.Database}})) $root.parentElement.querySelector('form').submit()">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</button>
+                                </div>
+                            </div>
+                            <template x-teleport="body">
+                                <div x-show="open" x-cloak>
+                                    <div class="op-scrim" @click="open = false"></div>
+                                    <div class="op-sheet" role="dialog" aria-label="{{$.T.Get "Export"}}" @keydown.escape.window="open = false">
+                                        <h2>{{$.T.Get "Export"}} <span class="op-mono" x-text="database"></span></h2>
+                                        <form method="POST" action="/mongodb/export" @submit="handleSubmit" class="op-col" style="gap:14px;margin-top:16px">
+                                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                                            <input type="hidden" name="database_name" :value="database">
+                                            <input type="hidden" name="local_path" :value="fullPath">
+                                            <div class="op-field"><span class="op-label">{{$.T.Get "Format:"}}</span>
+                                                <div class="op-segmented" role="group"><button type="button" :aria-pressed="(format === 'archive').toString()" @click="format = 'archive'">{{$.T.Get "Archive"}} (.archive)</button><button type="button" :aria-pressed="(format === 'gzip').toString()" @click="format = 'gzip'">GZIP (.archive.gz)</button></div>
+                                                <input type="hidden" name="export_format" :value="format">
+                                            </div>
+                                            <div class="op-field"><span class="op-label">{{$.T.Get "Destination:"}}</span>
+                                                <div class="op-segmented" role="group"><button type="button" :aria-pressed="(mode === 'browser').toString()" @click="mode = 'browser'">{{$.T.Get "Browser"}}</button><button type="button" :aria-pressed="(mode === 'files').toString()" @click="mode = 'files'">{{$.T.Get "Files"}}</button></div>
+                                                <input type="hidden" name="export_destination" :value="mode">
+                                            </div>
+                                            <label class="op-field" x-show="mode === 'files'" x-cloak><span class="op-label">{{$.T.Get "Folder"}}</span><span class="op-affix"><span class="op-affix-addon op-mono">/var/www/html/</span><input type="text" x-model="relativePath" placeholder="backups" class="op-input op-mono"></span></label>
+                                            <div class="op-actions" style="justify-content:flex-end"><button type="button" class="op-btn op-btn-secondary" @click="open = false">{{$.T.Get "Cancel"}}</button><button type="submit" class="op-btn op-btn-primary">{{template "op_icon" "download"}} {{$.T.Get "Export"}}</button></div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        {{end}}
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr><td colspan="4"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "db"}}</span><b>{{.T.Get "No databases yet."}}</b><a href="/mongodb/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Create your first database"}}</a></div></td></tr>
+                    {{end}}
+                {{else}}
+                    <tr><td colspan="4"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "info"}}</span><b>{{$.T.Get .StatusDetail}}</b><span id="refresh-message" class="op-hint"></span></div></td></tr>
+                {{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="op-tfoot"><span>{{.T.Get "Total databases:"}} <span id="total_records_count">{{len .Databases}}</span></span></div>
+{{template "bulk_bar" .}}
+</div>
+    </section>
+</div>
+
+{{if ne .HealthStatus "healthy"}}
+<script>
+    let countdown = 5;
+    const messageEl = document.getElementById('refresh-message');
+    const interval = setInterval(() => {
+        if (countdown > 0) {
+            messageEl.textContent = `{{.T.Get "The page will refresh in"}} ${countdown} {{.T.Get "seconds"}}`;
+            countdown--;
+        } else {
+            clearInterval(interval);
+            window.location.reload();
+        }
+    }, 1000);
+</script>
+{{end}}
+
+<script>
+    function exportModal(dbName) {
+        return {
+            open: false,
+            mode: 'browser',
+            format: 'archive',
+            database: dbName,
+            basePath: '/var/www/html/',
+            relativePath: '',
+            get fullPath() { return this.basePath + this.relativePath.replace(/^\/+/, ''); },
+            handleSubmit(event) {
+                if (this.mode === 'files' && !this.fullPath.startsWith(this.basePath)) event.preventDefault();
+            }
+        };
+    }
+</script>
+
+<!-- END templates/mongodb/databases.html -->
+{{end}}

@@ -1,0 +1,122 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/deliverability.html -->
+
+<div class="op-content" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Email Deliverability"}}</h1>
+            <p class="op-meta">{{.T.Get "Check SPF, DKIM and DMARC DNS records for your domains."}}</p>
+        </div>
+    </div>
+
+{{if .Domains}}
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "globe"}} {{.T.Get "Domains"}}</div>
+            <div class="op-kpi-value">{{len .Domains}}</div>
+            <div class="op-kpi-note op-mono" id="deliv-server-ip">{{.T.Get "Checking..."}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "shield"}} {{.T.Get "All records OK"}}</div>
+            <div class="op-kpi-value" id="deliv-ok">–</div>
+            <div class="op-kpi-note">{{.T.Get "SPF, DKIM and DMARC match"}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "alert"}} {{.T.Get "Need attention"}}</div>
+            <div class="op-kpi-value" id="deliv-bad">–</div>
+            <div class="op-kpi-note">{{.T.Get "missing or wrong records"}}</div>
+        </div>
+    </section>
+{{end}}
+
+    <section class="op-card" aria-label="{{.T.Get "Domains"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search"}}" aria-label="{{.T.Get "Search"}}"></label>
+        </div>
+{{if not .Domains}}
+        <div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "globe"}}</span><b>{{.T.Get "No domains yet."}}</b><a href="/domains/new" class="op-btn op-btn-primary op-btn-sm">{{template "op_icon" "plus"}} {{.T.Get "New domain"}}</a></div>
+{{else}}
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th>{{.T.Get "Domain"}}</th><th>SPF</th><th>DKIM</th><th>DMARC</th><th class="is-shrink"><span class="op-sr">{{.T.Get "Options"}}</span></th></tr></thead>
+            <tbody id="deliverabilityTableBody">
+            {{range .Domains}}
+            {{$d := .}}
+                <tr data-domain="{{$d.DomainURL}}" data-href="/emails/deliverability/{{$d.DomainURL}}" x-show="searchQuery === '' || {{toJSON $d.DomainURL}}.toLowerCase().includes(searchQuery.toLowerCase())">
+                    <td class="op-cell-title"><div class="op-row-title"><span class="op-ico-tile is-sm deliv-ico" style="--hue:var(--color-faint)">{{template "op_icon" "mail"}}</span><div style="min-width:0"><b class="punycode" style="overflow-wrap:anywhere">{{$d.DomainURL}}</b></div></div></td>
+                    <td data-label="SPF" class="spf-cell"><span class="op-status is-muted">{{$.T.Get "Checking..."}}</span></td>
+                    <td data-label="DKIM" class="dkim-cell"><span class="op-status is-muted">{{$.T.Get "Checking..."}}</span></td>
+                    <td data-label="DMARC" class="dmarc-cell"><span class="op-status is-muted">{{$.T.Get "Checking..."}}</span></td>
+                    <td class="is-shrink"><a href="/emails/deliverability/{{$d.DomainURL}}" class="op-btn op-btn-secondary op-btn-sm">{{$.T.Get "Details"}}</a></td>
+                </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+{{end}}
+    </section>
+</div>
+
+<script>
+function deliverabilityBadge(status) {
+    const map = {
+        ok: ['is-success', 'OK'],
+        missing: ['is-danger', {{toJSON (.T.Get "Missing")}}],
+        mismatch: ['is-warning', {{toJSON (.T.Get "Mismatch")}}],
+        wrong_ip: ['is-warning', {{toJSON (.T.Get "Wrong IP")}}],
+    };
+    const [cls, label] = map[status] || ['is-muted', status];
+    const span = document.createElement('span');
+    span.className = 'op-status ' + cls;
+    span.textContent = label;
+    return span.outerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    fetch('/emails/deliverability?output=json')
+        .then(response => response.json())
+        .then(data => {
+            const badDomains = [];
+            let okCount = 0, serverIP = '';
+            (data.domains || []).forEach(function (result) {
+                if (result.server_ip) serverIP = result.server_ip;
+                const row = document.querySelector(`tr[data-domain="${result.domain}"]`);
+                if (!row) return;
+                row.querySelector('.spf-cell').innerHTML = deliverabilityBadge(result.spf.status);
+                row.querySelector('.dkim-cell').innerHTML = deliverabilityBadge(result.dkim.status);
+                row.querySelector('.dmarc-cell').innerHTML = deliverabilityBadge(result.dmarc.status);
+
+                const bad = (st) => ['missing', 'mismatch', 'wrong_ip'].includes(st);
+                const hasProblem = bad(result.spf.status) || bad(result.dkim.status) || bad(result.dmarc.status);
+                const ico = row.querySelector('.deliv-ico');
+                if (ico) ico.style.setProperty('--hue', hasProblem ? 'var(--color-danger)' : 'var(--color-success)');
+                if (hasProblem) badDomains.push(result.domain); else okCount++;
+            });
+
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            set('deliv-ok', okCount);
+            set('deliv-bad', badDomains.length);
+            set('deliv-server-ip', serverIP ? {{toJSON (.T.Get "server IP")}} + ' ' + serverIP : '');
+
+            if (typeof reportHealthIssues === 'function' && badDomains.length) {
+                let issue;
+                if (badDomains.length === 1) {
+                    issue = { id: 'deliverability:' + badDomains[0], severity: 'warning', message: {{toJSON (.T.Get "Domain")}} + " " + badDomains[0] + " " + {{toJSON (.T.Get "has SPF/DKIM/DMARC problems.")}} };
+                } else if (badDomains.length === 2) {
+                    issue = { id: 'deliverability:' + badDomains.join(','), severity: 'warning', message: {{toJSON (.T.Get "Domains")}} + " " + badDomains.join(', ') + " " + {{toJSON (.T.Get "have SPF/DKIM/DMARC problems.")}} };
+                } else {
+                    issue = { id: 'deliverability:multiple', severity: 'warning', message: badDomains.length + " " + {{toJSON (.T.Get "domains have SPF/DKIM/DMARC problems.")}} };
+                }
+                reportHealthIssues('emails-deliverability', [issue], 24);
+            }
+        })
+        .catch(function (err) {
+            console.error('Failed to load deliverability status', err);
+        });
+});
+</script>
+
+<!-- END templates/emails/deliverability.html -->
+{{end}}

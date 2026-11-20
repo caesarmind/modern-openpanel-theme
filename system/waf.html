@@ -1,0 +1,137 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/system/waf.html -->
+
+{{if .Issues}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof reportHealthIssues === 'function') {
+        reportHealthIssues('waf', {{toJSON .Issues}}, 168);
+    }
+});
+</script>
+{{end}}
+{{if .Recommendations}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof reportHealthIssues === 'function') {
+        // own key, sharing 'waf' would make each call drop the other's seen ids
+        reportHealthIssues('waf-profiles', {{toJSON .Recommendations}}, 24);
+    }
+});
+</script>
+{{end}}
+
+<div class="op-content" x-data="{ searchQuery: '', statusFilter: 'all', levelFilter: 'all', profileFilter: 'all' }">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Web Firewall"}}</h1>
+            <p class="op-meta">{{.T.Get "Protect your websites from attacks like SQL injection, cross-site scripting and malicious bots."}}</p>
+        </div>
+        <div class="op-actions"><a class="op-btn op-btn-secondary" href="/server/waf/log">{{template "op_icon" "menu"}} {{.T.Get "View Logs"}}</a></div>
+    </div>
+
+    <section class="op-card">
+        <form method="post" action="/server/waf/all" class="op-waf-all">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <div class="op-waf-all-text">
+                <span class="op-ico-tile">{{template "op_icon" "shield"}}</span>
+                <div style="min-width:0">
+                    <b>{{.T.Get "Firewall for all domains"}}</b>
+                    <span>{{.T.Get "Turns the firewall on or off for every domain at once, and for domains you add later."}}</span>
+                    <span class="op-mono op-waf-count">{{if .Domains}}{{.CountOn}} / {{len .Domains}} {{.T.Get "domains protected"}}{{else}}{{.T.Get "Also used for new domains"}}{{end}}{{if and .Domains .Mixed}} · <button type="submit" name="action" value="{{if .AccountEnabled}}enable{{else}}disable{{end}}" class="op-link-btn">{{.T.Get "Apply to all domains"}}</button>{{end}}</span>
+                </div>
+            </div>
+            <span class="op-waf-switch">
+                <button type="submit" name="action" value="{{if .AccountEnabled}}disable{{else}}enable{{end}}" role="switch" aria-checked="{{if .AccountEnabled}}true{{else}}false{{end}}" aria-label="{{.T.Get "Firewall for all domains"}}" class="op-switch"></button>
+                <span>{{if .AccountEnabled}}{{.T.Get "On"}}{{else}}{{.T.Get "Off"}}{{end}}</span>
+            </span>
+        </form>
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Domains Table"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Search"}}" x-model="searchQuery" aria-label="{{.T.Get "Search domains"}}"></label>
+            <select class="op-select op-filter-select" x-model="statusFilter" aria-label="{{.T.Get "Status"}}">
+                <option value="all">{{.T.Get "Status"}}: {{.T.Get "All"}}</option>
+                <option value="On">{{.T.Get "On"}}</option>
+                <option value="DetectionOnly">{{.T.Get "Monitor only"}}</option>
+                <option value="Off">{{.T.Get "Off"}}</option>
+            </select>
+            <select class="op-select op-filter-select" x-model="levelFilter" aria-label="{{.T.Get "Level"}}">
+                <option value="all">{{.T.Get "Level"}}: {{.T.Get "All"}}</option>
+                {{range .LevelOptions}}<option value="{{.Key}}">{{.Name}}</option>{{end}}
+            </select>
+            <select class="op-select op-filter-select" x-model="profileFilter" aria-label="{{.T.Get "Profile"}}">
+                <option value="all">{{.T.Get "Profile"}}: {{.T.Get "All"}}</option>
+                <option value="none">{{.T.Get "None"}}</option>
+                {{range .ProfileOptions}}<option value="{{.Key}}">{{.Name}}</option>{{end}}
+            </select>
+            <button class="op-btn op-btn-ghost op-btn-sm" type="button" x-show="statusFilter !== 'all' || levelFilter !== 'all' || profileFilter !== 'all'" x-cloak @click="statusFilter = 'all'; levelFilter = 'all'; profileFilter = 'all'">{{.T.Get "Clear filters"}}</button>
+        </div>
+{{template "bulk_open" (dict "T" .T "Table" "#waf-domains-table" "Endpoint" "/server/waf/bulk")}}
+        <div class="op-table-wrap">
+            <table id="waf-domains-table" class="op-table">
+                <thead>
+                    <tr>
+{{template "bulk_head_checkbox" .}}
+                        <th scope="col">{{template "waf_sort" (dict "Label" (.T.Get "Domain Name") "Key" "domain" "Type" "string")}}</th>
+                        <th scope="col">{{template "waf_sort" (dict "Label" (.T.Get "Status") "Key" "status" "Type" "string")}}</th>
+                        <th scope="col" class="is-num">{{template "waf_sort" (dict "Label" (.T.Get "Blocked (24h)") "Key" "blocks" "Type" "number")}}</th>
+                        <th scope="col">{{template "waf_sort" (dict "Label" (.T.Get "Level") "Key" "level" "Type" "number")}}</th>
+                        <th scope="col">{{template "waf_sort" (dict "Label" (.T.Get "Profiles") "Key" "profiles" "Type" "string")}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{if not .Domains}}
+                    <tr><td colspan="7"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "globe"}}</span><b>{{.T.Get "No domains yet."}}</b></div></td></tr>
+                    {{else}}
+                    {{$modsecStatus := .ModsecStatus}}
+                    {{$rows := .Rows}}
+                    {{$csrf := .CSRFToken}}
+                    {{range .Domains}}
+                    {{$status := index $modsecStatus .DomainURL}}
+                    {{$row := index $rows .DomainURL}}
+                    <tr x-show="(searchQuery === '' || '{{.DomainURL}}'.toLowerCase().includes(searchQuery.toLowerCase())) && (statusFilter === 'all' || statusFilter === {{toJSON $row.Status}}) && (levelFilter === 'all' || levelFilter === {{toJSON $row.LevelKey}}) && (profileFilter === 'all' || (profileFilter === 'none' ? {{len $row.ProfileKeys}} === 0 : ({{toJSON $row.ProfileKeys}} || []).includes(profileFilter)))">
+{{template "bulk_row_checkbox" (dict "T" $.T "Key" .DomainURL "Label" .DomainURL)}}
+                        <td class="op-cell-title" data-sort-col="domain" data-sort-value="{{.DomainURL}}"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "globe"}}</span><div style="min-width:0"><a class="punycode op-row-link" href="/server/waf/{{.DomainURL}}">{{.DomainURL}}</a></div></div></td>
+                        <td data-label="{{$.T.Get "Status"}}" data-sort-col="status" data-sort-value="{{$status}}">{{if eq $status "On"}}<span class="op-status is-success">{{$.T.Get "On"}}</span>{{else if eq $status "DetectionOnly"}}<span class="op-status is-warning" title="{{$.T.Get "Requests are checked and logged, but nothing is blocked."}}">{{$.T.Get "Monitor only"}}</span>{{else}}<span class="op-status">{{$.T.Get "Off"}}</span>{{end}}</td>
+                        <td data-label="{{$.T.Get "Blocked (24h)"}}" class="is-num" data-sort-col="blocks" data-sort-value="{{$row.Blocks}}">{{if $row.Blocks}}<a href="/server/waf/log/{{.DomainURL}}" class="op-mono" style="color:var(--color-danger)">{{$row.Blocks}}</a>{{else}}<span class="op-mono op-muted">0</span>{{end}}</td>
+                        <td data-label="{{$.T.Get "Level"}}" data-sort-col="level" data-sort-value="{{$row.LevelStrength}}"><span class="op-tag">{{$row.Level}}</span></td>
+                        <td data-label="{{$.T.Get "Profiles"}}" data-sort-col="profiles" data-sort-value="{{join $row.Profiles ", "}}">{{if $row.Profiles}}<span class="op-chips" style="gap:4px">{{range $row.Profiles}}<span class="op-tag">{{.}}</span>{{end}}</span>{{else}}<a href="/server/waf/{{.DomainURL}}" class="op-hint">{{$.T.Get "None"}}</a>{{end}}</td>
+                        <td class="is-shrink op-cell-menu" style="position:relative" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                            <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions for"}} {{.DomainURL}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                            <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                <a href="/server/waf/{{.DomainURL}}">{{template "op_icon" "settings"}} {{$.T.Get "Manage Rules"}}</a>
+                                <a href="/server/waf/log/{{.DomainURL}}">{{template "op_icon" "menu"}} {{$.T.Get "View Logs"}}</a>
+                                <hr>
+                                <form action="/server/waf" method="post">
+                                    <input type="hidden" name="csrf_token" value="{{$csrf}}"/>
+                                    <input type="hidden" name="modsec_action" value="{{if or (eq $status "On") (eq $status "DetectionOnly")}}Off{{else}}On{{end}}">
+                                    <input type="hidden" name="domain_name" value="{{.DomainURL}}">
+                                    <button type="submit">{{template "op_icon" "shield"}} {{if or (eq $status "On") (eq $status "DetectionOnly")}}{{$.T.Get "Turn firewall off"}}{{else}}{{$.T.Get "Turn firewall on"}}{{end}}</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{if .Domains}}<div class="op-tfoot"><span>{{len .Domains}} {{.T.Get "domains"}}</span></div>{{end}}
+{{template "bulk_bar" .}}
+</div>
+    </section>
+</div>
+
+<script src="{{static "js/table-sort.js"}}"></script>
+
+<!-- END templates/system/waf.html -->
+{{end}}
+
+{{define "waf_sort"}}<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="{{.Type}}" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>{{end}}

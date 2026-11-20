@@ -1,0 +1,18 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* moodle's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from moodle/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Moodle learning management system (LMS).")}},
+  adminPath: '/login/index.php',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['moodle_version', 'admin_username', 'db_name'],
+  fields: [
+    K.version('moodle_version', function () { return K.gh('https://api.github.com/repos/moodle/moodle/tags?per_page=100', /^\d+\.\d+\.\d+$/, function (t) { return /^v\d+\.\d+\.\d+$/.test(t.name) ? t.name.slice(1) : ''; }); }),
+    K.user(), K.email(), K.pass()
+  ].concat(K.db('moodle')),
+  run: [K.run.pre, K.run.php, K.run.dl('Moodle'), K.run.ex(['Linking web root']), K.run.db, K.run.step({{toJSON (.T.Get "Running the Moodle CLI installer")}}, ['Running Moodle CLI installer']), K.run.save(['Setting permissions on moodledata', 'Registering cron job'])],
+  creds: K.creds()
+}{{end}}

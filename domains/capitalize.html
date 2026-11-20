@@ -1,0 +1,121 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "content"}}
+<!-- START templates/domains/capitalize.html -->
+
+<!-- page header -->
+<section aria-label="{{.T.Get "Edit Domain Display"}}">
+    <div class="op-page-head op-cms-head">
+        <div>
+        <div class="op-wp-title"><h1 class="op-title">{{.T.Get "Capitalize"}} <span class="punycode">{{.DomainURL}}</span></h1></div>
+        <p class="op-meta">{{.T.Get "You can customize your domain type case by clicking on the letter you want to change.(e.g. SuperDomainName.com)."}}</p>
+    </div>
+    <div class="op-actions">
+    </div>
+</div>
+<!-- END page header -->
+
+
+<div class="sm:mx-auto sm:max-w-3xl p-6 m-6">
+    <form class="mt-8" method="POST">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-form-grid">
+            <div class="op-field-wrap">
+
+<input type="hidden" name="domain_url" value="{{.DomainURL}}">
+<input type="hidden" name="capitalized_domain" id="capitalized_domain"
+       value="{{if .CapitalizedDomain}}{{.CapitalizedDomain}}{{else}}{{.DomainURL}}{{end}}"
+       class="op-input">
+
+<div id="letters-container" class="flex flex-wrap mt-2 justify-center">
+    <!-- Buttons are dynamically added here -->
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const domainInput = document.getElementById('capitalized_domain');
+        const lettersContainer = document.getElementById('letters-container');
+
+        function createLetterButtons(domain) {
+            lettersContainer.innerHTML = '';
+
+            domain.split('').forEach((char) => {
+                const button = document.createElement('button');
+                button.textContent = char;
+
+                button.classList.add('op-letter');
+
+                if (/^[A-Za-z]$/.test(char)) {
+                    if (char === char.toUpperCase()) {
+                        button.classList.add('is-on');
+                    } else {
+                        button.classList.add('border-transparent');
+                    }
+
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        if (button.textContent === button.textContent.toUpperCase()) {
+                            button.textContent = button.textContent.toLowerCase();
+                            button.classList.remove('is-on');
+                            button.classList.add('border-transparent');
+                        } else {
+                            button.textContent = button.textContent.toUpperCase();
+                            button.classList.remove('border-transparent');
+                            button.classList.add('is-on');
+                        }
+                        updateDomainValue();
+                    });
+                } else {
+                    button.classList.add('border-transparent', 'pointer-events-none');
+                }
+
+                lettersContainer.appendChild(button);
+            });
+        }
+
+        function updateDomainValue() {
+            const updatedDomain = Array.from(lettersContainer.children)
+                .map(button => button.textContent)
+                .join('');
+            domainInput.value = updatedDomain;
+        }
+
+        createLetterButtons(domainInput.value);
+
+        domainInput.addEventListener('input', function () {
+            createLetterButtons(domainInput.value);
+        });
+    });
+</script>
+
+
+            </div>
+        </div>
+
+<div class="op-sep"><div class="op-divider"></div></div>
+
+<div class="op-actions op-actions-end">
+
+
+    <button type="submit" class="op-btn op-btn-primary">
+        {{.T.Get "Save"}}
+        <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10"> <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/> </svg>
+    </button>
+
+
+</form>
+
+    <a href="/domains" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Domains"}}
+    </a>
+
+
+</div>
+
+</div>
+
+</section>
+
+<!-- END templates/domains/capitalize.html -->
+{{end}}

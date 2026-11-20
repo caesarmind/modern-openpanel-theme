@@ -1,0 +1,18 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* nextcloud's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from nextcloud/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Nextcloud file sync and collaboration platform.")}},
+  adminPath: '/',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['nextcloud_version', 'admin_username', 'db_name'],
+  fields: [
+    K.version('nextcloud_version', K.panelVersions('nextcloud')),
+    K.email(), K.user(), K.pass()
+  ].concat(K.db('nextcloud')),
+  run: [K.run.pre, K.run.php, K.run.dl('Nextcloud'), K.run.ex(), K.run.db, K.run.step({{toJSON (.T.Get "Running the Nextcloud CLI installer")}}, ['Running Nextcloud CLI installer']), K.run.save(['Configuring trusted domain', 'Deploying admin login helper'])],
+  creds: K.creds()
+}{{end}}

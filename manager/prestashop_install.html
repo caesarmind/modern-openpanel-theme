@@ -1,0 +1,21 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* prestashop's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from prestashop/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "PrestaShop e-commerce platform.")}},
+  doneNote: {{toJSON (.T.Get "PrestaShop gets a renamed admin folder during the install. Use Log in on the site in Site Manager to open the back office.")}},
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['prestashop_version', 'admin_email', 'db_name'],
+  fields: [
+    K.version('prestashop_version', K.panelVersions('prestashop')),
+    K.email(),
+    K.text('admin_firstname', {{toJSON (.T.Get "First name")}}, { value: 'Admin', required: true }),
+    K.text('admin_lastname', {{toJSON (.T.Get "Last name")}}, { value: 'User', required: true }),
+    K.pass()
+  ].concat(K.db('prestashop')),
+  run: [K.run.pre, K.run.php, K.run.dl('PrestaShop'), K.run.ex(), K.run.db, K.run.step({{toJSON (.T.Get "Running the PrestaShop CLI installer")}}, ['Running PrestaShop CLI installer']), K.run.save(['Removing installer folder', 'Securing admin directory', 'Deploying admin login helper'])],
+  creds: [{ label: {{toJSON (.T.Get "Email (login)")}}, field: 'admin_email' }, { label: {{toJSON (.T.Get "Password")}}, field: 'admin_password', from: 'pass', secret: true }, { label: {{toJSON (.T.Get "Database")}}, field: 'db_name', prefix: true }, { label: {{toJSON (.T.Get "Database user")}}, field: 'db_user', prefix: true }]
+}{{end}}

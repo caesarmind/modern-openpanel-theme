@@ -1,0 +1,61 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/ftp_quota.html -->
+
+<!-- page header -->
+<section aria-label="{{.T.Get "FTP Quota Header"}}">
+    <div class="op-page-head op-cms-head">
+        <div>
+        <div class="op-wp-title"><h1 class="op-title">{{.T.Get "FTP Quota"}}</h1></div>
+        <p class="op-meta">{{.T.Get "Change disk quota for FTP user"}} {{.Account.Username}}</p>
+    </div>
+    <div class="op-actions">
+    </div>
+</div>
+<!-- END page header -->
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard">
+    <form class="mt-8" method="POST">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-form-grid">
+
+  <div class="op-field-wrap">
+    <p class="text-sm op-muted">{{.T.Get "Folder"}}: <b>{{.Account.Path}}</b></p>
+    <p class="text-sm op-muted">{{.T.Get "Current quota"}}: <b>{{if .Account.HasQuota}}{{.Account.QuotaLabel}}{{else}}{{.T.Get "Unlimited"}}{{end}}</b>{{if .Account.HasUsage}} | {{.T.Get "Used"}}: <b>{{.Account.UsedLabel}}</b>{{end}}{{if .Account.OverQuota}} <span class="font-medium is-danger">{{.T.Get "Over quota"}}</span>{{end}}</p>
+  </div>
+
+  <div class="op-field-wrap">
+    <label for="quota" class="op-label op-label-row">{{.T.Get "Disk quota"}}</label>
+    <div class="op-join">
+      <input type="number" min="0" step="1" name="quota" id="quota" value="{{.QuotaValue}}" placeholder="{{.T.Get "Unlimited"}}" class="w-full block op-input">
+      <select name="quota_unit" id="quota_unit" aria-label="{{.T.Get "Unit"}}" class="w-24 block op-select">
+        <option value="M"{{if eq .QuotaUnit "M"}} selected{{end}}>MB</option>
+        <option value="G"{{if eq .QuotaUnit "G"}} selected{{end}}>GB</option>
+      </select>
+    </div>
+    <p class="mt-1 text-xs op-muted">{{.T.Get "Leave empty or set 0 for no limit. Uploads are blocked once the folder grows past the quota, files can still be deleted."}}</p>
+  </div>
+        </div>
+
+        <div class="op-sep"><div class="op-divider"></div></div>
+
+
+<div class="op-actions op-actions-end">
+    <a href="/ftp" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to FTP Accounts"}}
+    </a>
+    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Update"}}<svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path></svg></button>
+</div>
+
+    </form>
+</div>
+<!-- END form -->
+
+<!-- END templates/files/ftp_quota.html -->
+{{end}}

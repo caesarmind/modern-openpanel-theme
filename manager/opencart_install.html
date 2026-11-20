@@ -1,0 +1,18 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* opencart's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from opencart/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "OpenCart e-commerce platform.")}},
+  adminPath: '/admin/',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['opencart_version', 'admin_username', 'db_name'],
+  fields: [
+    K.version('opencart_version', function () { return K.gh('https://api.github.com/repos/opencart/opencart/releases?per_page=100', /^\d+\.\d+\.\d+(\.\d+)?$/, function (r) { return !r.prerelease && !r.draft ? r.tag_name : ''; }); }),
+    K.email(), K.user(), K.pass()
+  ].concat(K.db('opencart')),
+  run: [K.run.pre, K.run.php, K.run.dl('OpenCart'), K.run.ex(['Preparing config.php']), K.run.db, K.run.step({{toJSON (.T.Get "Running the OpenCart CLI installer")}}, ['Running OpenCart CLI installer']), K.run.save(['Removing installer folder', 'Deploying admin login helper'])],
+  creds: K.creds()
+}{{end}}

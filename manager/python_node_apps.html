@@ -1,0 +1,920 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "flowbite_js"}}
+<script defer src="{{static "vendor/flowbite/flowbite252.min.js"}}"></script>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/python_node_apps.html -->
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('logs', { rawMode: false });
+    });
+    let toastDisplayed = false;
+</script>
+
+<div class="op-page-head op-cms-head op-rt-head">
+    <div class="op-rt-id">
+        <span class="op-mgr-logo" aria-hidden="true">{{template "op_app_logo" .Type}}</span>
+        <div style="min-width:0">
+            <div class="op-eyebrow">{{if eq .Type "nodejs"}}Node.js{{else if eq .Type "python"}}Python{{else if eq .Type "ruby"}}Ruby{{else if eq .Type "java"}}Java{{else}}{{title .Type}}{{end}} {{.T.Get "app"}}{{if .Service}} · {{.Service}}{{end}}</div>
+            <h1 class="op-title">{{.CurrentDomain}}</h1>
+            <p class="op-meta"><a class="op-link" href="https://{{.CurrentDomain}}" target="_blank" rel="noopener">https://{{.CurrentDomain}}</a></p>
+        </div>
+    </div>
+
+    <div class="op-actions">
+        <span class="op-status {{if eq .PM2Status "true"}}is-success{{else}}is-muted{{end}}">{{if eq .PM2Status "true"}}{{.T.Get "Active"}}{{else if eq .PM2Status "false"}}{{.T.Get "Inactive"}}{{else}}{{.T.Get "Unknown"}}{{end}}</span>
+<button type="button" id="restartButton" class="op-btn op-btn-secondary">{{template "op_icon" "refresh"}} {{.T.Get "Restart"}}</button>
+
+<script>
+    document.getElementById('restartButton').addEventListener('click', function(event) {
+        event.preventDefault();
+        const pm2Id = {{toJSON .Service}};
+        showToast({{toJSON (.T.Get "Application restart in progress. Please wait.")}}, 'loading');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/pm2/restart/${pm2Id}`, true);
+        xhr.setRequestHeader("X-CSRF-Token", csrf_token);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                showToast({{toJSON (.T.Get "Application restarted successfully.")}}, 'success');
+                setTimeout(() => { location.reload(); }, 1000);
+            } else {
+                let msg = {{toJSON (.T.Get "Error restarting application.")}};
+                try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+                showToast(msg, 'error');
+                console.error('Restart failed:', xhr.statusText);
+            }
+        };
+        xhr.onerror = function() {
+            showToast({{toJSON (.T.Get "Error restarting application.")}}, 'error');
+            console.error('Network error occurred');
+        };
+        xhr.send();
+    });
+</script>
+
+{{if eq .PM2Status "false"}}
+<button type="button" onclick="startApp(this);" class="op-btn op-btn-primary">{{template "op_icon" "play"}} {{.T.Get "Start"}}</button>
+
+<script>
+    function startApp(button) {
+        const pm2Id = {{toJSON .Service}};
+        showToast({{toJSON (.T.Get "Starting application. Please wait.")}}, 'loading');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/pm2/start/${pm2Id}`, true);
+        xhr.setRequestHeader("X-CSRF-Token", csrf_token);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                showToast({{toJSON (.T.Get "Application started successfully.")}}, 'success');
+                setTimeout(() => { location.reload(); }, 1000);
+            } else {
+                let msg = {{toJSON (.T.Get "Error starting application.")}};
+                try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+                showToast(msg, 'error');
+                console.error('Start failed:', xhr.statusText);
+            }
+        };
+        xhr.onerror = function() {
+            showToast({{toJSON (.T.Get "Error starting application.")}}, 'error');
+            console.error('Network error occurred');
+        };
+        xhr.send();
+    }
+</script>
+
+{{else if eq .PM2Status "true"}}
+<button type="button" onclick="stopApp(this);" class="op-btn op-btn-secondary">{{template "op_icon" "stop"}} {{.T.Get "Stop"}}</button>
+
+<script>
+    function stopApp(button) {
+        const pm2Id = {{toJSON .Service}};
+        showToast({{toJSON (.T.Get "Stopping application. Please wait.")}}, 'loading');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/pm2/stop/${pm2Id}`, true);
+        xhr.setRequestHeader("X-CSRF-Token", csrf_token);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                showToast({{toJSON (.T.Get "Application stopped successfully.")}}, 'success');
+                setTimeout(() => { location.reload(); }, 1000);
+            } else {
+                let msg = {{toJSON (.T.Get "Error stopping application.")}};
+                try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+                showToast(msg, 'error');
+                console.error('Stop failed:', xhr.statusText);
+            }
+        };
+        xhr.onerror = function() {
+            showToast({{toJSON (.T.Get "Error stopping application.")}}, 'error');
+            console.error('Network error occurred');
+        };
+        xhr.send();
+    }
+</script>
+{{end}}
+
+
+        {{template "temp_link" .}}
+        {{template "op_site_del" (dict "T" .T "Label" (.T.Get "Delete application")
+            "Delete" (.T.Get "Delete application") "DeleteText" (.T.Get "Stops the application, deletes its container and removes it from Site Manager. Files and databases stay.") "DeleteJS" (print "confirmRemoveforWP(" (toJSON .CurrentDomain) ")"))}}
+    </div>
+</div>
+
+<section class="op-rt-run" aria-label="{{.T.Get "Start command"}}" x-data>
+    <div class="op-rt-run-line"><span class="op-rt-prompt">$</span><code id="op-rt-cmd">{{if .StartCommand}}{{.StartCommand}}{{else if .CustomCmd}}{{.CustomCmd}}{{else if .StartupFile}}{{.StartupFile}}{{else}}{{.T.Get "No start command set"}}{{end}}</code>
+        <button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy start command"}}" @click="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('op-rt-cmd').textContent.trim()); showToast({{toJSON (.T.Get "Copied start command.")}}, 'success')">{{template "op_icon" "copy"}}</button></div>
+    <div class="op-rt-run-meta">
+        <span><i class="op-rt-dot{{if ne .PM2Status "true"}} is-off{{end}}"></i>{{if eq .PM2Status "true"}}{{.T.Get "Running"}}{{else}}{{.T.Get "Stopped"}}{{end}}</span>
+        {{if .Service}}<span>{{.T.Get "service"}} <b>{{.Service}}{{if .Container.Port}}:{{.Container.Port}}{{end}}</b></span>{{end}}
+        {{if .Container.Version}}<span>{{if eq .Type "nodejs"}}Node.js{{else if eq .Type "python"}}Python{{else if eq .Type "ruby"}}Ruby{{else if eq .Type "java"}}Java{{else}}{{title .Type}}{{end}} <b>{{.Container.Version}}</b></span>{{end}}
+        {{if .Workdir}}<span>{{.T.Get "workdir"}} <b>{{.Workdir}}</b></span>{{end}}
+    </div>
+</section>
+
+{{- $rt := "" -}}{{- $run := "" -}}{{- $inst := "" -}}
+{{- if eq .Type "nodejs"}}{{$rt = "Node.js"}}{{$run = "node"}}{{$inst = "npm install"}}
+{{- else if eq .Type "python"}}{{$rt = "Python"}}{{$run = "python"}}{{$inst = "pip install -r requirements.txt"}}
+{{- else if eq .Type "ruby"}}{{$rt = "Ruby"}}{{$run = "ruby"}}{{$inst = "bundle install"}}
+{{- else if eq .Type "java"}}{{$rt = "Java"}}{{$run = "java"}}{{$inst = "mvn install"}}{{end}}
+<div class="op-content op-mgr-shell"
+     x-data="{ activeTab: (new URLSearchParams(window.location.search).get('tab') || 'dashboard').replace(/^remove$/, 'dashboard').replace(/^backup$/, 'backups') }"
+     x-init="$watch('activeTab', t => t === 'logs' && window.loadAppLogs && loadAppLogs()); activeTab === 'logs' && setTimeout(() => window.loadAppLogs && loadAppLogs(), 0)">
+
+    <div class="op-wp-tabs-bar op-mgr-nav" x-effect="activeTab; $nextTick(() => { const a = $el.querySelector('.is-active'); if (a && $el.scrollWidth > $el.clientWidth) $el.scrollLeft = a.offsetLeft - 8; })">
+        <ul id="wp-tab" data-tabs-toggle="#wp-tab-content" role="tablist" class="op-wp-tabs">
+            <li role="presentation"><a href="#" id="dashboard-tab" data-tabs-target="#dashboard" role="tab" aria-controls="dashboard" aria-selected="true" @click="activeTab = 'dashboard'" :class="activeTab === 'dashboard' && 'is-active'" class="op-wp-tab">{{template "op_icon" "layout"}}<span class="op-wp-tab-label">{{.T.Get "Overview"}}</span></a></li>
+            <li role="presentation"><a href="#" id="settings-tab" data-tabs-target="#settings" role="tab" aria-controls="settings" aria-selected="false" @click="activeTab = 'settings'" :class="activeTab === 'settings' && 'is-active'" class="op-wp-tab">{{template "op_icon" "adjustments"}}<span class="op-wp-tab-label">{{.T.Get "Settings"}}</span></a></li>
+            <li role="presentation"><a href="#pip" id="pip-tab" data-tabs-target="#pip" role="tab" aria-controls="pip" aria-selected="false" @click="activeTab = 'pip'" :class="activeTab === 'pip' && 'is-active'" class="op-wp-tab">{{template "op_icon" "box"}}<span class="op-wp-tab-label">{{.Manifest.File}}</span></a></li>
+            <li role="presentation"><a href="#envvars" id="envvars-tab" data-tabs-target="#envvars" role="tab" aria-controls="envvars" aria-selected="false" @click="activeTab = 'envvars'" :class="activeTab === 'envvars' && 'is-active'" class="op-wp-tab">{{template "op_icon" "listdetails"}}<span class="op-wp-tab-label">{{.T.Get "Environment"}}</span></a></li>
+            <li role="presentation"><a href="#logs" id="logs-tab" data-tabs-target="#logs" role="tab" aria-controls="logs" aria-selected="false" @click="activeTab = 'logs'" :class="activeTab === 'logs' && 'is-active'" class="op-wp-tab">{{template "op_icon" "terminal"}}<span class="op-wp-tab-label">{{.T.Get "Logs"}}</span></a></li>
+            <li role="presentation"><a href="#clone" id="clone-tab" data-tabs-target="#clone" role="tab" aria-controls="clone" aria-selected="false" @click="activeTab = 'clone'" :class="activeTab === 'clone' && 'is-active'" class="op-wp-tab">{{template "op_icon" "copy"}}<span class="op-wp-tab-label">{{.T.Get "Clone"}}</span></a></li>
+            <li role="presentation"><a href="#backups" id="backups-tab" data-tabs-target="#backups" role="tab" aria-controls="backups" aria-selected="false" @click="activeTab = 'backups'" :class="activeTab === 'backups' && 'is-active'" class="op-wp-tab">{{template "op_icon" "archive"}}<span class="op-wp-tab-label">{{.T.Get "Backups"}}</span></a></li>
+            {{if .UserAllowed.malware_scan}}
+            <li role="presentation"><a href="#" id="security-tab" data-tabs-target="#security" role="tab" aria-controls="security" aria-selected="false" @click="activeTab = 'security'" :class="activeTab === 'security' && 'is-active'" class="op-wp-tab">{{template "op_icon" "shield"}}<span class="op-wp-tab-label">{{.T.Get "Security"}}</span></a></li>
+            {{end}}
+        </ul>
+    </div>
+
+    <div id="wp-tab-content" class="op-mgr-body">
+
+        {{if .UserAllowed.malware_scan}}
+        <div class="hidden op-wp-panel" id="security" role="tabpanel" aria-labelledby="security-tab">
+            {{template "malware_scan_panel" .}}
+        </div>
+        {{end}}
+
+        <div class="hidden op-wp-panel" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+
+            <div class="op-mgr-meters" aria-label="{{.T.Get "Resource use"}}">
+                {{template "op_rt_usage" .}}
+                <div class="op-kpi"><span class="op-kpi-label">{{template "op_icon" "folder"}} {{.T.Get "Folder size"}}</span><span class="op-kpi-value" id="filesSize">–</span><span class="op-kpi-note">{{.Docroot}}</span></div>
+            </div>
+
+            <section class="op-card">
+                <div class="op-card-head"><h2>{{.T.Get "How requests reach the app"}}</h2></div>
+                <div class="op-mgr-flow">
+                    <div class="op-mgr-hop">
+                        <span class="op-label">{{template "op_icon" "globe"}} {{.T.Get "Domain"}}</span>
+                        <b>{{.CurrentDomain}}</b>
+                        <p class="op-hint">{{if eq .SSLState "valid"}}{{.T.Get "SSL certificate valid until %(date)s" "date" .SSLExpires}}{{else if eq .SSLState "expiring"}}{{.T.Get "SSL certificate expires %(date)s" "date" .SSLExpires}}{{else if eq .SSLState "expired"}}{{.T.Get "SSL certificate expired"}}{{else if eq .SSLState "missing"}}{{.T.Get "SSL is on, the certificate isn't issued yet"}}{{else}}{{.T.Get "Served over plain HTTP"}}{{end}}</p>
+                    </div>
+                    <span class="op-mgr-arrow" aria-hidden="true">{{template "op_icon" "arrowright"}}</span>
+                    <div class="op-mgr-hop">
+                        <span class="op-label">{{template "op_icon" "server"}} {{.T.Get "Web server"}}</span>
+                        <b>{{if .WebServer}}{{title .WebServer}}{{else}}{{.T.Get "Web server"}}{{end}}</b>
+                        <p class="op-hint">{{.T.Get "Proxies every path to the container"}}</p>
+                    </div>
+                    <span class="op-mgr-arrow" aria-hidden="true">{{template "op_icon" "arrowright"}}</span>
+                    <div class="op-mgr-hop">
+                        <span class="op-label">{{template "op_icon" "box"}} {{.T.Get "Container"}}</span>
+                        <b>{{lower .Service}}{{if .Container.Port}}:{{.Container.Port}}{{end}}</b>
+                        <p class="op-hint">{{if .Image}}{{.Image}}{{else}}{{$rt}} {{.Container.Version}}{{end}}</p>
+                    </div>
+                </div>
+                {{if .Container.Port}}<p class="op-hint op-mgr-flow-note">{{.T.Get "Other services in your account reach the app at"}} <span class="op-mono">{{lower .Service}}:{{.Container.Port}}</span>.</p>{{end}}
+            </section>
+
+            <div class="op-mgr-grid2">
+                <section class="op-card">
+                    <div class="op-card-head">
+                        <h2>{{.T.Get "Files"}}</h2>
+                        {{if .UserAllowed.filemanager}}<a href="/files/{{replace .Docroot "/var/www/html/" ""}}">{{.T.Get "Open in File Manager"}}</a>{{end}}
+                    </div>
+                    <dl class="op-mgr-kv" x-data>
+                        <dt>{{.T.Get "Folder"}}</dt><dd class="op-mono">{{.Docroot}}</dd>
+                        <dd><button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy folder path"}}" @click="navigator.clipboard && navigator.clipboard.writeText({{toJSON .Docroot}}); showToast({{toJSON (.T.Get "Copied folder path.")}}, 'success')">{{template "op_icon" "copy"}}</button></dd>
+                        <dt>{{.T.Get "Startup file"}}</dt><dd class="op-mono">{{replace .StartupFile (print .Docroot "/") ""}}</dd>
+                        <dd><button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy startup file path"}}" @click="navigator.clipboard && navigator.clipboard.writeText({{toJSON .StartupFile}}); showToast({{toJSON (.T.Get "Copied startup file path.")}}, 'success')">{{template "op_icon" "copy"}}</button></dd>
+                    </dl>
+                    {{if .Files}}
+                    <ul class="op-mgr-files">
+                        {{range .Files}}<li class="{{if .Dir}}is-dir{{end}}">{{if .Dir}}{{template "op_icon" "folder"}}{{else}}{{template "op_icon" "file"}}{{end}}<span>{{.Name}}</span><span class="op-mono">{{if .Dir}}{{.Modified}}{{else}}{{.Size}}{{end}}</span></li>{{end}}
+                    </ul>
+                    {{if .HiddenFiles}}<p class="op-hint">{{.T.Get "%(n)s hidden files not shown" "n" (toString .HiddenFiles)}}</p>{{end}}
+                    {{else}}
+                    <p class="op-hint">{{.T.Get "The folder is empty."}}</p>
+                    {{end}}
+                    {{if or .UserAllowed.disk_usage .UserAllowed.inodes .UserAllowed.ftp}}
+                    <div class="op-mgr-links">
+                        {{if .UserAllowed.disk_usage}}<a class="op-btn op-btn-secondary op-btn-sm" href="{{.DiskUsageHref}}">{{template "op_icon" "chartpie"}} {{.T.Get "Disk Usage"}}</a>{{end}}
+                        {{if .UserAllowed.inodes}}<a class="op-btn op-btn-secondary op-btn-sm" href="{{.InodesExplorerHref}}">{{template "op_icon" "file"}} {{.T.Get "Inodes Explorer"}}</a>{{end}}
+                        {{if .UserAllowed.ftp}}<a class="op-btn op-btn-secondary op-btn-sm" href="/ftp">{{template "op_icon" "ftp"}} {{.T.Get "FTP Accounts"}}</a>{{end}}
+                    </div>
+                    {{end}}
+                </section>
+
+                <section class="op-card">
+                    <div class="op-card-head">
+                        <h2>{{.T.Get "Latest log lines"}}</h2>
+                        <a href="?domain={{.CurrentDomain}}&tab=logs" @click.prevent="document.getElementById('logs-tab').click()">{{.T.Get "All logs"}}</a>
+                    </div>
+                    <pre class="op-mgr-mini" id="op-rt-tail">{{.T.Get "Loading..."}}</pre>
+                </section>
+            </div>
+
+            <div class="op-mgr-side3">
+                {{template "waf_panel" .}}
+                {{template "visitors" .}}
+                <section class="op-card">
+                    <div class="op-card-head"><h2>{{.T.Get "Created"}}</h2></div>
+                    <b class="op-kpi-value" id="created_date" data-relative-date="{{.Container.CreatedDate}}">{{.Container.CreatedDate}}</b>
+                    <p class="op-mono op-hint">{{replace (replace .Container.CreatedDate "T" " ") "Z" " UTC"}}</p>
+                </section>
+            </div>
+        </div>
+
+        <div class="hidden op-wp-panel" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+            <form action="/pm2/update/{{.Service}}" method="POST" class="op-mgr-form"
+                  x-data="{ startup: {{toJSON .StartupFile}}, custom: {{toJSON .CustomCmd}}, workdir: {{toJSON .Workdir}}, git: {{toJSON .GitRepoURL}}, req: {{if .RequirementsSelected}}true{{else}}false{{end}},
+                            ext: {{if eq .Type "nodejs"}}'js'{{else if eq .Type "python"}}'py'{{else if eq .Type "ruby"}}'rb'{{else if eq .Type "java"}}'java'{{else}}''{{end}},
+                            get startupErr() { const v = this.startup; if (!v.startsWith('/var/www/html/')) return {{toJSON (.T.Get "Path must start with /var/www/html/")}}; if (v.includes('../')) return {{toJSON (.T.Get "Path traversal (../) is not allowed")}}; if (this.ext && !v.endsWith('.' + this.ext)) return {{toJSON (.T.Get "Startup file needs to be a .%(ext)s file")}}.replace('%(ext)s', this.ext); return ''; },
+                            get customErr() { return this.custom.includes('..') ? {{toJSON (.T.Get "Path traversal (..) is not allowed")}} : ''; },
+                            get workdirErr() { const v = this.workdir; if (!v.startsWith('/var/www/html/')) return {{toJSON (.T.Get "Path must start with /var/www/html/")}}; if (v.includes('../')) return {{toJSON (.T.Get "Path traversal (../) is not allowed")}}; return ''; },
+                            get gitErr() { return this.git !== '' && !this.git.startsWith('https://') ? {{toJSON (.T.Get "Only https:// URLs are supported")}} : ''; },
+                            get runs() { return (this.req ? {{toJSON $inst}} + ' && ' : '') + (this.custom.trim() || {{toJSON $run}} + ' ' + this.startup); } }"
+                  @submit="if (startupErr || customErr || workdirErr || gitErr) { $event.preventDefault(); showToast({{toJSON (.T.Get "Fix the highlighted fields first.")}}, 'error'); }">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <input type="hidden" name="requirements" :value="req ? '1' : ''" value="{{if .RequirementsSelected}}1{{end}}">
+
+                <div class="op-card-head"><h2>{{.T.Get "Settings"}}</h2><span class="op-hint">{{.T.Get "Saved to the app's service in docker-compose.yml and .env"}}</span></div>
+
+                <div class="op-mgr-sec">
+                    <div><h3>{{.T.Get "Startup"}}</h3><p class="op-hint">{{.T.Get "Which file starts the app, and whether packages are installed first."}}</p></div>
+                    <div class="op-mgr-fields">
+                        <div class="op-field">
+                            <label class="op-label" for="startup_file">{{.T.Get "Startup file"}}</label>
+                            <input class="op-input op-mono" required id="startup_file" name="startup_file" type="text" x-model="startup" :class="startupErr && 'is-invalid'">
+                            <p class="op-hint" x-show="!startupErr">{{.T.Get "Run with %(cmd)s when no custom command is set." "cmd" $run}}</p>
+                            <p class="op-hint is-danger" x-show="startupErr" x-text="startupErr" x-cloak></p>
+                        </div>
+                        <div class="op-field">
+                            <label class="op-label" for="custom_cmd">{{.T.Get "Custom startup command"}} <span class="op-muted">{{.T.Get "optional"}}</span></label>
+                            <input class="op-input op-mono" id="custom_cmd" name="custom_cmd" type="text" x-model="custom" placeholder="{{$run}} {{replace .StartupFile (print .Docroot "/") ""}}" :class="customErr && 'is-invalid'">
+                            <p class="op-hint" x-show="!customErr">{{.T.Get "Used instead of the default, with any flags you need."}}</p>
+                            <p class="op-hint is-danger" x-show="customErr" x-text="customErr" x-cloak></p>
+                        </div>
+                        <div class="op-field">
+                            <label class="op-label" for="workdir">{{.T.Get "Work dir"}}</label>
+                            <input class="op-input op-mono" required id="workdir" name="workdir" type="text" x-model="workdir" :class="workdirErr && 'is-invalid'">
+                            <p class="op-hint" x-show="!workdirErr">{{.T.Get "Packages are installed here with %(cmd)s." "cmd" $inst}}</p>
+                            <p class="op-hint is-danger" x-show="workdirErr" x-text="workdirErr" x-cloak></p>
+                        </div>
+                        <label class="op-check-row op-switch-row">
+                            <span><b>{{.T.Get "Install packages before startup"}}</b><p>{{.T.Get "Runs %(cmd)s before the startup command." "cmd" $inst}}</p></span>
+                            <input type="checkbox" role="switch" x-model="req" aria-label="{{.T.Get "Install packages before startup"}}">
+                        </label>
+                        <div class="op-field">
+                            <span class="op-label">{{.T.Get "Runs on start"}}</span>
+                            <code class="op-mgr-preview" x-text="runs"></code>
+                        </div>
+                    </div>
+                </div>
+
+                {{if .UserAllowed.git}}
+                <div class="op-mgr-sec">
+                    <div><h3>{{.T.Get "Git deploy"}}</h3><p class="op-hint">{{.T.Get "Re-fetch the code from a repository on every restart."}}</p></div>
+                    <div class="op-mgr-fields">
+                        <div class="op-field">
+                            <label class="op-label" for="git_repo_url">{{.T.Get "Git repository URL"}} <span class="op-muted">{{.T.Get "optional"}}</span></label>
+                            <input class="op-input op-mono" id="git_repo_url" name="git_repo_url" type="text" placeholder="https://github.com/user/repo.git" x-model="git" :class="gitErr && 'is-invalid'">
+                            <p class="op-hint is-danger" x-show="gitErr" x-text="gitErr" x-cloak></p>
+                            <p class="op-hint">{{.T.Get "On every restart the code is reset to the latest commit, before install and startup run. Local changes in the folder are overwritten. Only public repositories work; for a private one, put a personal access token in the URL. Clear the field to disconnect."}}</p>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+
+                <div class="op-mgr-sec">
+                    <div><h3>{{.T.Get "Version"}}</h3><p class="op-hint">{{.T.Get "Restart the app after changing the %(rt)s version." "rt" $rt}}</p></div>
+                    <div class="op-mgr-fields">
+                        <div class="op-field">
+                            <label class="op-label" for="version">{{.T.Get "%(rt)s version" "rt" $rt}}</label>
+                            <select name="version" id="version" required class="op-select op-mono"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="op-mgr-sec">
+                    <div><h3>{{.T.Get "Resource limits"}}</h3><p class="op-hint">{{.T.Get "CPU, memory and processes this container can use."}}</p></div>
+                    <div class="op-mgr-fields is-3">
+                        <div class="op-field"><label class="op-label" for="cpu">{{.T.Get "CPU (cores)"}}</label><input class="op-input op-mono" required id="cpu" name="cpu" type="number" min="0.10" step=".01" value="{{.CPU}}"></div>
+                        <div class="op-field"><label class="op-label" for="ram">{{.T.Get "Memory (GB)"}}</label><input class="op-input op-mono" required id="ram" name="ram" type="number" min="0.10" step=".01" value="{{.RAM}}"></div>
+                        <div class="op-field"><label class="op-label" for="pids">{{.T.Get "PIDs"}}</label><input class="op-input op-mono" required id="pids" name="pids" type="number" min="10" max="1000" step="1" value="{{.PIDs}}"><p class="op-hint">{{.T.Get "10 to 1000"}}</p></div>
+                    </div>
+                </div>
+
+                <div class="op-mgr-foot">
+                    <span class="op-hint">{{.T.Get "Restart the application to apply the changes."}}</span>
+                    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save changes"}}</button>
+                </div>
+            </form>
+
+            <script>
+            (function () {
+                const versionSelect = document.getElementById('version');
+                const currentVersion = {{toJSON .CurrentVersion}};
+                const loading = document.createElement('option');
+                loading.textContent = {{toJSON (.T.Get "Loading versions...")}};
+                versionSelect.appendChild(loading);
+                fetch('/docker/tags/' + encodeURIComponent({{toJSON .Type}}))
+                    .then(r => r.json())
+                    .then(data => {
+                        versionSelect.innerHTML = '';
+                        if (data.error) {
+                            const o = document.createElement('option'); o.value = ''; o.textContent = data.error; versionSelect.appendChild(o);
+                            return;
+                        }
+                        const versions = data.map(item => item.latest).filter(v => v);
+                        if (currentVersion && !versions.includes(currentVersion)) versions.unshift(currentVersion);
+                        versions.forEach(v => {
+                            const o = document.createElement('option');
+                            o.value = v;
+                            o.textContent = v === currentVersion ? v + ' ' + {{toJSON (.T.Get "(current)")}} : v;
+                            o.selected = v === currentVersion;
+                            versionSelect.appendChild(o);
+                        });
+                    })
+                    .catch(err => {
+                        versionSelect.innerHTML = '';
+                        const o = document.createElement('option'); o.value = currentVersion || ''; o.textContent = currentVersion || ({{toJSON (.T.Get "Error")}} + ': ' + err.message); versionSelect.appendChild(o);
+                    });
+            })();
+            </script>
+        </div>
+
+                <div class="hidden op-wp-panel" id="pip" role="tabpanel" aria-labelledby="pip-tab">
+
+                <div class="op-card-head op-rt-pkg-head">
+                    <div><h2 class="op-mono">{{.Manifest.File}}</h2><span class="op-hint op-mono">{{.Manifest.Path}}</span></div>
+                    <div class="op-actions">
+                        {{if eq .Type "nodejs"}}
+                        <button type="button" data-pm="npm" class="op-btn op-btn-primary op-btn-sm install-btn">{{.T.Get "NPM install"}}</button>
+                        <button type="button" data-pm="pnpm" class="op-btn op-btn-secondary op-btn-sm install-btn">{{.T.Get "PNPM install"}}</button>
+                        {{else if eq .Type "python"}}
+                        <button type="button" data-pm="pip" class="op-btn op-btn-primary op-btn-sm install-btn">{{.T.Get "PIP install"}}</button>
+                        {{else if eq .Type "ruby"}}
+                        <button type="button" data-pm="bundle" class="op-btn op-btn-primary op-btn-sm install-btn">{{.T.Get "Bundle install"}}</button>
+                        {{else if eq .Type "java"}}
+                        <button type="button" data-pm="mvn" class="op-btn op-btn-primary op-btn-sm install-btn">{{.T.Get "Maven install"}}</button>
+                        {{end}}
+                        {{if .UserAllowed.filemanager}}<a href="/file-manager/edit-file/{{replace .Manifest.Path "/var/www/html/" ""}}?new=true" target="_blank" class="op-btn op-btn-ghost op-btn-sm" id="npm-edit-link">{{template "op_icon" "pencil"}} {{.T.Get "Edit file"}}</a>{{end}}
+                    </div>
+                </div>
+                {{if not .Manifest.Found}}
+                <p class="op-meta">{{.T.Get "%(file)s was not found in the app folder." "file" .Manifest.Path}}</p>
+                {{else}}
+                <div class="op-rt-pkg">
+                    <div class="op-col">
+                        {{range .Manifest.Groups}}
+                        <div class="op-table-wrap">
+                            <table class="op-table is-plain op-rt-deps">
+                                <thead><tr><th>{{$.T.Get .Title}}</th><th>{{$.T.Get .ValueLabel}}</th>{{if .HasInstalled}}<th>{{$.T.Get "Installed"}}</th>{{end}}</tr></thead>
+                                <tbody>
+                                    {{$inst := .HasInstalled}}
+                                    {{range .Rows}}<tr><td class="op-mono">{{.Name}}</td><td class="op-mono">{{.Value}}</td>{{if $inst}}<td class="op-mono">{{if .Installed}}{{.Installed}}{{else}}<span class="op-muted">{{$.T.Get "not installed"}}</span>{{end}}</td>{{end}}</tr>{{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="op-meta">{{.T.Get "No packages listed in this file."}}</p>
+                        {{end}}
+                    </div>
+                    <pre class="op-pre op-rt-manifest" id="requirements_file">{{.Manifest.Text}}</pre>
+                </div>
+                {{end}}
+
+    <div id="installPIPModal">
+    <div class="modal-body"></div>
+    </div>
+
+                </div>
+
+                <div class="hidden op-wp-panel" id="envvars" role="tabpanel" aria-labelledby="envvars-tab">
+                    <div class="op-section">
+                        <div>
+                            <h2 class="op-h">{{.T.Get "Environment Variables"}}</h2>
+                            <p class="op-meta">{{.T.Get "Custom environment variables passed to the application's container, one KEY=VALUE per line."}}</p>
+                        </div>
+                        <div class="op-section-body">
+                            <form action="/pm2/envvars/{{.Service}}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                                <textarea name="env_vars" rows="10" placeholder="API_KEY=changeme&#10;DATABASE_URL=postgres://user:pass@host/db" class="op-input">{{.EnvVars}}</textarea>
+                                <p class="op-hint">{{.T.Get "Restart the application from the Overview tab after saving for changes to take effect."}}</p>
+                                <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save Environment Variables"}}</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hidden op-wp-panel" id="clone" role="tabpanel" aria-labelledby="clone-tab">
+
+                    <p class="op-meta">{{.T.Get "Clone this application's files and settings onto a new domain - useful for quick staging copies."}}</p>
+
+                    <form id="pm2-CloneForm">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+                        <div class="op-sep"><div class="op-divider"></div></div>
+
+                        <div class="op-section">
+                            <div>
+                                <h2 class="op-h">{{.T.Get "Location"}}</h2>
+                                <p class="op-meta">{{.T.Get "Please choose the URL to install the clone on"}}</p>
+                            </div>
+                            <div class="op-section-body">
+                                <div class="op-form-grid">
+                                    <div class="op-field-wrap">
+                                        <label class="op-label" for="pm2-target_domain_id">{{.T.Get "Target"}}<span class="is-danger">*</span></label>
+                                        <div class="op-field-ctl">
+                                            <div class="flex">
+                                                <select class="op-input" name="target_domain_id" id="pm2-target_domain_id">
+                                                    <option selected disabled value="">{{.T.Get "Select a domain"}}</option>
+                                                    {{range .Domains}}
+                                                        <option class="punycode" value="{{.DomainID}}">{{.DomainURL}}</option>
+                                                    {{end}}
+                                                </select>
+                                                <div class="input-group-append flex">
+                                                    <input type="text" name="target_subdirectory" id="pm2-target_subdirectory" placeholder="{{.T.Get "subfolder"}}" class="op-input op-join-r">
+                                                </div>
+                                            </div>
+                                            <p class="op-hint">{{.T.Get "Make sure the target domain/subfolder isn't already used by another site - existing files there may be overwritten."}}</p>
+                                        </div>
+                                    </div>
+                                    <div class="op-field-wrap">
+                                        <label class="op-label" for="pm2-target_service_name">{{.T.Get "Service Name"}}<span class="is-danger">*</span></label>
+                                        <div class="op-field-ctl">
+                                            <input class="op-input" id="pm2-target_service_name" name="target_service_name" type="text" placeholder="{{.Service}}-clone" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="op-sep"><div class="op-divider"></div></div>
+
+                        <div class="op-section">
+                            <div>
+                                <h2 class="op-h">{{.T.Get "Startup"}}</h2>
+                                <p class="op-meta">{{.T.Get "Version, requirements, and resource limits are carried over from this application automatically."}}</p>
+                            </div>
+                            <div class="op-section-body">
+                                <div class="op-form-grid">
+                                    <div class="op-field-wrap">
+                                        <label class="op-label" for="pm2-clone_startup_file">{{.T.Get "Startup File"}}<span class="is-danger">*</span></label>
+                                        <div class="op-field-ctl">
+                                            <input class="op-input" id="pm2-clone_startup_file" name="startup_file" type="text" value="{{.StartupFile}}" />
+                                            <p class="op-hint">{{.T.Get "Prefilled from this application - update the domain portion of the path to match the target above."}}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="op-sep"><div class="op-divider"></div></div>
+
+                        <div class="op-actions op-actions-end">
+                            <button type="button" id="pm2-startCloneBtn" class="op-btn op-btn-primary">{{.T.Get "Clone Application"}}</button>
+                        </div>
+                    </form>
+
+                    <script>
+                        (function() {
+                            const domainSelect = document.getElementById('pm2-target_domain_id');
+                            const subdirInput = document.getElementById('pm2-target_subdirectory');
+                            const startupFileInput = document.getElementById('pm2-clone_startup_file');
+                            const originalStartupFile = {{toJSON .StartupFile}};
+                            let startupFileTouched = false;
+                            startupFileInput.addEventListener('input', function() { startupFileTouched = true; });
+
+                            function updateStartupFilePreview() {
+                                if (startupFileTouched) return;
+                                const targetDomain = domainSelect.options[domainSelect.selectedIndex]?.textContent || '';
+                                if (!targetDomain || targetDomain === {{toJSON (.T.Get "Select a domain")}}) return;
+                                const parts = originalStartupFile.split('/var/www/html/');
+                                if (parts.length < 2) return;
+                                const afterDomain = parts[1].split('/').slice(1).join('/');
+                                const subdir = subdirInput.value.trim();
+                                startupFileInput.value = '/var/www/html/' + targetDomain + (subdir ? '/' + subdir : '') + (afterDomain ? '/' + afterDomain : '');
+                            }
+                            domainSelect.addEventListener('change', updateStartupFilePreview);
+                            subdirInput.addEventListener('input', updateStartupFilePreview);
+
+                            document.getElementById('pm2-startCloneBtn').addEventListener('click', function() {
+                                const btn = this;
+                                if (!domainSelect.value) {
+                                    showToast({{toJSON (.T.Get "Please select a target domain.")}}, 'error');
+                                    return;
+                                }
+                                btn.disabled = true;
+                                btn.textContent = {{toJSON (.T.Get "Cloning...")}};
+                                const formData = new URLSearchParams(new FormData(document.getElementById('pm2-CloneForm')));
+                                showToast({{toJSON (.T.Get "Cloning process started... Please wait.")}}, 'loading');
+
+                                fetch("/pm2/clone/{{.Service}}", {
+                                    method: "POST",
+                                    headers: { 'X-CSRF-Token': csrf_token, 'Content-Type': 'application/x-www-form-urlencoded' },
+                                    body: formData.toString()
+                                })
+                                    .then(response => response.json().then(data => {
+                                        if (!response.ok) throw data;
+                                        return data;
+                                    }))
+                                    .then(response => {
+                                        if (response.status === 'success') {
+                                            showToast(response.warning || {{toJSON (.T.Get "Cloned successfully!")}}, response.warning ? 'warning' : 'success');
+                                            btn.textContent = {{toJSON (.T.Get "Clone Complete")}};
+                                        } else {
+                                            showToast({{toJSON (.T.Get "Error cloning application")}}, 'error');
+                                            btn.disabled = false;
+                                            btn.textContent = {{toJSON (.T.Get "Try Again")}};
+                                        }
+                                    })
+                                    .catch(error => {
+                                        showToast(`${error?.error || error}`, 'error');
+                                        btn.disabled = false;
+                                        btn.textContent = {{toJSON (.T.Get "Retry Clone")}};
+                                    });
+                            });
+                        })();
+                    </script>
+
+                </div>
+
+                <div class="hidden op-wp-panel" id="backups" role="tabpanel" aria-labelledby="backups-tab">
+
+                    <div class="op-section">
+                        <div>
+                            <h2 class="op-h">{{.T.Get "Create a Backup"}}</h2>
+                            <p class="op-meta">{{.T.Get "Archives the app's files, and records its current version/requirements/startup command/resource limits and environment variables."}}</p>
+                        </div>
+                        <div class="op-section-body">
+                            <div class="op-form-grid">
+                                <div class="op-field-wrap">
+                                    <button id="pm2-runBackup" type="button" class="op-btn op-btn-primary">{{.T.Get "Generate Backup"}}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="op-sep"><div class="op-divider"></div><div class="whitespace-nowrap">{{.T.Get "or"}}</div><div class="op-divider"></div><div></div></div>
+
+                    <div class="op-section">
+                        <div>
+                            <h2 class="op-h">{{.T.Get "Restore from Backups"}}</h2>
+                            <p class="op-meta">{{.T.Get "Restore files and settings from a backup. Every setting is validated before anything is changed."}}</p>
+                        </div>
+                        <div class="op-section-body">
+                            <div class="op-form-grid">
+                                <div class="op-field-wrap">
+                                    <div class="op-field-ctl op-stack-sm">
+                                        <button id="pm2-restore-btn-or" class="op-btn op-btn-primary" type="button">
+                                            {{.T.Get "Display Backups"}}
+                                        </button>
+
+                                        <div id="pm2-restore-section" class="hidden">
+                                            <p>{{.T.Get "Select a backup date:"}}</p>
+                                            <select class="op-input" id="pm2-restoreBackupDate"></select>
+
+                                            <button type="button" id="pm2-confirmRestore" class="op-btn op-btn-primary">
+                                                {{.T.Get "Start Restore"}}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                        (function() {
+                            const runBackupButton = document.getElementById("pm2-runBackup");
+                            const restoreButton = document.getElementById("pm2-restore-btn-or");
+                            const restoreBackupDateSelect = document.getElementById("pm2-restoreBackupDate");
+                            const confirmRestoreButton = document.getElementById("pm2-confirmRestore");
+                            let restoreConfirmed = false;
+
+                            if (runBackupButton) {
+                                runBackupButton.addEventListener("click", function () {
+                                    runBackupButton.disabled = true;
+                                    runBackupButton.textContent = {{toJSON (.T.Get "Generating...")}};
+                                    showToast({{toJSON (.T.Get "Generating backup... Please wait.")}}, 'loading');
+
+                                    fetch("/pm2/backup/{{.Service}}", { method: "POST", headers: { 'X-CSRF-Token': csrf_token } })
+                                        .then(response => response.json().then(data => {
+                                            if (!response.ok) throw data;
+                                            return data;
+                                        }))
+                                        .then(() => {
+                                            showToast({{toJSON (.T.Get "Backup created successfully!")}}, 'success');
+                                            runBackupButton.disabled = false;
+                                            runBackupButton.textContent = {{toJSON (.T.Get "Generate Backup")}};
+                                        })
+                                        .catch(error => {
+                                            showToast(`${error?.error || error}`, 'error');
+                                            runBackupButton.disabled = false;
+                                            runBackupButton.textContent = {{toJSON (.T.Get "Generate Backup")}};
+                                        });
+                                });
+                            }
+
+                            if (restoreButton) {
+                                restoreButton.addEventListener("click", function () {
+                                    document.getElementById("pm2-restore-section").classList.remove("hidden");
+                                    restoreButton.classList.add("hidden");
+                                    fetch("/pm2/backups/{{.Service}}", { headers: { 'X-CSRF-Token': csrf_token } })
+                                        .then(response => response.json())
+                                        .then(dates => {
+                                            restoreBackupDateSelect.innerHTML = "";
+                                            if (dates.length > 0) {
+                                                dates.forEach(date => {
+                                                    const option = document.createElement("option");
+                                                    option.value = date;
+                                                    option.textContent = date;
+                                                    restoreBackupDateSelect.appendChild(option);
+                                                });
+                                            } else {
+                                                const option = document.createElement("option");
+                                                option.textContent = {{toJSON (.T.Get "No backups available")}};
+                                                option.disabled = true;
+                                                restoreBackupDateSelect.appendChild(option);
+                                            }
+                                        })
+                                        .catch(error => console.error("Error fetching backup dates:", error));
+                                });
+                            }
+
+                            if (confirmRestoreButton) {
+                                confirmRestoreButton.addEventListener("click", function () {
+                                    if (!restoreConfirmed) {
+                                        confirmRestoreButton.textContent = {{toJSON (.T.Get "Click again to confirm")}};
+                                        confirmRestoreButton.classList.remove("op-btn-primary");
+                                        confirmRestoreButton.classList.add("op-btn-danger");
+                                        restoreConfirmed = true;
+                                        return;
+                                    }
+                                    const selectedDate = restoreBackupDateSelect.value;
+                                    showToast({{toJSON (.T.Get "Restoring backup... Please wait.")}}, 'warning');
+                                    fetch("/pm2/restore/{{.Service}}?backup_date=" + encodeURIComponent(selectedDate), { method: "POST", headers: { 'X-CSRF-Token': csrf_token } })
+                                        .then(response => response.json().then(data => {
+                                            if (!response.ok) throw data;
+                                            return data;
+                                        }))
+                                        .then(() => {
+                                            showToast({{toJSON (.T.Get "Backup restored successfully!")}}, 'success');
+                                            setTimeout(() => {
+                                                restoreConfirmed = false;
+                                                confirmRestoreButton.textContent = {{toJSON (.T.Get "Start Restore")}};
+                                                confirmRestoreButton.classList.remove("op-btn-danger");
+                                                confirmRestoreButton.classList.add("op-btn-primary");
+                                            }, 5000);
+                                        })
+                                        .catch(error => {
+                                            const details = error && error.details ? ' - ' + error.details.join('; ') : '';
+                                            showToast(`${(error?.error || error)}${details}`, 'error');
+                                        });
+                                });
+                            }
+                        })();
+                    </script>
+
+                </div>
+
+                <div class="hidden op-wp-panel" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+
+                    <div class="op-card-head op-mgr-loghead">
+                        <h2 id="app-log-title">{{.T.Get "Container log"}} <span class="op-hint op-mono">{{lower .Service}}</span></h2>
+                        <div class="op-actions">
+                            <button type="button" class="op-btn op-btn-sm op-btn-secondary"
+                                @click="$store.logs.rawMode = !$store.logs.rawMode; renderLogs(window.__loadedLogs || '', $store.logs.rawMode);"
+                                x-text="$store.logs.rawMode ? {{toJSON (.T.Get "Formatted view")}} : {{toJSON (.T.Get "Raw view")}}">{{.T.Get "Raw view"}}</button>
+                            <button type="button" class="op-btn op-btn-sm op-btn-secondary" @click="loadAppLogs()">{{template "op_icon" "refresh"}} {{.T.Get "Refresh"}}</button>
+                            <button type="button" class="op-icon-btn" title="{{.T.Get "Copy to clipboard"}}" aria-label="{{.T.Get "Copy to clipboard"}}" @click="copyLogs()">{{template "op_icon" "copy"}}</button>
+                            <button type="button" class="op-icon-btn" title="{{.T.Get "Open log in new tab"}}" aria-label="{{.T.Get "Open log in new tab"}}" @click="openLogsInNewTab()">{{template "op_icon" "external"}}</button>
+                        </div>
+                    </div>
+
+                    <div id="app-log" class="op-mgr-log" tabindex="0"><pre>{{.T.Get "Loading application logs.."}}</pre></div>
+
+                    <script>
+                    // one request feeds both the Logs tab and the overview's last lines
+                    window.loadAppLogs = function () {
+                        const svc = {{toJSON .Service}};
+                        return fetch(`/pm2/logs/${encodeURIComponent(svc)}`)
+                            .then(response => response.text())
+                            .then(data => {
+                                window.__loadedLogs = data;
+                                renderLogs(data, Alpine.store('logs').rawMode);
+                                renderLogTail(data);
+                            })
+                            .catch(error => {
+                                document.getElementById('app-log').innerHTML = '';
+                                showToast({{toJSON (.T.Get "Error fetching container logs for application.")}}, 'warning');
+                                console.error(error);
+                            });
+                    };
+
+                    function parseLogLine(line) {
+                        try {
+                            const j = JSON.parse(line);
+                            if (j && j.log !== undefined) return { time: j.time || '', msg: String(j.log).replace(/\n$/, ''), err: (j.stream || '').toLowerCase() === 'stderr' };
+                        } catch (e) {}
+                        const m = line.match(/^(\d{4}-\d\d-\d\dT[\d:.]+Z?)\s?(.*)$/);
+                        return m ? { time: m[1], msg: m[2], err: false } : { time: '', msg: line, err: false };
+                    }
+
+                    function renderLogs(data, rawMode) {
+                        const box = document.getElementById('app-log');
+                        box.innerHTML = '';
+                        const pre = document.createElement('pre');
+                        box.appendChild(pre);
+                        if (rawMode) { pre.textContent = data; box.classList.add('is-raw'); return; }
+                        box.classList.remove('is-raw');
+                        const lines = data.split('\n').map(l => l.trim()).filter(Boolean);
+                        if (!lines.length) { pre.textContent = {{toJSON (.T.Get "Nothing logged yet.")}}; return; }
+                        lines.forEach(line => {
+                            const l = parseLogLine(line);
+                            if (l.time) {
+                                const t = document.createElement('span');
+                                t.className = 'op-mgr-log-t';
+                                t.textContent = l.time.replace('T', ' ').replace(/\.\d+Z?$/, '') + ' ';
+                                pre.appendChild(t);
+                            }
+                            const msg = document.createElement('span');
+                            if (l.err) msg.className = 'op-log-hl is-danger';
+                            msg.textContent = l.msg + '\n';
+                            pre.appendChild(msg);
+                        });
+                    }
+
+                    function renderLogTail(data) {
+                        const tail = document.getElementById('op-rt-tail');
+                        if (!tail) return;
+                        const lines = data.split('\n').map(l => l.trim()).filter(Boolean).slice(-8);
+                        tail.innerHTML = '';
+                        if (!lines.length) { tail.textContent = {{toJSON (.T.Get "Nothing logged yet.")}}; return; }
+                        lines.forEach(line => {
+                            const l = parseLogLine(line);
+                            const t = document.createElement('span');
+                            t.className = 'op-mgr-log-t';
+                            const hm = l.time.match(/T(\d\d:\d\d:\d\d)/);
+                            t.textContent = (hm ? hm[1] : '') + ' ';
+                            const msg = document.createElement('span');
+                            if (l.err) msg.className = 'op-log-hl is-danger';
+                            msg.textContent = l.msg + '\n';
+                            tail.append(t, msg);
+                        });
+                    }
+
+                    document.addEventListener('DOMContentLoaded', () => window.loadAppLogs());
+
+function copyLogs() {
+    if (!window.__loadedLogs) return;
+
+    copyToClipboard(window.__loadedLogs)
+        .then(() => {
+            showToast({{toJSON (.T.Get "Logs copied to clipboard.")}}, "success");
+        })
+        .catch(err => {
+            console.error("Clipboard copy failed:", err);
+            showToast({{toJSON (.T.Get "Failed to copy logs.")}}, "warning");
+        });
+}
+
+function openLogsInNewTab() {
+    const domain = {{toJSON .Service}};
+    const url = `/pm2/logs/${encodeURIComponent(domain)}`;
+    window.open(url, "_blank");
+}
+                    </script>
+                </div>
+
+                <div class="hidden op-wp-panel" id="remove" role="tabpanel">
+            <script>
+                function confirmRemoveforWP(Id) {
+                    showToast({{toJSON (.T.Get "Application removal started. Please wait.")}}, 'loading');
+                    var xhr = new XMLHttpRequest();
+                    const domain = {{toJSON .CurrentDomain}};
+                    xhr.open('POST', `/pm2/delete/${domain}`, true);
+                    xhr.setRequestHeader("X-CSRF-Token", csrf_token);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === 4) {
+                                window.location.href = '/sites';
+                        }
+                    };
+
+                    xhr.send('id=' + Id + '&csrf_token=' + encodeURIComponent(csrf_token));
+                }
+            </script>
+
+                    <p class="op-meta"></p>
+                </div>
+
+    </div>
+</div>
+
+<script>
+
+function GetWPfilesSize() {
+    const filesSizeSpan = document.getElementById("filesSize");
+    const destinationPath = {{toJSON (replace .Docroot "/var/www/html/" "")}};
+
+    fetch(`/json/directory-size?folder=${encodeURIComponent(destinationPath)}`)
+        .then(response => response.json())
+        .then(data => {
+            filesSizeSpan.textContent = data.size;
+        })
+        .catch(error => {
+            console.error("An error occurred fetching file size from container:", error);
+            showToast({{toJSON (.T.Get "An error occurred fetching folder size from the container.")}}, 'warning');
+        });
+}
+
+GetWPfilesSize();
+
+</script>
+
+<script>
+document.querySelector('html').addEventListener('click', function(e) {
+    const button = e.target.closest('.install-btn');
+    if (!button) return;
+    const pm2Id = {{toJSON .Service}};
+    const status = {{toJSON .PM2Status}};
+    const packageManager = button.dataset.pm;
+    const url = `/pm2/install/${packageManager}/${encodeURIComponent(pm2Id)}`;
+
+    if (status === "false") {
+        showToast({{toJSON (.T.Get "Cannot install while container is stopped.")}}, 'error');
+        return;
+    }
+
+    showToast({{toJSON (.T.Get "Installing packages.. Please wait.")}}, 'loading');
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-Token': csrf_token,
+            'Content-Type': 'application/json'
+        },
+        body: null
+    })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+        const modalBody = document.querySelector('#installPIPModal .modal-body');
+        modalBody.innerHTML = '';
+
+        const pre = document.createElement('pre');
+        pre.classList.add('overflow-auto', 'max-h-64', 'my-4', 'op-pre');
+        pre.textContent = data.output || data.error_output || data.message || "";
+        modalBody.appendChild(pre);
+
+        if (ok) {
+            showToast({{toJSON (.T.Get "Package installation completed.")}}, 'success');
+        } else {
+            showToast({{toJSON (.T.Get "Package installation failed.")}}, 'error');
+            console.error('Installation failed:', data.message);
+        }
+    })
+    .catch(error => {
+        showToast({{toJSON (.T.Get "Error running package install for application.")}}, 'error');
+        console.error(error);
+    });
+});
+</script>
+
+<!-- END templates/manager/python_node_apps.html -->
+{{end}}

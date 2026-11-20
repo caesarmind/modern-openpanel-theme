@@ -1,0 +1,36 @@
+{{/* every one-click CMS install page: the app's own file defines "cms_app", its wizard config as a JS object (K is window.opIWKit), and renders cmsinstall_page */}}
+{{define "cmsinstall_page"}}<!-- START templates/manager/{{$.App.Slug}}_install.html -->
+<div class="op-content">
+{{if .Domains}}
+{{template "op_iw_kit" .}}
+<script>
+(function () {
+  var K = window.opIWKit;
+  var app = {{template "cms_app" .}};
+  window.opIWConfig = Object.assign({
+    slug: {{toJSON (print .App.Slug)}},
+    name: {{toJSON (print .App.Name)}},
+    title: {{toJSON (.T.Get "Install %(name)s" "name" (print .App.Name))}},
+    cta: {{toJSON (.T.Get "Install %(name)s" "name" (print .App.Name))}},
+    endpoint: {{toJSON (print "/" .App.Slug "/install")}},
+    logo: {{toJSON (static (print "images/apps/" .App.Slug ".svg"))}},
+    domains: {{toJSON .Domains}},
+    mysqlPrefix: {{toJSON .MySQLPrefix}},
+    strength: {{.PasswordStrength}},
+    success: ['installation completed'],
+    manager: '/sites',
+    t: K.t
+  }, app);
+})();
+</script>
+{{template "op_install_wizard" .}}
+{{else}}
+<div class="op-card op-empty op-block-card">
+    <p class="op-strong">{{.T.Get "No domains yet"}}</p>
+    <p class="op-hint">{{.T.Get "Add your first domain to get started"}}</p>
+    <a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}}{{.T.Get "New domain"}}</a>
+</div>
+{{end}}
+</div>
+<!-- END templates/manager/{{$.App.Slug}}_install.html -->
+{{end}}

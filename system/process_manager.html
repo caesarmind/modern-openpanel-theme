@@ -1,0 +1,168 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/system/process_manager.html -->
+<script src="{{static "js/data-table.js"}}"></script>
+<div class="op-content" x-data="{ ...createTableController({
+        storageKey: 'processManagerColumnsVisibility',
+        columns: { container: true, uid: true, pid: true, ppid: false, cpu: true, stime: true, tty: false, time: true, cmd: true, actions: true }
+    }), container: '' }" x-init="init()">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{len .ProcessData}} {{.T.Get "processes"}} · {{len .Containers}} {{.T.Get "containers"}}</div>
+            <h1 class="op-title">{{.T.Get "Processes"}}</h1>
+            <p class="op-meta">{{.T.Get "View and manage currently running processes on the server."}}</p>
+        </div>
+        <div class="op-actions">
+            <a href="/process-manager" data-preserve-sort class="op-btn op-btn-secondary">{{template "op_icon" "refresh"}} {{.T.Get "Refresh"}}</a>
+        </div>
+    </div>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "apps"}} {{.T.Get "Processes"}}</div><div class="op-kpi-value">{{len .ProcessData}}</div><div class="op-kpi-note">{{.T.Get "Running right now"}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "layout"}} {{.T.Get "Containers"}}</div><div class="op-kpi-value">{{len .Containers}}</div><div class="op-kpi-note">{{.T.Get "With running processes"}}</div></div>
+        {{with .Busiest}}
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{$.T.Get "Busiest"}}</div><div class="op-kpi-value op-mono" style="font-size:18px">{{$.ProgramName .CMD}}</div><div class="op-kpi-note">{{.C}}% {{$.T.Get "CPU in"}} {{.Container}}</div></div>
+        {{else}}
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{.T.Get "Busiest"}}</div><div class="op-kpi-value">—</div><div class="op-kpi-note">&nbsp;</div></div>
+        {{end}}
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "info"}} {{.T.Get "Updated"}}</div><div class="op-kpi-value" style="font-size:20px" x-data x-text="new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })">—</div><div class="op-kpi-note">{{.T.Get "Refresh to read them again"}}</div></div>
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Processes Table"}}">
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search processes"}}" aria-label="{{.T.Get "Search processes"}}"></label>
+            {{if gt (len .Containers) 1}}
+            <select class="op-select op-select-sm" style="width:auto;flex:none" x-model="container" aria-label="{{.T.Get "Container"}}">
+                <option value="">{{.T.Get "All containers"}}</option>
+                {{range .Containers}}<option value="{{.}}">{{.}}</option>{{end}}
+            </select>
+            {{end}}
+            <div class="relative" :class="open && 'z-40'" style="margin-left:auto" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                <button class="op-filter" type="button" :aria-expanded="open.toString()" @click="open = !open">{{template "op_icon" "cols"}} {{.T.Get "Columns"}}</button>
+                <div class="op-menu op-columns" x-show="open" x-cloak style="right:0;top:40px">
+                    {{template "column_toggle" (dict "Key" "container" "Label" (.T.Get "Container"))}}
+                    {{template "column_toggle" (dict "Key" "uid" "Label" (.T.Get "User"))}}
+                    {{template "column_toggle" (dict "Key" "pid" "Label" (.T.Get "PID"))}}
+                    {{template "column_toggle" (dict "Key" "ppid" "Label" (.T.Get "Parent PID"))}}
+                    {{template "column_toggle" (dict "Key" "cpu" "Label" (.T.Get "CPU"))}}
+                    {{template "column_toggle" (dict "Key" "stime" "Label" (.T.Get "Started"))}}
+                    {{template "column_toggle" (dict "Key" "tty" "Label" (.T.Get "Terminal"))}}
+                    {{template "column_toggle" (dict "Key" "time" "Label" (.T.Get "CPU time"))}}
+                </div>
+            </div>
+        </div>
+
+{{template "bulk_open" (dict "T" .T "Table" "#process-manager-table" "Endpoint" "/process-manager/bulk")}}
+        <div class="op-table-wrap">
+            <table id="process-manager-table" class="op-table">
+                <thead>
+                    <tr>
+{{template "bulk_head_checkbox" .}}
+                        <th x-show="columns.container" scope="col" title="{{.T.Get "Service (Container name) in which the process is running."}}">{{template "proc_sort" (dict "Label" (.T.Get "Container") "Key" "container" "Type" "string")}}</th>
+                        <th x-show="columns.uid" scope="col" title="{{.T.Get "The user ID running the process inside the container."}}">{{template "proc_sort" (dict "Label" (.T.Get "User") "Key" "uid" "Type" "string")}}</th>
+                        <th x-show="columns.pid" scope="col" class="is-num" title="{{.T.Get "The Process ID (PID) of the process."}}">{{template "proc_sort" (dict "Label" (.T.Get "PID") "Key" "pid" "Type" "number")}}</th>
+                        <th x-show="columns.ppid" scope="col" class="is-num" title="{{.T.Get "The Parent Process ID (PPID), which refers to the process ID of the parent process."}}">{{template "proc_sort" (dict "Label" (.T.Get "Parent PID") "Key" "ppid" "Type" "number")}}</th>
+                        <th x-show="columns.cpu" scope="col" class="is-num" title="{{.T.Get "The CPU usage percentage for the process."}}">{{template "proc_sort" (dict "Label" (.T.Get "CPU") "Key" "cpu" "Type" "number")}}</th>
+                        <th x-show="columns.stime" scope="col" title="{{.T.Get "The start time of the process."}}">{{template "proc_sort" (dict "Label" (.T.Get "Started") "Key" "stime" "Type" "string")}}</th>
+                        <th x-show="columns.tty" scope="col" title="{{.T.Get "The terminal associated with the process. ? means that the process is running in the background."}}">{{template "proc_sort" (dict "Label" (.T.Get "Terminal") "Key" "tty" "Type" "string")}}</th>
+                        <th x-show="columns.time" scope="col" class="is-num" title="{{.T.Get "The cumulative CPU time the process has consumed."}}">{{template "proc_sort" (dict "Label" (.T.Get "CPU time") "Key" "time" "Type" "duration")}}</th>
+                        <th scope="col" title="{{.T.Get "The command that is running in the container."}}">{{template "proc_sort" (dict "Label" (.T.Get "Command") "Key" "cmd" "Type" "string")}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+    {{if not .ProcessData}}
+                    <tr>
+                        <td colspan="11"><div class="op-empty"><b>{{.T.Get "No processes"}}</b><span class="op-hint">{{.T.Get "Start a service to see its processes here."}}</span></div></td>
+                    </tr>
+    {{else}}
+        {{$userAllowed := .UserAllowed}}
+        {{range .ProcessData}}
+                    <tr x-data="{ full: false }" data-row-check x-show="(container === '' || container === {{toJSON .Container}}) && (searchQuery === '' || {{toJSON .Container}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .PID}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .CMD}}.toLowerCase().includes(searchQuery.toLowerCase()))" class="domain_row">
+{{template "bulk_row_checkbox" (dict "T" $.T "Key" (printf "%s/%v" .Container .PID) "Label" (printf "%s %v" .Container .PID))}}
+                        <td x-show="columns.container" data-sort-col="container">{{if or (index $userAllowed "services") (index $userAllowed "docker")}}<a class="op-tag" href="/{{if index $userAllowed "services"}}services/{{.Container}}{{else}}containers{{end}}">{{.Container}}</a>{{else}}<span class="op-tag">{{.Container}}</span>{{end}}</td>
+                        <td x-show="columns.uid" data-label="{{$.T.Get "User"}}" data-sort-col="uid"><span class="op-mono">{{.UID}}</span></td>
+                        <td x-show="columns.pid" data-label="{{$.T.Get "PID"}}" class="is-num" data-sort-col="pid"><span class="op-mono">{{.PID}}</span></td>
+                        <td x-show="columns.ppid" data-label="{{$.T.Get "Parent PID"}}" class="is-num" data-sort-col="ppid"><span class="op-mono">{{.PPID}}</span></td>
+                        <td x-show="columns.cpu" data-label="{{$.T.Get "CPU"}}" class="is-num" data-sort-col="cpu"><span class="op-mono">{{.C}}%</span></td>
+                        <td x-show="columns.stime" data-label="{{$.T.Get "Started"}}" data-sort-col="stime"><span class="op-mono" style="white-space:nowrap" title="{{.STIME}}">{{replace .STIME " +0000 UTC" ""}}</span></td>
+                        <td x-show="columns.tty" data-label="{{$.T.Get "Terminal"}}" data-sort-col="tty"><span class="op-mono">{{.TTY}}</span></td>
+                        <td x-show="columns.time" data-label="{{$.T.Get "CPU time"}}" class="is-num" data-sort-col="time"><span class="op-mono">{{.TIME}}</span></td>
+                        <td data-label="{{$.T.Get "Command"}}" data-sort-col="cmd" data-sort-value="{{.CMD}}"><div class="op-proc-cmd"><span class="op-mono" :class="full &amp;&amp; 'is-full'" title="{{.CMD}}">{{.CMD}}</span>{{if gt (len .CMD) 60}}<button type="button" class="op-proc-more" @click="full = !full" x-text="full ? {{toJSON ($.T.Get "Shorten command")}} : {{toJSON ($.T.Get "Show full command")}}">{{$.T.Get "Show full command"}}</button>{{end}}</div></td>
+                        <td class="is-shrink op-cell-menu" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                            <button x-ref="btn" class="op-icon-btn" type="button" :aria-expanded="open.toString()" @click="toggle()" aria-label="{{$.T.Get "Actions for"}} {{.PID}}">{{template "op_icon" "dots"}}</button>
+                            <div x-ref="menu" class="op-menu" x-show="open" x-cloak>
+                                <button type="button" @click="full = !full; open = false">{{template "op_icon" "code"}} <span x-text="full ? '{{$.T.Get "Shorten command"}}' : '{{$.T.Get "Show full command"}}'"></span></button>
+                                <button type="button" @click="navigator.clipboard && navigator.clipboard.writeText({{toJSON .CMD}}); open = false">{{template "op_icon" "copy"}} {{$.T.Get "Copy command"}}</button>
+                                {{if index $userAllowed "services"}}<a href="/services/{{.Container}}">{{template "op_icon" "info"}} {{$.T.Get "Open service"}}</a>{{end}}
+                                <hr>
+                                <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Terminate this process?")}} + ' ' + {{toJSON .PID}})) sendPID({{toJSON .PID}}, {{toJSON .Container}}, $el)">{{template "op_icon" "xcircle"}} {{$.T.Get "Terminate"}}</button>
+                            </div>
+                        </td>
+                    </tr>
+        {{end}}
+    {{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="op-tfoot"><span>{{len .ProcessData}} {{.T.Get "processes"}}</span></div>
+{{template "bulk_bar" .}}
+</div>
+    </section>
+</div>
+
+
+<script>
+const i18n = {
+    terminatingPid: "{{.T.Get "Terminating PID:"}}",
+    pidPrefix: "{{.T.Get "PID:"}}",
+    terminatedSuffix: "{{.T.Get "terminated"}}",
+    killingPid: "{{.T.Get "Killing PID:"}}",
+    failedSuffix: "{{.T.Get "failed"}}"
+};
+
+function sendPID(pid, container, btn) {
+    const row = btn.closest('tr');
+    const requestData = { pid_to_kill: pid, container: container };
+
+    showToast(`${i18n.terminatingPid} ${pid}`, 'warning');
+
+    fetch('/process-manager', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-Token': csrf_token,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+    })
+        .then(response => response.json().catch(() => ({})))
+        .then(data => {
+            if (data.success) {
+                showToast(`${i18n.pidPrefix} ${pid} ${i18n.terminatedSuffix}`, 'success');
+                row.remove();
+            } else {
+                showToast(data.error_message || data.error || `${i18n.killingPid} ${pid} ${i18n.failedSuffix}`, 'error');
+            }
+        })
+        .catch(error => {
+            showToast(`${i18n.killingPid} ${pid} ${i18n.failedSuffix}`, 'error');
+        });
+}
+</script>
+<script src="{{static "js/table-sort.js"}}"></script>
+
+<!-- END templates/system/process_manager.html -->
+{{end}}
+
+{{define "column_toggle"}}
+<label><input type="checkbox" class="op-check" x-model="columns.{{.Key}}" x-on:change="saveColumns"> {{.Label}}</label>
+{{end}}
+
+{{define "proc_sort"}}
+<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="{{.Type}}" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>
+{{end}}

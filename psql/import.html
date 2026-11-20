@@ -1,0 +1,77 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/psql/import.html -->
+<div class="op-content">
+
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Import into Database"}}</h1>
+        <p class="op-meta">{{.T.Get "Select a local file to upload and import into a PostgreSQL database."}}</p>
+    </div>
+</div>
+
+<section class="op-card" id="toAddActive">
+    <form method="POST" enctype="multipart/form-data" x-data="{ isInstalling: false, file: '' }" @submit="isInstalling = true">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+    <div class="op-section">
+        <div><h3>{{.T.Get "Database"}}</h3><p>{{.T.Get "The dump is imported into this database. Existing tables with the same names are replaced."}}</p></div>
+        <label class="op-field"><span class="op-label">{{.T.Get "Select database:"}} <span class="is-danger">*</span></span>
+            <select name="database_name" class="op-select" required><option value=""></option></select>
+        </label>
+    </div>
+    <div class="op-section">
+        <div><h3>{{.T.Get "File"}}</h3><p>{{.T.Get "A .sql dump from your computer."}}</p></div>
+        <div class="op-field"><span class="op-label">{{.T.Get "Select File"}} <span class="is-danger">*</span></span>
+            <label class="op-drop" x-data="{ over: false }" :class="{ 'is-picked': file, 'is-over': over }" @dragover="over = true" @dragleave="over = false" @drop="over = false">
+                <input type="file" name="db_file" accept=".sql" id="file" required aria-label="{{.T.Get "Select file to upload"}}" @change="file = $event.target.files[0] ? $event.target.files[0].name : ''">
+                <span class="op-drop-ico">{{template "op_icon" "upload"}}</span>
+                <span class="op-drop-text"><b x-text="file || {{toJSON (.T.Get "Choose a .sql file")}}">{{.T.Get "Choose a .sql file"}}</b><span x-text="file ? {{toJSON (.T.Get "Click or drop another file to replace it")}} : {{toJSON (.T.Get "or drag it here")}}">{{.T.Get "or drag it here"}}</span></span>
+                <button class="op-btn op-btn-ghost op-btn-sm op-drop-clear" type="button" x-show="file" x-cloak @click.prevent="file = ''; $el.parentElement.querySelector('input').value = ''">{{.T.Get "Remove"}}</button>
+            </label>
+        </div>
+    </div>
+    <div class="op-form-foot">
+        <a class="op-btn op-btn-secondary" href="/postgresql">{{.T.Get "Cancel"}}</a>
+        <button type="submit" class="op-btn op-btn-primary" :disabled="!file || isInstalling">{{template "op_icon" "upload"}} <span x-text="isInstalling ? {{toJSON (.T.Get "Importing...")}} : {{toJSON (.T.Get "Import")}}">{{.T.Get "Import"}}</span></button>
+    </div>
+    </form>
+</section>
+<!-- END form -->
+
+<script>
+    var selectedDbName = {{toJSON .DBName}};
+
+    function refreshData() {
+        fetch('/postgresql/info', { headers: { 'X-CSRF-TOKEN': csrf_token } })
+            .then(res => res.json())
+            .then(data => {
+                var databaseSelect = document.querySelector("select[name='database_name']");
+                databaseSelect.innerHTML = '';
+
+                var defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.text = {{toJSON (.T.Get "Select a database")}};
+                defaultOption.selected = !selectedDbName;
+                databaseSelect.appendChild(defaultOption);
+
+                data.databases.forEach(function(database) {
+                    var opt = document.createElement('option');
+                    opt.value = database.database;
+                    opt.text = database.database;
+                    if (database.database === selectedDbName) opt.selected = true;
+                    databaseSelect.appendChild(opt);
+                });
+            })
+            .catch(function (error) {
+                console.error('Error fetching data:', error);
+            });
+    }
+    refreshData();
+</script>
+</div>
+
+<!-- END templates/psql/import.html -->
+{{end}}

@@ -1,0 +1,456 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/docker/container_form.html -->
+
+<div class="op-content" x-data="containerForm({
+        editing: {{.Editing}},
+        name: {{toJSON .ServiceName}},
+        image: {{toJSON .Image}},
+        cpu: {{toJSON .CPU}},
+        ram: {{toJSON .RAM}},
+        pids: {{toJSON .PIDs}},
+        env: {{toJSON .Environment}},
+        networks: {{toJSON .Networks}},
+        volumes: {{toJSON .VolumeEntries}},
+        healthcheck: {{toJSON .Healthcheck}},
+        domain: {{toJSON .Domain}},
+        port: {{toJSON .Port}},
+        socket: {{.AddSocket}},
+        existing: {{if .ExistingServicesJSON}}{{.ExistingServicesJSON}}{{else}}[]{{end}},
+        availableVolumes: {{toJSON .AvailableVolumes}}
+    })">
+<div class="op-page-head">
+    <div>
+        <div class="op-eyebrow"><a href="/containers" style="color:var(--color-accent-text)">{{.T.Get "Containers"}}</a></div>
+        <h1 class="op-title">{{if .Editing}}{{.Title}}{{else}}{{.T.Get "Add a container"}}{{end}}</h1>
+        <p class="op-meta" x-show="phase === 'form'">{{if .Editing}}{{.T.Get "Change the image, limits, networks and storage of this service. Saving restarts it with the new settings."}}{{else}}{{.T.Get "Run any Docker image next to your websites, for example a Redis cache, a queue worker or your own app."}}{{end}}</p>
+        <p class="op-meta" x-show="phase !== 'form'" x-cloak>
+            <span x-show="phase === 'running'">{{.T.Get "Creating container"}}</span>
+            <span x-show="phase === 'done'">{{.T.Get "Container created"}}</span>
+            <span x-show="phase === 'error'">{{.T.Get "Could not create container"}}</span>
+            <b class="op-mono" style="color:var(--color-accent-text)" x-text="name"></b>
+        </p>
+    </div>
+    <div class="op-actions" x-show="phase === 'form'">
+        <a href="/containers" class="op-btn op-btn-secondary">{{.T.Get "Cancel"}}</a>
+        <button type="submit" form="container-form" :disabled="!canSubmit()" class="op-btn op-btn-primary">{{template "op_icon" "box"}} {{if .Editing}}{{.T.Get "Save changes"}}{{else}}{{.T.Get "Create container"}}{{end}}</button>
+    </div>
+</div>
+
+<section class="op-card" x-show="phase !== 'form'" x-cloak aria-label="{{.T.Get "Progress"}}">
+    <div class="op-card-head">
+        <div><h2 x-text="phase === 'done' ? {{toJSON (.T.Get "Container created")}} : (phase === 'error' ? {{toJSON (.T.Get "Could not create container")}} : {{toJSON (.T.Get "Creating container")}})"></h2><p class="op-meta op-mono" x-text="image"></p></div>
+        <span class="op-count" style="font-size:14px" x-text="progress() + '%'"></span>
+    </div>
+    <div class="op-progress" style="margin-bottom:16px"><span :style="{ width: progress() + '%' }"></span></div>
+    <ol class="op-col" style="gap:8px;margin:0;padding:0;list-style:none">
+        <template x-for="(st, i) in steps" :key="st.id">
+            <li class="op-step" :class="{ 'is-done': st.state === 'done', 'is-error': st.state === 'error' }">
+                <span class="op-step-mark"><template x-if="st.state === 'done'"><span style="display:contents">{{template "op_icon" "check"}}</span></template><template x-if="st.state === 'error'"><span style="display:contents">{{template "op_icon" "x"}}</span></template><template x-if="st.state !== 'done' &amp;&amp; st.state !== 'error'"><span x-text="i + 1"></span></template></span>
+                <div><b x-text="st.label"></b><p x-show="st.state === 'active'" style="margin:0">{{.T.Get "Working on it…"}}</p></div>
+            </li>
+        </template>
+    </ol>
+    <div x-show="errorText" x-cloak class="op-alert is-danger" style="margin-top:16px">{{template "op_icon" "alert"}}<span class="op-mono" style="white-space:pre-line;overflow-wrap:anywhere" x-text="errorText"></span></div>
+    <div class="op-form-foot" x-show="phase === 'error'" x-cloak>
+        <a x-show="saved" href="/containers" class="op-btn op-btn-secondary">{{.T.Get "Go to containers"}}</a>
+        <button x-show="!saved" type="button" @click="phase = 'form'" class="op-btn op-btn-primary">{{.T.Get "Back to the form"}}</button>
+    </div>
+    <div class="op-form-foot" x-show="phase === 'done'" x-cloak>
+        <a class="op-btn op-btn-secondary" href="/containers/new">{{.T.Get "Add another"}}</a>
+        <a class="op-btn op-btn-primary" href="/containers">{{.T.Get "Go to containers"}}</a>
+    </div>
+</section>
+
+<div class="op-ct-form-grid" x-show="phase === 'form'">
+<section class="op-card" aria-label="{{.T.Get "Container settings"}}">
+    <form id="container-form" method="POST" @submit="onSubmit($event)">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+        {{if .Error}}
+        <div class="op-alert is-danger" style="margin-bottom:18px">{{template "op_icon" "alert"}}<span>{{.T.Get .Error}}</span></div>
+        {{end}}
+
+        <!-- 1: image and name -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">1</span>{{.T.Get "Image and name"}}</h3><p>{{.T.Get "Image from Docker Hub, or a full address like ghcr.io/owner/app:1.0. Add a tag to pin the version."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                <div class="op-ct-2col">
+                    <label class="op-field" for="image"><span class="op-label">{{.T.Get "Docker image"}} <span style="color:var(--color-danger)">*</span></span>
+                        <input type="text" id="image" name="image" x-model.trim="image" @input="suggestName()" required autocomplete="off" spellcheck="false" list="popular-images" placeholder="redis:7-alpine" class="op-input op-mono">
+                    </label>
+                    <label class="op-field" for="service_name"><span class="op-label">{{.T.Get "Name"}} <span style="color:var(--color-danger)">*</span></span>
+                        <input type="text" id="service_name" name="service_name" x-model="name" @input="name = name.toLowerCase().replace(/[^a-z0-9]/g, ''); nameTouched = true"
+                               {{if .Editing}}readonly{{end}} required pattern="[a-z][a-z0-9]{2,}" autocomplete="off" spellcheck="false" placeholder="redis" class="op-input op-mono">
+                        <span class="op-hint" :style="nameError ? { color: 'var(--color-danger)' } : {}" x-text="nameError || {{toJSON (.T.Get "Other services reach this container by its name, for example")}} + ' ' + (name || 'redis') + ':6379.'"></span>
+                    </label>
+                </div>
+                <datalist id="popular-images">
+                    <template x-for="img in popular" :key="img"><option :value="img"></option></template>
+                </datalist>
+                {{if not .Editing}}
+                <div x-show="!new URLSearchParams(location.search).has('template')"><span class="op-label" style="display:block;margin-bottom:8px">{{.T.Get "Popular images"}}</span>
+                    <div class="op-chips" style="gap:6px"><template x-for="img in popular" :key="img"><button class="op-chip op-mono" type="button" style="font-size:12px" @click="image = img; suggestName()" :aria-pressed="(image === img).toString()" x-text="img"></button></template></div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- 2: resources -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">2</span>{{.T.Get "Resources"}}</h3><p>{{.T.Get "Limits for this container only, it can't use more than your plan allows."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                <div class="op-segmented" role="group" aria-label="{{.T.Get "Size presets"}}" style="align-self:flex-start">
+                    <template x-for="p in presets" :key="p.name"><button type="button" :aria-pressed="isPreset(p).toString()" @click="applyPreset(p)" x-text="p.label"></button></template>
+                    <button type="button" :aria-pressed="(!presets.some(p => isPreset(p))).toString()" disabled style="cursor:default">{{.T.Get "Custom"}}</button>
+                </div>
+                <div class="op-ct-3col">
+                    <label class="op-field" for="cpu"><span class="op-label">{{.T.Get "CPU cores"}} <span style="color:var(--color-danger)">*</span></span><span class="op-unit"><input type="number" id="cpu" name="cpu" x-model="cpu" min="0.05" step="0.05" required class="op-input op-mono"><em>{{.T.Get "cores"}}</em></span></label>
+                    <label class="op-field" for="ram_amount"><span class="op-label">{{.T.Get "Memory"}} <span style="color:var(--color-danger)">*</span></span><span class="op-unit"><input type="number" id="ram_amount" x-model="ramAmount" min="0.05" step="0.05" required class="op-input op-mono"><em>GB</em></span></label>
+                    <label class="op-field" for="pids"><span class="op-label">{{.T.Get "Max processes"}} <span style="color:var(--color-danger)">*</span></span><input type="number" id="pids" name="pids" x-model="pids" min="1" step="1" required class="op-input op-mono"></label>
+                </div>
+                <input type="hidden" name="ram" :value="ramAmount + 'G'">
+            </div>
+        </div>
+
+        <!-- 3: networks -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">3</span>{{.T.Get "Networks"}}</h3><p>{{.T.Get "The container can talk to every service on the networks you choose."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                {{if .AvailableNetworks}}
+                <div class="op-options" style="--cols:2">
+                    {{range .AvailableNetworks}}
+                    <label class="op-option" style="align-items:center"><input type="checkbox" name="network" value="{{.}}" x-model="networks"><div><b class="op-mono">{{.}}</b></div></label>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="op-empty" style="padding:18px"><b style="font-size:14px">{{.T.Get "No networks are defined for your account."}}</b></div>
+                {{end}}
+                <span class="op-hint" :style="!networks.length ? { color: 'var(--color-danger)' } : {}" x-text="networks.length ? (domain &amp;&amp; !networks.includes('www') ? {{toJSON (.T.Get "www is added too, the web server reaches the container over it.")}} : {{toJSON (.T.Get "Pick every network whose services this container needs.")}}) : {{toJSON (.T.Get "Choose at least one network.")}}"></span>
+            </div>
+        </div>
+
+        <!-- 4: storage -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">4</span>{{.T.Get "Storage"}} <span class="op-hint" style="font-weight:400;white-space:nowrap">{{.T.Get "optional"}}</span></h3><p>{{.T.Get "New volumes are created when you save, and keep their data if the container is deleted."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                <template x-for="(v, i) in volumes" :key="v.id">
+                    <div class="op-ct-vol">
+                        <div class="op-col" style="flex:1 1 150px;min-width:0;gap:4px">
+                            <select x-show="!v.isNew" :name="v.isNew ? '' : 'volume_name'" @change="if ($event.target.value === '__new__') { v.isNew = true; v.Name = ''; $nextTick(() => $el.parentElement.querySelector('input').focus()); } else { v.Name = $event.target.value }" class="op-select" aria-label="{{.T.Get "Volume"}}">
+                                <optgroup label="{{.T.Get "Your volumes"}}">
+                                    <template x-for="vn in availableVolumes" :key="vn"><option :value="vn" :selected="vn === v.Name" x-text="vn"></option></template>
+                                </optgroup>
+                                <option value="__new__">{{.T.Get "+ New volume"}}</option>
+                            </select>
+                            <div x-show="v.isNew" x-cloak style="display:flex;gap:6px">
+                                <input type="text" :name="v.isNew ? 'volume_name' : ''" x-model.trim="v.Name" :required="v.isNew" :pattern="v.isNew ? '[a-z][a-z0-9_]{2,63}' : null" placeholder="app_data" spellcheck="false" autocomplete="off"
+                                       title="{{.T.Get "3 to 64 lowercase letters, digits or _, starting with a letter"}}" aria-label="{{.T.Get "New volume name"}}" class="op-input op-mono">
+                                <button type="button" x-show="availableVolumes.length" @click="v.isNew = false; v.Name = availableVolumes[0]" class="op-icon-btn" title="{{.T.Get "Use an existing volume"}}" aria-label="{{.T.Get "Use an existing volume"}}">{{template "op_icon" "menu"}}</button>
+                            </div>
+                        </div>
+                        <input type="text" name="volume_mount" x-model.trim="v.Mount" required placeholder="/data" spellcheck="false" aria-label="{{.T.Get "Mount path"}}" class="op-input op-mono" style="flex:1 1 120px;min-width:0">
+                        <input type="hidden" name="volume_readonly" :value="v.ReadOnly ? 'on' : 'off'">
+                        <label class="op-ct-ro"><button class="op-switch" type="button" role="switch" :aria-checked="(!!v.ReadOnly).toString()" @click="v.ReadOnly = !v.ReadOnly" aria-label="{{.T.Get "Read-only"}}"></button>{{.T.Get "Read-only"}}</label>
+                        <button type="button" @click="volumes.splice(i, 1)" class="op-icon-btn" style="height:36px" title="{{.T.Get "Remove"}}" aria-label="{{.T.Get "Remove volume"}}">{{template "op_icon" "trash"}}</button>
+                    </div>
+                </template>
+                <div class="op-empty" x-show="!volumes.length" style="padding:18px"><b style="font-size:14px">{{.T.Get "No volumes"}}</b><span class="op-hint">{{.T.Get "Data written by the container is lost when it's recreated."}}</span></div>
+                <div><button type="button" @click="addVolume()" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "plus"}} {{.T.Get "Add volume"}}</button></div>
+                <input type="checkbox" name="add_socket" x-model="socket" hidden>
+                <div class="op-check-row" style="align-items:center"><span style="color:var(--color-warning);display:flex">{{template "op_icon" "alert"}}</span><span><b>{{.T.Get "Give access to the Docker socket"}}</b><p>{{.T.Get "Only for tools that manage containers, like Portainer or Watchtower. The container can then control all your other containers."}}</p></span><button class="op-switch" type="button" role="switch" :aria-checked="socket.toString()" @click="socket = !socket" aria-label="{{.T.Get "Docker socket"}}"></button></div>
+            </div>
+        </div>
+
+        <!-- 5: environment -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">5</span>{{.T.Get "Environment variables"}} <span class="op-hint" style="font-weight:400;white-space:nowrap">{{.T.Get "optional"}}</span></h3><p>{{.T.Get "Stored in your .env file, the compose file only points to them."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                <div x-show="!bulk" class="op-col" style="gap:8px">
+                    <template x-for="(e, i) in envRows" :key="e.id">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px">
+                            <input type="text" x-model.trim="e.key" placeholder="KEY" spellcheck="false" aria-label="{{.T.Get "Variable name"}}" class="op-input op-mono" style="flex:1 1 140px;min-width:0">
+                            <input type="text" x-model="e.value" placeholder="{{.T.Get "value"}}" spellcheck="false" aria-label="{{.T.Get "Value"}}" class="op-input op-mono" style="flex:2 1 200px;min-width:0">
+                            <button type="button" @click="envRows.splice(i, 1)" class="op-icon-btn" style="height:36px" title="{{.T.Get "Remove"}}" aria-label="{{.T.Get "Remove variable"}}">{{template "op_icon" "trash"}}</button>
+                        </div>
+                    </template>
+                    <div class="op-empty" x-show="!envRows.length" style="padding:18px"><b style="font-size:14px">{{.T.Get "No environment variables"}}</b></div>
+                </div>
+                <div x-show="bulk" x-cloak>
+                    <textarea x-model="bulkText" rows="6" spellcheck="false" placeholder="REDIS_PASSWORD: secret&#10;TZ: Europe/Belgrade" aria-label="{{.T.Get "Variables as text"}}" class="op-input op-mono" style="height:auto;padding-top:10px;resize:vertical"></textarea>
+                    <span class="op-hint" style="display:block;margin-top:6px">{{.T.Get "One variable per line, as KEY: value or KEY=value."}}</span>
+                </div>
+                <span class="op-hint" x-show="!editing &amp;&amp; envText().includes('{domain}')" x-cloak>{{.T.Get "{domain} is replaced with the domain chosen below, or localhost if none."}}</span>
+                <div class="op-actions">
+                    <button type="button" x-show="!bulk" @click="envRows.push({ id: nextId++, key: '', value: '' })" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "plus"}} {{.T.Get "Add"}}</button>
+                    <button type="button" @click="toggleBulk()" class="op-btn op-btn-ghost op-btn-sm" x-text="bulk ? {{toJSON (.T.Get "Use rows")}} : {{toJSON (.T.Get "Paste as text")}}"></button>
+                </div>
+                <textarea name="environment" hidden :value="envText()"></textarea>
+            </div>
+        </div>
+
+        <!-- 6: domain -->
+        <div class="op-section">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">6</span>{{.T.Get "Domain"}} <span class="op-hint" style="font-weight:400;white-space:nowrap">{{.T.Get "optional"}}</span></h3><p>{{.T.Get "Pick a domain to make the app reachable from outside, the web server will proxy it to this container."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                {{if .Editing}}
+                {{if .Domain}}
+                <p style="margin:0;font-size:14px"><a href="https://{{.Domain}}" target="_blank" rel="noopener" class="op-mono" style="color:var(--color-accent-text)">{{.Domain}}</a> <span class="op-hint">&rarr; {{.ServiceName}}:{{.Port}}</span></p>
+                <span class="op-hint">{{.T.Get "Deleting the container removes the proxy from the domain."}}</span>
+                {{else}}
+                <div class="op-empty" style="padding:18px"><b style="font-size:14px">{{.T.Get "No domain"}}</b><span class="op-hint">{{.T.Get "This container is not reachable from a domain. A domain can only be set when the container is created."}}</span></div>
+                {{end}}
+                {{else}}
+                <div class="op-ct-domain">
+                    <label class="op-field" for="domain"><span class="op-label">{{.T.Get "Domain"}}</span>
+                        <select id="domain" name="domain" class="op-select" @change="domain = $event.target.value">
+                            <option value="" :selected="!domain">{{.T.Get "None, only reachable by other containers"}}</option>
+                            {{if .Domains}}<optgroup label="{{.T.Get "Your domains"}}">{{range .Domains}}<option value="{{.}}" :selected="domain === {{toJSON .}}">{{.}}</option>{{end}}</optgroup>{{end}}
+                        </select>
+                    </label>
+                    <label class="op-field" for="port" x-show="domain" x-cloak><span class="op-label">{{.T.Get "Container port"}} <span style="color:var(--color-danger)">*</span></span>
+                        <input type="number" id="port" name="port" x-model="port" min="1" max="65535" step="1" placeholder="80" :required="!!domain" class="op-input op-mono">
+                    </label>
+                </div>
+                <div class="op-alert is-warning" x-show="domain" x-cloak>{{template "op_icon" "alert"}}<span>{{.T.Get "All requests to this domain go to the container on the port the app listens on, any website files on the domain stop being served. The container joins the www network."}}</span></div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- 7: health check -->
+        <div class="op-section" x-data="{ openHc: {{if .Healthcheck}}true{{else}}false{{end}} }">
+            <div><h3 class="op-ct-step"><span class="op-ct-num">7</span>{{.T.Get "Health check"}} <span class="op-hint" style="font-weight:400;white-space:nowrap">{{.T.Get "optional"}}</span></h3><p>{{.T.Get "In docker compose healthcheck format. The Containers page shows the container as healthy or unhealthy."}}</p></div>
+            <div class="op-col" style="gap:14px;min-width:0">
+                <button type="button" class="op-btn op-btn-ghost op-btn-sm" style="align-self:flex-start" @click="openHc = !openHc" :aria-expanded="openHc.toString()"><span class="op-ct-chev" :class="openHc &amp;&amp; 'is-open'">{{template "op_icon" "chev"}}</span> <span x-text="openHc ? {{toJSON (.T.Get "Hide health check")}} : {{toJSON (.T.Get "Add a health check")}}"></span></button>
+                <div x-show="openHc" x-cloak class="op-col" style="gap:8px">
+                    <textarea name="healthcheck" x-model="healthcheck" rows="5" spellcheck="false" aria-label="{{.T.Get "Health check"}}" class="op-input op-mono" style="height:auto;padding-top:10px;resize:vertical"
+                              placeholder="test: [&#34;CMD&#34;, &#34;redis-cli&#34;, &#34;ping&#34;]&#10;interval: 30s&#10;timeout: 5s&#10;retries: 3"></textarea>
+                    <div><button type="button" x-show="!healthcheck" @click="healthcheck = exampleHealthcheck()" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Insert example"}}</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="op-form-foot">
+            <a href="/containers" class="op-btn op-btn-secondary">{{.T.Get "Cancel"}}</a>
+            <button type="submit" :disabled="!canSubmit()" class="op-btn op-btn-primary">{{if .Editing}}{{.T.Get "Save changes"}}{{else}}{{.T.Get "Create container"}}{{end}}</button>
+        </div>
+    </form>
+</section>
+
+<aside class="op-col op-ct-aside">
+    <section class="op-card"><div class="op-card-head"><div><h2>docker-compose.yml</h2><p class="op-meta">{{if .Editing}}{{.T.Get "How this service is saved in your compose file."}}{{else}}{{.T.Get "What gets added to your compose file."}}{{end}}</p></div></div>
+        <div class="op-ct-code"><pre x-text="compose()"></pre><button class="op-icon-btn" type="button" @click="copyText(compose())" aria-label="{{.T.Get "Copy compose snippet"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></div>
+    </section>
+    <section class="op-card"><div class="op-card-head"><div><h2>.env</h2><p class="op-meta">{{.T.Get "Limits and variables, saved next to it."}}</p></div></div>
+        <div class="op-ct-code"><pre x-text="dotenv()"></pre><button class="op-icon-btn" type="button" @click="copyText(dotenv())" aria-label="{{.T.Get "Copy .env lines"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></div>
+    </section>
+    <section class="op-card" x-show="existing.length"><div class="op-card-head"><div><h2>{{.T.Get "Already on this account"}}</h2><p class="op-meta"><span x-text="existing.length"></span> {{if .Editing}}{{.T.Get "services in your compose file."}}{{else}}{{.T.Get "services, pick a name that isn't taken."}}{{end}}</p></div></div>
+        <div class="op-chips" style="gap:6px"><template x-for="n in existing" :key="n"><span class="op-tag op-mono" :class="n === name &amp;&amp; 'is-accent'" x-text="n"></span></template></div>
+    </section>
+</aside>
+</div>
+</div>
+
+<script>
+function containerForm(init) {
+    // memory is always edited in GB, older values saved in MB are converted
+    const ramMatch = String(init.ram || '1G').trim().match(/^([\d.]+)\s*([MG])?/i);
+    const ramGB = ramMatch ? (String(ramMatch[2] || 'G').toUpperCase() === 'M' ? Math.round(parseFloat(ramMatch[1]) / 1024 * 100) / 100 : parseFloat(ramMatch[1])) : 1;
+    let nextId = 1;
+    const parseEnv = text => String(text || '').split('\n').map(line => {
+        const m = line.match(/^\s*([^:=\s]+)\s*[:=]\s?(.*)$/);
+        return m ? { id: nextId++, key: m[1], value: m[2].trim() } : null;
+    }).filter(Boolean);
+    return {
+        editing: init.editing,
+        name: init.name || '',
+        nameTouched: !!init.name,
+        image: init.image || '',
+        cpu: init.cpu || '0.5',
+        ramAmount: String(ramGB),
+        pids: init.pids || '500',
+        networks: init.networks || [],
+        volumes: (init.volumes || []).map(v => ({ id: nextId++, Name: v.Name, Mount: v.Mount, ReadOnly: v.ReadOnly, isNew: !!v.Name && !(init.availableVolumes || []).includes(v.Name) && !v.Name.includes('/') })),
+        availableVolumes: init.availableVolumes || [],
+        existing: init.existing || [],
+        envRows: parseEnv(init.env),
+        bulk: false,
+        bulkText: '',
+        healthcheck: init.healthcheck || '',
+        domain: init.domain || '',
+        port: init.port || '',
+        socket: !!init.socket,
+        popular: ['redis:alpine', 'valkey/valkey:alpine', 'memcached:alpine', 'rabbitmq:3-management-alpine', 'minio/minio:latest', 'adminer:latest', 'mailpit/mailpit:latest', 'node:lts-alpine', 'python:3-alpine', 'nginx:alpine'],
+
+        // mirrors what the handler writes, so the preview shows the real keys
+        prefix() { return (this.name || 'app').toUpperCase().replace(/[-.]/g, '_'); },
+        compose() {
+            const n = this.name || 'app', p = this.prefix(), ram = (this.ramAmount || '1') + 'G';
+            const lim = this.editing ? ['${' + p + '_CPU}', '${' + p + '_RAM}', '${' + p + '_PIDS}'] : ['${' + p + '_CPU:-' + this.cpu + '}', '${' + p + '_RAM:-' + ram + '}', '${' + p + '_PIDS:-' + this.pids + '}'];
+            const out = ['services:', '  ' + n + ':', '    image: ' + (this.image || 'redis:7-alpine'), '    container_name: ' + n, '    restart: always'];
+            const vols = this.volumes.filter(v => v.Name && v.Mount).map(v => v.Name + ':' + v.Mount + (v.ReadOnly ? ':ro' : ''));
+            if (this.socket) vols.push('/run/user/${USER_ID}/podman/podman.sock:/var/run/docker.sock:ro');
+            if (vols.length) { out.push('    volumes:'); vols.forEach(v => out.push('      - ' + v)); }
+            out.push('    deploy:', '      resources:', '        limits:', '          cpus: ' + lim[0], '          memory: ' + lim[1], '          pids: ' + lim[2]);
+            const nets = this.networks.slice();
+            if (this.domain && !nets.includes('www')) nets.push('www');
+            if (nets.length) { out.push('    networks:'); nets.forEach(v => out.push('      - ' + v)); }
+            const env = (this.bulk ? parseEnv(this.bulkText) : this.envRows).filter(e => e.key);
+            if (env.length) { out.push('    environment:'); env.forEach(e => out.push('      ' + e.key + ': ${' + p + '_' + e.key.toUpperCase() + '}')); }
+            if (this.healthcheck.trim()) { out.push('    healthcheck:'); this.healthcheck.trim().split('\n').forEach(l => out.push('      ' + l)); }
+            if (this.domain && !this.editing) out.push('    labels:', '      openpanel.domain: ' + this.domain, '      openpanel.port: "' + (this.port || '80') + '"');
+            return out.join('\n');
+        },
+        dotenv() {
+            const p = this.prefix();
+            const out = [p + '_CPU=' + this.cpu, p + '_RAM=' + (this.ramAmount || '1') + 'G', p + '_PIDS=' + this.pids];
+            (this.bulk ? parseEnv(this.bulkText) : this.envRows).filter(e => e.key).forEach(e => out.push(p + '_' + e.key.toUpperCase() + '=' + e.value));
+            return out.join('\n');
+        },
+        copyText(t) {
+            if (navigator.clipboard) navigator.clipboard.writeText(t);
+            if (window.showToast) showToast({{toJSON (.T.Get "Copied")}}, 'success');
+        },
+        get nextId() { return nextId; },
+        set nextId(v) { nextId = v; },
+        presets: [
+            { name: 'small', label: {{toJSON (.T.Get "Small")}}, cpu: '0.25', ram: '0.25', pids: '100' },
+            { name: 'medium', label: {{toJSON (.T.Get "Medium")}}, cpu: '0.5', ram: '1', pids: '500' },
+            { name: 'large', label: {{toJSON (.T.Get "Large")}}, cpu: '1', ram: '2', pids: '1000' },
+        ],
+        applyPreset(p) { this.cpu = p.cpu; this.ramAmount = p.ram; this.pids = p.pids; },
+        isPreset(p) { return String(this.cpu) === p.cpu && String(this.ramAmount) === p.ram && String(this.pids) === p.pids; },
+
+        // name follows the image until the user types their own
+        suggestName() {
+            if (this.editing || (this.nameTouched && this.name)) return;
+            let base = this.image.split('@')[0].split(':')[0].split('/').pop().toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!base) { this.name = ''; return; }
+            if (base.length < 3 || !/^[a-z]/.test(base)) base = 'app' + base;
+            let candidate = base, i = 2;
+            while (this.existing.includes(candidate)) candidate = base + i++;
+            this.name = candidate;
+            this.nameTouched = false;
+        },
+        get nameError() {
+            if (this.editing || !this.name) return '';
+            if (!/^[a-z]/.test(this.name)) return {{toJSON (.T.Get "Must start with a letter.")}};
+            if (this.name.length < 3) return {{toJSON (.T.Get "Must be at least 3 characters.")}};
+            if (this.existing.includes(this.name)) return {{toJSON (.T.Get "A service with this name already exists.")}};
+            return '';
+        },
+
+        addVolume() {
+            const isNew = !this.availableVolumes.length;
+            this.volumes.push({ id: nextId++, Name: isNew ? '' : this.availableVolumes[0], Mount: '', ReadOnly: false, isNew });
+        },
+
+        toggleBulk() {
+            if (this.bulk) {
+                this.envRows = parseEnv(this.bulkText);
+            } else {
+                this.bulkText = this.envRows.filter(e => e.key).map(e => e.key + ': ' + e.value).join('\n');
+            }
+            this.bulk = !this.bulk;
+        },
+        envText() {
+            const rows = this.bulk ? parseEnv(this.bulkText) : this.envRows;
+            return rows.filter(e => e.key).map(e => e.key + ': ' + e.value).join('\n');
+        },
+
+        exampleHealthcheck() {
+            const img = this.image.toLowerCase();
+            if (img.includes('redis') || img.includes('valkey')) return 'test: ["CMD", "redis-cli", "ping"]\ninterval: 30s\ntimeout: 5s\nretries: 3';
+            if (img.includes('postgres')) return 'test: ["CMD-SHELL", "pg_isready"]\ninterval: 30s\ntimeout: 5s\nretries: 3';
+            if (img.includes('mysql') || img.includes('mariadb')) return 'test: ["CMD", "mysqladmin", "ping"]\ninterval: 30s\ntimeout: 5s\nretries: 3';
+            return 'test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]\ninterval: 30s\ntimeout: 5s\nretries: 3';
+        },
+
+        canSubmit() {
+            if (!this.editing && this.domain && !(this.port >= 1 && this.port <= 65535)) return false;
+            return this.image && this.name && !this.nameError && this.networks.length > 0;
+        },
+        phase: 'form',
+        saved: false,
+        errorText: '',
+        steps: [],
+        allSteps: [
+            { id: 'validate', label: {{toJSON (.T.Get "Validating container details")}}, state: 'pending' },
+            { id: 'save', label: {{toJSON (.T.Get "Saving container to docker-compose.yml")}}, state: 'pending' },
+            { id: 'pull', label: {{toJSON (.T.Get "Downloading image")}}, state: 'pending' },
+            { id: 'start', label: {{toJSON (.T.Get "Starting container")}}, state: 'pending', domainOnly: true },
+            { id: 'proxy', label: {{toJSON (.T.Get "Pointing the domain to the container")}}, state: 'pending', domainOnly: true },
+            { id: 'done', label: {{toJSON (.T.Get "Container created")}}, state: 'pending' },
+        ],
+        progress() {
+            if (this.phase === 'done') return 100;
+            return Math.round(this.steps.filter(s => s.state === 'done').length / this.steps.length * 100);
+        },
+        setStep(id) {
+            const idx = this.steps.findIndex(s => s.id === id);
+            if (idx < 0) return;
+            this.steps.forEach((s, i) => { if (i < idx) s.state = 'done'; else if (i === idx) s.state = 'active'; });
+        },
+        onSubmit(event) {
+            if (!this.canSubmit()) { event.preventDefault(); return; }
+            if (this.editing) return;
+            event.preventDefault();
+            const data = new FormData(event.target);
+            data.set('stream', '1');
+            this.steps = this.allSteps.filter(s => !s.domainOnly || this.domain);
+            this.steps.forEach(s => s.state = 'pending');
+            this.errorText = '';
+            this.saved = false;
+            this.phase = 'running';
+            this.setStep('validate');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            this.runStream(data);
+        },
+        async runStream(data) {
+            const fail = msg => {
+                const active = this.steps.find(s => s.state === 'active');
+                if (active) active.state = 'error';
+                this.errorText = msg;
+                this.phase = 'error';
+            };
+            try {
+                const res = await fetch(window.location.pathname, { method: 'POST', body: data });
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '';
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (value) buf += decoder.decode(value, { stream: true });
+                    const lines = buf.split('\n');
+                    buf = lines.pop();
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        let msg;
+                        try { msg = JSON.parse(line); } catch (e) { continue; }
+                        if (msg.step) this.setStep(msg.step);
+                        if (msg.error) { this.saved = !!msg.saved; fail(msg.error); return; }
+                        if (msg.done) {
+                            this.steps.forEach(s => s.state = 'done');
+                            this.phase = 'done';
+                            if (window.showToast) showToast(msg.status, 'success');
+                            setTimeout(() => { window.location.href = '/containers'; }, 1500);
+                            return;
+                        }
+                    }
+                    if (done) break;
+                }
+                fail({{toJSON (.T.Get "The server stopped responding before the container was created.")}});
+            } catch (e) {
+                fail({{toJSON (.T.Get "Connection lost while creating the container.")}});
+            }
+        }
+    };
+}
+</script>
+
+<!-- END templates/docker/container_form.html -->
+{{end}}

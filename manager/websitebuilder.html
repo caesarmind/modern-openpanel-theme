@@ -1,0 +1,354 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "flowbite_js"}}
+<script defer src="{{static "vendor/flowbite/flowbite252.min.js"}}"></script>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/websitebuilder.html -->
+
+<script>let toastDisplayed = false;</script>
+
+<div class="op-page-head op-cms-head op-rt-head">
+    <div class="op-rt-id">
+        <span class="op-mgr-logo" aria-hidden="true">{{template "op_app_logo" "websitebuilder"}}</span>
+        <div style="min-width:0">
+            <div class="op-eyebrow">{{.T.Get "Website Builder"}}</div>
+            <h1 class="op-title">{{.CurrentDomain}}</h1>
+            <p class="op-meta"><a class="op-link" href="https://{{.CurrentDomain}}" target="_blank" rel="noopener">https://{{.CurrentDomain}}</a>{{if .Container.CreatedDate}} · {{.T.Get "Created"}} {{replace (replace .Container.CreatedDate "T" " ") "Z" " UTC"}}{{end}}</p>
+        </div>
+    </div>
+
+    <div class="op-actions">
+        {{template "temp_link" .}}
+        <a href="/website-builder/edit?domain={{.CurrentDomain}}" id="login_button" class="op-btn op-btn-primary">
+            <span id="spinner" class="spinner-border spinner-border-sm hidden" role="status" aria-hidden="true"></span>
+            <span id="button_text">{{template "op_icon" "pencil"}} {{.T.Get "Open Editor"}}</span>
+        </a>
+        {{template "op_site_del" (dict "T" .T "Label" (.T.Get "Detach or delete")
+            "Detach" (.T.Get "Detach website") "DetachText" (.T.Get "Remove the website from this manager without deleting any files.") "DetachJS" (print "confirmDetach(" (toJSON .Container.ID) ")")
+            "Delete" (.T.Get "Delete website") "DeleteText" (.T.Get "All website files are deleted. There is no coming back after you press delete.") "DeleteJS" (print "confirmRemoveforWP(" (toJSON .Container.ID) ")"))}}
+    </div>
+</div>
+
+<section class="op-card op-sb-frame" aria-label="{{.T.Get "Preview"}}" x-data="{ w: '100%', src: false }">
+    <div class="op-sb-bar">
+        <span class="op-sb-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="op-sb-addr">{{template "op_icon" "lock"}}<span>https://{{.CurrentDomain}}</span></span>
+        <div class="op-segmented" role="group" aria-label="{{.T.Get "Preview width"}}">
+            <button type="button" :aria-pressed="(w === '100%').toString()" @click="w = '100%'">{{.T.Get "Desktop"}}</button>
+            <button type="button" :aria-pressed="(w === '768px').toString()" @click="w = '768px'">{{.T.Get "Tablet"}}</button>
+            <button type="button" :aria-pressed="(w === '390px').toString()" @click="w = '390px'">{{.T.Get "Phone"}}</button>
+        </div>
+    </div>
+    <div class="op-sb-stage"><div class="op-sb-page" :style="{ width: w }">{{if .BlankPage}}<div class="op-sb-blank">{{template "op_icon" "layout"}}<b>{{.T.Get "This page is still blank"}}</b><p>{{.T.Get "The builder created an empty index.html. Open the editor and drag in blocks, then save."}}</p></div>{{else}}<iframe src="https://{{.CurrentDomain}}" title="{{.T.Get "Preview of"}} {{.CurrentDomain}}" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>{{end}}</div></div>
+    {{if .HasSource}}
+    <div class="op-sb-foot"><span>{{.T.Get "One page. The editor saves it as index.html and style.css."}}</span><button class="op-btn op-btn-ghost op-btn-sm" type="button" @click="src = !src" :aria-expanded="src.toString()" aria-controls="op-sb-src"><span x-show="!src">{{.T.Get "View source"}}</span><span x-show="src" x-cloak>{{.T.Get "Hide source"}}</span></button></div>
+    <div class="op-terminal op-sb-src" id="op-sb-src" x-show="src" x-cloak><div class="op-terminal-bar"><i></i><i></i><i></i><span>index.html</span></div><pre>{{.IndexSource}}</pre></div>
+    {{end}}
+</section>
+
+<div class="op-content op-wp-layout">
+
+    <div class="op-wp-main">
+
+        <div class="op-card op-wp-tabs-card" x-data="{ activeTab: (new URLSearchParams(window.location.search).get('tab') || 'dashboard').replace(/^remove$/, 'dashboard') }">
+
+    <div class="op-wp-tabs-bar">
+        <ul id="wp-tab" data-tabs-toggle="#wp-tab-content" role="tablist" data-tab-overflow data-more-label="{{.T.Get "More"}}" class="op-wp-tabs">
+            <li role="presentation">
+                <a href="#" id="dashboard-tab" data-tabs-target="#dashboard" role="tab" aria-controls="dashboard" aria-selected="true"
+                   @click="activeTab = 'dashboard'"
+                   :class="activeTab === 'dashboard' && 'is-active'"
+                   class="op-wp-tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="mr-1" viewBox="0 0 16 16"><path d="M2 10h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1m9-9h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1m0 9a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1zm0-10a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zM2 9a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2zm7 2a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2zM0 2a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm5.354.854a.5.5 0 1 0-.708-.708L3 3.793l-.646-.647a.5.5 0 1 0-.708.708l1 1a.5.5 0 0 0 .708 0z"/></svg>
+                    <span class="op-wp-tab-label">{{.T.Get "Overview"}}</span>
+                </a>
+            </li>
+            <li role="presentation">
+                <a href="#" id="backups-tab" data-tabs-target="#backups" role="tab" aria-controls="backups" aria-selected="false"
+                   @click="activeTab = 'backups'"
+                   :class="activeTab === 'backups' && 'is-active'"
+                   class="op-wp-tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="mr-1" viewBox="0 0 16 16"><path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 5.146a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0z"/></svg>
+                    <span class="op-wp-tab-label">{{.T.Get "Backups"}}</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+            <div id="wp-tab-content">
+                <div class="hidden op-wp-panel" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+
+        <section class="op-card">
+            <div class="op-card-head">
+                <h2>{{.T.Get "Files"}}</h2>
+                {{if .UserAllowed.filemanager}}<a href="/files/{{replace .Docroot "/var/www/html/" ""}}">{{.T.Get "Open in File Manager"}}</a>{{end}}
+            </div>
+            {{if .Files}}
+            <ul class="op-mgr-files op-sb-files">
+                {{range .Files}}<li class="{{if .Dir}}is-dir{{end}}">{{if .Dir}}{{template "op_icon" "folder"}}{{else}}{{template "op_icon" "file"}}{{end}}<span>{{.Name}}</span><span class="op-mono">{{if .Size}}{{.Size}} · {{end}}{{$.T.Get "saved %(date)s" "date" .Modified}}</span></li>{{end}}
+            </ul>
+            {{end}}
+            <dl class="op-mgr-kv" x-data>
+                <dt>{{.T.Get "Folder"}}</dt><dd class="op-mono">{{.Docroot}}</dd>
+                <dd><button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy folder path"}}" @click="navigator.clipboard && navigator.clipboard.writeText({{toJSON .Docroot}}); showToast({{toJSON (.T.Get "Copied folder path.")}}, 'success')">{{template "op_icon" "copy"}}</button></dd>
+                <dt>{{.T.Get "Folder size"}}</dt><dd class="op-mono" id="filesSize">{{.T.Get "Calculating.."}}</dd><dd></dd>
+            </dl>
+            {{if or .UserAllowed.disk_usage .UserAllowed.inodes .UserAllowed.ftp}}
+            <div class="op-mgr-links">
+                {{if .UserAllowed.disk_usage}}<a class="op-btn op-btn-secondary op-btn-sm" href="{{.DiskUsageHref}}">{{template "op_icon" "chartpie"}} {{.T.Get "Disk Usage"}}</a>{{end}}
+                {{if .UserAllowed.inodes}}<a class="op-btn op-btn-secondary op-btn-sm" href="{{.InodesExplorerHref}}">{{template "op_icon" "file"}} {{.T.Get "Inodes Explorer"}}</a>{{end}}
+                {{if .UserAllowed.ftp}}<a class="op-btn op-btn-secondary op-btn-sm" href="/ftp">{{template "op_icon" "ftp"}} {{.T.Get "FTP Accounts"}}</a>{{end}}
+            </div>
+            {{end}}
+        </section>
+                </div>
+
+                <div class="hidden op-wp-panel" id="backups" role="tabpanel" aria-labelledby="backups-tab">
+                    <div class="op-section">
+                        <div>
+                            <h2 class="op-h">{{.T.Get "Create a Backup"}}</h2>
+                            <p class="op-meta">{{.T.Get "Generate a backup of website files."}}</p>
+                        </div>
+                        <div class="op-section-body">
+                            <div class="op-form-grid">
+                                <div class="op-field-wrap">
+                                    <div class="op-field-ctl op-stack-sm">
+                                        <div class="flex items-center">
+                                            <input checked id="backupFiles" type="checkbox" class="op-native-check">
+                                            <label for="checked-checkbox" class="op-check-label">{{.T.Get "Backup Files"}} <b id="files-size-for-backup"></b></label>
+                                        </div>
+                                        <button id="runBackup" type="button" class="op-btn op-btn-primary"><i class="bi bi-download mr-2"></i> {{.T.Get "Generate Backup"}}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="op-sep"><div class="op-divider"></div><div class="whitespace-nowrap">{{.T.Get "or"}}</div><div class="op-divider"></div><div></div></div>
+
+                    <div class="op-section">
+                        <div>
+                            <h2 class="op-h">{{.T.Get "Restore from Backups"}}</h2>
+                            <p class="op-meta">{{.T.Get "Restore website files from a previous backup."}}</p>
+                        </div>
+                        <div class="op-section-body">
+                            <div class="op-form-grid">
+                                <div class="op-field-wrap">
+                                    <div class="op-field-ctl op-stack-sm">
+                                        <button id="restore-btn-or" class="op-btn op-btn-primary" type="button">
+                                            {{.T.Get "Display Backups"}}
+                                        </button>
+
+                                        <div id="restore-section" class="hidden">
+                                            <p>{{.T.Get "Select a backup date:"}}</p>
+                                            <select class="op-input" id="restoreBackupDate"></select>
+
+                                            <div id="restoreStatus" class="mt-3"></div>
+
+                                            <button data-selected-domain="{{.CurrentDomain}}" type="button" id="confirmRestore" class="op-btn op-btn-primary">
+                                                {{template "op_icon" "refresh"}} {{.T.Get "Start Restore"}}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hidden op-wp-panel" id="remove" role="tabpanel">
+                    <script>
+                        function confirmRemoveforWP(Id) {
+                            showToast({{toJSON (.T.Get "Delete process started. Please wait.")}}, 'loading');
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/website-builder/remove', true);
+                            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                            xhr.setRequestHeader('X-CSRF-Token', csrf_token);
+                            xhr.onreadystatechange = function () {
+                                if (xhr.readyState === 4) {
+                                    window.location.href = '/sites';
+                                }
+                            };
+                            xhr.send('id=' + Id + '&csrf_token=' + encodeURIComponent(csrf_token));
+                        }
+
+                        function confirmDetach(Id) {
+                            showToast({{toJSON (.T.Get "Detach process started. Please wait.")}}, 'loading');
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/website-builder/detach', true);
+                            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                            xhr.setRequestHeader('X-CSRF-Token', csrf_token);
+                            xhr.onreadystatechange = function () {
+                                if (xhr.readyState === 4) {
+                                    if (xhr.status === 200) {
+                                        window.location.href = '/sites';
+                                    } else {
+                                        showToast({{toJSON (.T.Get "An error occurred while detaching website. Please try again.")}}, 'error');
+                                    }
+                                }
+                            };
+                            xhr.send('id=' + Id + '&csrf_token=' + encodeURIComponent(csrf_token));
+                        }
+                    </script>
+                    <p class="op-meta"></p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+    <div class="op-wp-side">
+
+{{template "pagespeed_panel" .}}
+
+        {{template "visitors" .}}
+
+{{template "waf_panel" .}}
+
+<section class="op-card">
+    <div class="op-card-head"><h2>{{.T.Get "Created"}}</h2></div>
+    <b class="op-kpi-value" id="created_date" data-relative-date="{{.Container.CreatedDate}}">{{.Container.CreatedDate}}</b>
+    <p class="op-mono op-hint">{{replace (replace .Container.CreatedDate "T" " ") "Z" " UTC"}}</p>
+</section>
+
+    </div>
+
+</div>
+
+<script>
+
+function GetWPfilesSize() {
+    const filesSizeSpan = document.getElementById("filesSize");
+    const filesSizeSpanForBackup = document.getElementById("files-size-for-backup");
+    const destinationPath = {{toJSON (replace .Docroot "/var/www/html/" "")}};
+
+    fetch(`/json/directory-size?folder=${encodeURIComponent(destinationPath)}`)
+        .then(response => response.json())
+        .then(data => {
+            filesSizeSpan.textContent = data.size;
+            filesSizeSpanForBackup.textContent = `( ~ ${data.size} )`;
+        })
+        .catch(error => {
+            console.error("An error occurred fetching file size from container:", error);
+            showToast({{toJSON (.T.Get "An error occurred fetching folder size from the container.")}}, 'warning');
+        });
+}
+
+const restoreButton = document.getElementById("restore-btn-or");
+const restoreBackupDateSelect = document.getElementById("restoreBackupDate");
+const confirmRestoreButton = document.getElementById("confirmRestore");
+
+const restoreDomain = {{toJSON .CurrentDomain}};
+var docroot = {{toJSON .Docroot}};
+let restoreConfirmed = false;
+
+if (restoreButton) {
+    restoreButton.addEventListener("click", function () {
+        document.querySelector("#restore-section").classList.remove("hidden");
+        document.querySelector("#restore-btn-or").classList.add("hidden");
+        fetch(`/wordpress/backup/get_dates/${restoreDomain}?docroot=${docroot}`)
+            .then(response => response.json())
+            .then(data => {
+                restoreBackupDateSelect.innerHTML = "";
+
+                if (data.length > 0) {
+                    data.forEach(dateInfo => {
+                        const { date, hasDbBackup, hasFilesBackup } = dateInfo;
+                        const option = document.createElement("option");
+                        option.value = date;
+                        option.textContent = `${date} ({{.T.Get "Files Backup"}})`;
+                        restoreBackupDateSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement("option");
+                    option.textContent = "{{.T.Get "No backups available"}}";
+                    option.disabled = true;
+                    restoreBackupDateSelect.appendChild(option);
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching backup dates:", error);
+            });
+    });
+}
+
+if (confirmRestoreButton) {
+    confirmRestoreButton.addEventListener("click", function () {
+        if (!restoreConfirmed) {
+            confirmRestoreButton.textContent = {{toJSON (.T.Get "Click again to confirm")}};
+            confirmRestoreButton.classList.remove("op-btn-primary");
+            confirmRestoreButton.classList.add("op-btn-danger");
+            restoreConfirmed = true;
+        } else {
+            const selectedDate = restoreBackupDateSelect.value;
+            showToast({{toJSON (.T.Get "Restoring backup... Please wait.")}}, 'warning');
+
+            fetch(`/wordpress/backup/restore/${restoreDomain}?docroot=${docroot}&backup_date=${selectedDate}`, { method: 'POST', headers: { 'X-CSRF-Token': csrf_token } })
+                .then(response => {
+                    if (response.ok) {
+                        return response.text();
+                    }
+                    throw new Error({{toJSON (.T.Get "Restore request failed.")}});
+                })
+                .then(result => {
+                    showToast(`${result}`, 'success');
+
+                    setTimeout(() => {
+                        restoreConfirmed = false;
+                        confirmRestoreButton.textContent = {{toJSON (.T.Get "Start Restore")}};
+                        confirmRestoreButton.classList.remove("op-btn-danger");
+                        confirmRestoreButton.classList.add("op-btn-primary");
+                    }, 5000);
+                })
+                .catch(error => {
+                    console.error("Error during restore:", error);
+                    showToast(`${error.message}`, 'error');
+                });
+        }
+    });
+}
+
+const runBackupButton = document.getElementById("runBackup");
+const backupFilesCheckbox = document.getElementById("backupFiles");
+
+if (runBackupButton) {
+    runBackupButton.addEventListener("click", function () {
+        const backupFiles = backupFilesCheckbox.checked;
+
+        if (!backupFiles) {
+            showToast({{toJSON (.T.Get "No options selected to backup. Please ensure that at least Files is selected.")}}, 'error');
+            return;
+        }
+
+        showToast({{toJSON (.T.Get "Generating website backup.. Please wait.")}}, 'loading');
+
+        fetch(`/wordpress/backup/run/${restoreDomain}?docroot=${docroot}&backup_files=${backupFiles}`, { method: 'POST', headers: { 'X-CSRF-Token': csrf_token } })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                }
+                throw new Error({{toJSON (.T.Get "Backup request failed.")}});
+            })
+            .then(result => {
+                showToast(`${result}`, 'success');
+            })
+            .catch(error => {
+                showToast(`${error.message}`, 'error');
+                console.error("Error during backup:", error);
+            });
+    });
+} else {
+    console.error("start backup button not available.");
+}
+
+GetWPfilesSize();
+
+</script>
+
+<!-- END templates/manager/websitebuilder.html -->
+{{end}}

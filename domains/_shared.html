@@ -1,0 +1,57 @@
+{{define "alpine_plugins"}}{{end}}
+
+{{define "no_domain"}}
+<!-- START templates/domains/partials/_no_domain.html -->
+<div class="op-card op-empty op-block-card">
+    <p class="op-strong">{{.T.Get "No domains yet"}}</p>
+    <p class="op-hint">{{.T.Get "Add your first domain to get started"}}</p>
+    <a href="/domains/new" class="op-btn op-btn-primary"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" aria-hidden="true" class="remixicon -ml-1 size-5 shrink-0"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"></path></svg>{{.T.Get "New domain"}}</a>
+</div>
+<!-- END templates/domains/partials/_no_domain.html -->
+{{end}}
+
+{{define "domain_selector"}}
+<!-- domain_selector(domains, redirect_base) -->
+<div class="op-card op-block-card">
+    <div class="op-form-grid">
+        <div class="op-field-wrap">
+            <select id="domains" name="version" onchange="redirectToSelectedVersion(this, '{{.RedirectBase}}')" class="op-input">
+                <option value="" disabled selected>{{.T.Get "Select domain"}}</option>
+                {{range .Domains}}
+                    <option class="punycode" value="{{.DomainURL}}" {{if hasSuffix .DomainURL ".onion"}}disabled{{end}}>{{.DomainURL}}</option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+</div>
+
+<script>
+function redirectToSelectedVersion(selectElement, baseUrl) {
+    const selectedValue = selectElement.value;
+    if (selectedValue) {
+        window.location.href = `${baseUrl}${selectedValue}`;
+    }
+}
+</script>
+{{end}}
+
+{{/* op- versions of the two above for migrated pages: dict "T", "Domains", "RedirectBase", "Label" */}}
+{{define "op_domain_picker"}}
+<section class="op-card" style="max-width:560px">
+    <label class="op-field"><span class="op-label">{{.Label}}</span>
+        <select class="op-select" onchange="if (this.value) window.location.href = {{.RedirectBase}} + this.value">
+            <option value="" disabled selected>{{.T.Get "Select domain"}}</option>
+            {{range .Domains}}<option class="punycode" value="{{.DomainURL}}" {{if hasSuffix .DomainURL ".onion"}}disabled{{end}}>{{.DomainURL}}</option>{{end}}
+        </select>
+    </label>
+</section>
+{{end}}
+
+{{define "op_no_domain"}}
+<section class="op-card op-empty">
+    <span class="op-ico-tile">{{template "op_icon" "globe"}}</span>
+    <b>{{.T.Get "No domains yet"}}</b>
+    <span class="op-hint">{{.T.Get "Add your first domain to get started"}}</span>
+    <a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "New domain"}}</a>
+</section>
+{{end}}

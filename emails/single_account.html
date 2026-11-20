@@ -1,0 +1,344 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/single_account.html -->
+
+<!-- page header -->
+<div class="op-page-head op-cms-head">
+        <div class="gap-x-3">
+            <h1 class="op-title">{{.T.Get "Edit Email account"}}</h1>
+            <p class="op-meta punycode">{{.Quota.Address}}</p>
+        </div>
+    <div class="op-actions">
+            <a href="/emails/delete/{{.Quota.Address}}" class="op-btn op-btn-danger"><i class="bi bi-trash3"></i> {{.T.Get "Delete"}}</a>
+    </div>
+</div>
+<!-- END page header -->
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+    <form class="mt-8" id="email-settings-form" action="/emails/edit/{{.Quota.Address}}" method="post">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+        <div class="op-form-grid">
+
+  <div class="op-field-wrap">
+    <label for="email" class="op-label op-label-row">{{.T.Get "Email address"}}</label>
+      <input type="hidden" name="email_address" value="{{.Quota.Address}}" readonly required>
+
+      <input type="email" class="op-input" name="email_address" value="{{.Quota.Address}}" readonly disabled>
+  </div>
+
+  <div class="op-field-wrap">
+    <div class="flex justify-between mb-1">
+     <label for="usage" class="op-label op-label-row">{{.T.Get "Current Usage"}}</label>
+
+    <span class="op-label op-label-row">{{.Quota.QuotaDisplay}}</span>
+    </div>
+    <div class="op-progress op-progress-lg">
+    <div class="op-progress-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Quota.PercentVal}}" style="width: {{.Quota.CappedVal}}%;"></div>
+    </div>
+  </div>
+
+
+<div class="op-field-wrap">
+  <label for="gb" class="op-label op-label-row">
+    {{.T.Get "Change allocated storage space"}}<span class="is-danger">*</span>
+  </label>
+
+  <div class="op-join">
+    <input
+      type="number"
+      min="0"
+      name="gb"
+      value="{{.Quota.AllocatedQuota}}"
+      step="any"
+      class="op-input op-join-l"
+    >
+
+    <div class="input-group-append">
+      <select
+        class="op-input"
+        name="format"
+        id="format"
+      >
+        <option value="k" {{if eq .Quota.AllocatedValue "k"}}selected{{end}}>KiB</option>
+        <option value="M" {{if eq .Quota.AllocatedValue "M"}}selected{{end}}>MiB</option>
+        <option value="G" {{if eq .Quota.AllocatedValue "G"}}selected{{end}}>GiB</option>
+        <option value="T" {{if eq .Quota.AllocatedValue "T"}}selected{{end}}>TiB</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="op-hint">
+    {{if ne .MaxEmailQuotaNumeric 0.0}}
+      {{.T.Get "Maximum allowed: "}} {{.MaxEmailQuotaNumeric}}{{.AllocatedUnit}}
+    {{end}}
+  </p>
+</div>
+
+
+<script>
+const quotaInput = document.querySelector('input[name="gb"]');
+const unitSelect = document.querySelector('select[name="format"]');
+
+const unitsHierarchy = { 'B': 0, 'k': 1, 'M': 2, 'G': 3, 'T': 4 };
+const unitsMultiplier = { 'B': 1, 'k': 1024, 'M': 1024**2, 'G': 1024**3, 'T': 1024**4 };
+
+const maxQuotaNumeric = {{.MaxEmailQuotaNumeric}};
+const maxUnit = {{toJSON .AllocatedUnit}};
+
+function getMaxInUnit(unit) {
+    if (maxQuotaNumeric === 0) return Infinity;
+    const multiplier = unitsMultiplier[maxUnit] / unitsMultiplier[unit];
+    return maxQuotaNumeric * multiplier;
+}
+
+function limitQuotaInput() {
+    const maxInCurrentUnit = getMaxInUnit(unitSelect.value);
+    if (parseFloat(quotaInput.value) > maxInCurrentUnit) {
+        quotaInput.value = maxInCurrentUnit;
+    }
+}
+
+function limitUnits() {
+    const options = unitSelect.querySelectorAll('option');
+    options.forEach(option => {
+        if (maxQuotaNumeric === 0) {
+            option.disabled = false;
+        } else {
+            option.disabled = unitsHierarchy[option.value] > unitsHierarchy[maxUnit];
+        }
+    });
+    if (unitSelect.options[unitSelect.selectedIndex].disabled) {
+        unitSelect.value = maxUnit.toLowerCase();
+    }
+}
+
+quotaInput.addEventListener('input', limitQuotaInput);
+unitSelect.addEventListener('change', limitQuotaInput);
+
+limitUnits();
+limitQuotaInput();
+</script>
+
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6 mb-2 col-span-full">
+  <div class="col-span">
+    <label for="incoming" class="op-label op-label-row">{{.T.Get "Receiving Incoming Mail"}}<span class="is-danger">*</span></label>
+    <div class="flex">
+    <div class="form-field" id="incoming">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="incoming" id="allow_incoming" value="allow"
+                {{if eq .ReceiveRestriction "ACCEPT"}}
+                    checked
+                {{end}}>&nbsp;
+            <label class="form-check-label" for="allow_incoming"> {{.T.Get "Allow"}}</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="incoming" id="suspend_incoming" value="suspend"
+                {{if eq .ReceiveRestriction "REJECT"}}
+                    checked
+                {{end}}>&nbsp;
+            <label class="form-check-label" for="suspend_incoming"> {{.T.Get "Suspend"}}</label>
+        </div>
+    </div>
+    </div>
+  </div>
+
+  <div class="col-span">
+    <label for="incoming" class="op-label op-label-row">{{.T.Get "Sending Outgoing Mail"}}<span class="is-danger">*</span></label>
+    <div class="flex">
+    <div class="form-field" id="outgoing">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="outgoing" id="allow_outgoing" value="allow"
+                {{if eq .SendRestriction "ACCEPT"}}
+                    checked
+                {{end}}>
+            <label class="form-check-label" for="allow_outgoing">{{.T.Get "Allow"}}</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="outgoing" id="suspend_outgoing" value="suspend"
+                {{if eq .SendRestriction "REJECT"}}
+                    checked
+                {{end}}>
+            <label class="form-check-label" for="suspend_outgoing">{{.T.Get "Suspend"}}</label>
+        </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+
+<div
+  class="op-field-wrap"
+  x-data="passwordStrength({
+    weak: {{toJSON (.T.Get "Weak password")}},
+    medium: {{toJSON (.T.Get "Medium strength password")}},
+    strong: {{toJSON (.T.Get "Strong password")}},
+    tooWeak: {{toJSON (.T.Get "Password does not meet the required strength.")}}
+  }, {{.PasswordStrength}})"
+  x-init="checkStrength()"
+>
+  <label
+    for="email_password"
+    class="op-label op-label-row"
+  >
+    {{.T.Get "Password"}}<span class="is-danger">*</span>
+  </label>
+  <div class="flex">
+    <input
+      type="text"
+      name="email_password"
+      id="email_password"
+      maxlength="30"
+      minlength="8"
+      title="{{.T.Get "Password must be between 8 and 30 characters."}}"
+      placeholder=" {{.T.Get "New Password"}}"
+      class="op-input op-join-l"
+      x-model="password"
+      x-ref="input"
+      @input="checkStrength()"
+    />
+
+    <div class="input-group-append">
+      <button
+        type="button"
+        id="generatePassword"
+        class="op-btn op-btn-secondary op-join-btn"
+      >
+        <i class="bi bi-shuffle"></i>
+      </button>
+    </div>
+
+    <div class="input-group-append">
+      <button
+        class="op-btn op-btn-secondary op-join-btn is-last"
+        type="button"
+        id="togglePassword"
+      >
+        <i class="bi bi-eye"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Password strength indicator -->
+  <div class="op-progress op-strength">
+    <div
+      class="op-strength-bar"
+      :class="{ 'is-danger': strength === 'Weak', 'is-warning': strength === 'Medium', 'is-success': strength === 'Strong' }"
+      style="width: 0%"
+      :style="{
+        width:
+          strength === 'Weak'
+            ? '33%'
+            : strength === 'Medium'
+            ? '66%'
+            : strength === 'Strong'
+            ? '100%'
+            : '0%'
+      }"
+    ></div>
+  </div>
+  <p
+    class="op-hint op-strength-text" :class="{ 'is-danger': strength === 'Weak', 'is-warning': strength === 'Medium', 'is-success': strength === 'Strong' }"
+  >
+    <span x-text="strengthMessage" class="text-xs"></span>
+  </p>
+</div>
+
+        </div>
+
+        <div class="op-sep"><div class="op-divider"></div></div>
+
+<div class="op-actions op-actions-end">
+    <a href="/emails" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Emails"}}
+    </a>
+    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Update Email Settings"}}<svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+        </svg>
+    </button>
+</div>
+
+    </form>
+</div>
+<!-- END form -->
+
+<script>
+    let originalValues = {
+        email_address: {{toJSON .Quota.Address}},
+        gb: {{toJSON .Quota.AllocatedQuota}},
+        format: {{toJSON .Quota.AllocatedValue}},
+        incoming: "allow",
+        outgoing: "allow",
+        email_password: ""
+    };
+
+    function updateOriginalValues() {
+        originalValues.gb = document.querySelector('input[name="gb"]').value;
+        originalValues.format = document.querySelector('select[name="format"]').value;
+        originalValues.incoming = document.querySelector('input[name="incoming"]:checked').value;
+        originalValues.outgoing = document.querySelector('input[name="outgoing"]:checked').value;
+        originalValues.email_password = document.querySelector('input[name="email_password"]').value;
+    }
+
+    function hasChanged() {
+        return originalValues.gb !== document.querySelector('input[name="gb"]').value ||
+            originalValues.format !== document.querySelector('select[name="format"]').value ||
+            originalValues.incoming !== document.querySelector('input[name="incoming"]:checked').value ||
+            originalValues.outgoing !== document.querySelector('input[name="outgoing"]:checked').value ||
+            originalValues.email_password !== document.querySelector('input[name="email_password"]').value;
+    }
+
+    document.getElementById("email-settings-form").addEventListener("submit", function(e) {
+        if (!hasChanged()) {
+            e.preventDefault();
+        }
+    });
+
+    updateOriginalValues();
+
+</script>
+
+<script>
+
+    function generateRandomStrongPassword(length) {
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+        let result = "";
+        for (let i = 0; i < length; i++) {
+            const randomIndex = Math.floor(Math.random() * charset.length);
+            result += charset.charAt(randomIndex);
+        }
+        return result;
+    }
+
+    document.getElementById("generatePassword").addEventListener("click", function () {
+        const generatedPassword = generateRandomStrongPassword(16);
+        const passwordField = document.getElementById("email_password");
+
+        passwordField.value = generatedPassword;
+
+        passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+        }
+    });
+
+
+    document.getElementById("togglePassword").addEventListener("click", function() {
+        const passwordField = document.getElementById("email_password");
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+        } else {
+            passwordField.type = "password";
+        }
+    });
+</script>
+
+<!-- END templates/emails/single_account.html -->
+{{end}}

@@ -1,0 +1,97 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "content"}}
+<!-- START templates/domains/delete.html -->
+
+
+<!-- page header -->
+<section aria-label="{{.T.Get "Delete Domain Header"}}">
+    <div class="op-page-head op-cms-head">
+        <div>
+        <div class="op-wp-title"><h1 class="op-title">{{.T.Get "Delete domain"}} <span class="punycode">{{.DomainURL}}</span></h1></div>
+        <p class="op-meta">{{.T.Get "Deleting the domain name will stop any services associated with this domain from working, however all existing data such as emails and files will remain on disk."}}</p>
+    </div>
+    <div class="op-actions">
+    </div>
+</div>
+<!-- END page header -->
+
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+    <form class="mt-8" method="POST">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-form-grid">
+
+            {{if or (gt .SiteCount 0) (gt .SubdomainCount 0)}}
+
+                {{if gt .SubdomainCount 0}}
+                <div class="op-field-wrap">
+                    <p class="op-muted">{{.SubdomainCount}}
+                        {{if gt .SubdomainCount 1}} {{.T.Get "subdomains"}}{{else}}{{.T.Get "subdomain"}}{{end}} {{.T.Get "associated with this domain."}} {{.T.Get "Please remove the subdomains first in order to delete the domain name."}}</p>
+                </div>
+                {{end}}
+
+                {{if gt .SiteCount 0}}
+                <div class="op-field-wrap">
+                    <p class="op-muted">{{.SiteCount}}
+                        {{if gt .SiteCount 1}} {{.T.Get "websites"}}{{else}}{{.T.Get "website"}}{{end}} {{.T.Get "associated with this domain."}} {{.T.Get "Please remove the websites first in order to delete the domain name."}}</p>
+                    <p class="my-4 op-muted">{{.T.Get "Websites that use this domain:"}}</p>
+                            {{range .Sites}}
+                                <ul>
+                                    <li><a href="/website?domain={{.SiteName}}" class="">{{.SiteName}}</a></li>
+                                </ul>
+                            {{end}}
+                </div>
+                {{end}}
+
+            {{else}}
+
+            <input type="hidden" name="domain_url" value="{{.DomainURL}}">
+
+            <div class="op-field-wrap">
+
+                <p class="text op-muted">
+                <ul class="list-disc pl-6 space-y-2 my-4 text-left">
+                <li><span class="is-success">{{.T.Get "Folder"}} {{.Docroot}} {{.T.Get "and all associated data will be kept."}}</span></li>
+                    {{if .UserAllowed.ftp}}
+                <li><span class="is-success">{{.T.Get "FTP accounts that have a path under this domain document root will remain."}}</span></li>
+                    {{end}}
+                <li><span class="is-danger">{{.T.Get "Websites that use this domain name will immediately stop working."}}</span></li>
+                {{if .UserAllowed.emails}}
+                    <li><span class="is-danger">{{.T.Get "All"}} @<span class="punycode">{{.DomainURL}}</span> {{.T.Get "email accounts will be deleted, but the messages remain on disk."}}</span></li>
+                {{end}}
+                <li><span class="is-danger">{{.T.Get "DNS zone with all its records will be permanently deleted."}}</span></li>
+                <li><span class="is-danger">{{.T.Get "SSL certificate for the domain will immediately be revoked."}}</span></li>
+                </ul>
+                </p>
+
+            </div>
+
+            {{end}}
+        </div>
+
+
+<div class="op-sep"><div class="op-divider"></div></div>
+
+<div class="op-actions op-actions-end">
+    <a href="/domains" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Domains"}}
+    </a>
+
+{{if not (or (gt .SiteCount 0) (gt .SubdomainCount 0))}}
+    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Delete Domain"}} <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path></svg>
+    </button>
+{{end}}
+
+
+</div>
+
+    </form>
+</div>
+<!-- END form -->
+
+<!-- END templates/domains/delete.html -->
+{{end}}

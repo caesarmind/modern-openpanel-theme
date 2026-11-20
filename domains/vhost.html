@@ -1,0 +1,69 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "content"}}
+
+{{if .DomainName}}
+{{template "op_conf_editor_assets" .}}
+{{$kind := "brace"}}{{if or (eq .WebServerPreference "apache") (eq .WebServerPreference "litespeed")}}{{$kind = "apache"}}{{end}}
+
+<form method="post" class="op-content" x-data="opConfEditor({ kind: {{toJSON $kind}}, busy: { save: {{toJSON (.T.Get "Saving the VirtualHost file")}}, steps: {{toJSON (.T.Get "Writing the file|Testing the configuration|Reloading the web server")}}, note: {{toJSON (.T.Get "Stay on this page until it finishes.")}} } })" @submit="onSubmit($event)" @keydown.window.ctrl.s.prevent="save()" @keydown.window.meta.s.prevent="save()">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+    <input type="hidden" name="domain_name" value="{{.DomainName}}">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow"><a href="/domains/vhosts" style="color:var(--color-accent-text)">{{.T.Get "Domain VHosts"}}</a></div>
+            <h1 class="op-title punycode" style="overflow-wrap:anywhere">{{.DomainName}}</h1>
+            <p class="op-meta">{{title .WebServerPreference}} {{.T.Get "VirtualHost file for this domain. Saving checks that every block is closed, then the web server tests and reloads it."}}</p>
+        </div>
+        <div class="op-actions">
+            <a href="/domains/vhosts" class="op-btn op-btn-secondary">{{template "op_icon" "arrowleft"}} {{.T.Get "All domains"}}</a>
+            <button type="submit" x-ref="save" class="op-btn op-btn-primary" :disabled="!dirty">{{.T.Get "Save Changes"}}</button>
+        </div>
+    </div>
+    <section class="op-kpis" aria-label="{{.T.Get "VirtualHost"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "folder"}} {{.T.Get "Document root"}}</div>{{if .Domain.Docroot}}<div class="op-confed-root"><span class="op-mono">{{.Domain.Docroot}}</span><button class="op-icon-btn" type="button" onclick="copyToClipboard(this.dataset.v)" data-v="{{.Domain.Docroot}}" aria-label="{{.T.Get "Copy"}} {{.Domain.Docroot}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></div>{{else}}<div class="op-kpi-value" style="font-size:18px">—</div>{{end}}</div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "cpu"}} {{.T.Get "Handler"}}</div>{{if .Domain.PHPVersion}}<div class="op-kpi-value" style="font-size:18px">PHP {{.Domain.PHPVersion}}</div><div class="op-kpi-note op-mono">php-fpm-{{.Domain.PHPVersion}}</div>{{else}}<div class="op-kpi-value" style="font-size:18px">—</div><div class="op-kpi-note">{{.T.Get "No PHP version set"}}</div>{{end}}</div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "lock"}} {{.T.Get "Ports"}}</div><div class="op-kpi-value" style="font-size:18px">{{if .File.Ports}}{{join .File.Ports " + "}}{{else}}—{{end}}</div><div class="op-kpi-note">{{if .File.SSL}}{{.T.Get "SSL is set up"}}{{else}}{{.T.Get "No SSL block"}}{{end}}{{if .File.Lines}} · {{.File.Lines}} {{.T.Get "lines"}}{{end}}</div></div>
+    </section>
+    <div class="op-alert is-warning" role="status">{{template "op_icon" "alert"}}<span><b>{{.T.Get "For advanced users."}}</b> {{.T.Get "A wrong change can take the site offline. Each save is checked and rolled back if the web server rejects it, but keep a copy of what you change."}}</span></div>
+    {{template "op_conf_editor" (dict "T" .T "Name" "vhost_content" "Content" .VhostContent "File" (printf "%s.conf" .DomainName) "Label" (.T.Get "VirtualHosts File"))}}
+</form>
+
+{{else}}
+
+<div class="op-content" aria-label="{{.T.Get "Select Domain Header"}}" x-data="{ q: '' }">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Domain VHosts"}}</h1>
+            <p class="op-meta">{{.T.Get "Each domain has its own"}} {{title .WebServerPreference}} {{.T.Get "VirtualHost file with its document root, PHP version and SSL setup. Pick one to edit it."}}</p>
+        </div>
+    </div>
+    {{if .Domains}}
+    <div class="op-alert is-warning" role="status">{{template "op_icon" "alert"}}<span><b>{{.T.Get "For advanced users."}}</b> {{.T.Get "A wrong change can take a site offline. Each save is checked and rolled back if the web server rejects it, but keep a copy of what you change."}}</span></div>
+    <section class="op-card" aria-label="{{.T.Get "Domains"}}">
+        <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="q" placeholder="{{.T.Get "Search domains, paths or PHP"}}" aria-label="{{.T.Get "Search domains"}}"></label></div>
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th scope="col">{{.T.Get "Domain"}}</th><th scope="col">{{.T.Get "Document root"}}</th><th scope="col">{{.T.Get "Handler"}}</th><th scope="col">{{.T.Get "Ports"}}</th><th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th></tr></thead>
+            <tbody>
+            {{range .Domains}}
+            {{$vf := index $.VhostFiles .DomainURL}}
+            <tr data-href="/domains/vhosts?domain={{.DomainURL}}" x-show="!q || {{toJSON (printf "%s %s %s" .DomainURL .Docroot .PHPVersion)}}.toLowerCase().includes(q.toLowerCase())">
+                <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "file"}}</span><div><b class="punycode" style="overflow-wrap:anywhere">{{.DomainURL}}</b>{{if $vf.Lines}}<span class="op-sub">{{$vf.Lines}} {{$.T.Get "lines"}}</span>{{end}}</div></div></td>
+                <td data-label="{{$.T.Get "Document root"}}">{{if .Docroot}}<span style="display:inline-flex;align-items:center;gap:6px;min-width:0"><span class="op-mono" style="font-size:12px;overflow-wrap:anywhere">{{.Docroot}}</span><button class="op-icon-btn" type="button" style="width:26px;height:26px;flex:none" onclick="copyToClipboard(this.dataset.v)" data-v="{{.Docroot}}" aria-label="{{$.T.Get "Copy"}} {{.Docroot}}" title="{{$.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></span>{{else}}<span class="op-faint">—</span>{{end}}</td>
+                <td data-label="{{$.T.Get "Handler"}}">{{if .PHPVersion}}<span class="op-tag op-mono">php-fpm-{{.PHPVersion}}</span>{{else}}<span class="op-faint">—</span>{{end}}</td>
+                <td data-label="{{$.T.Get "Ports"}}">{{if $vf.Ports}}<span class="op-chips" style="gap:4px">{{range $vf.Ports}}<span class="op-tag op-mono">{{.}}</span>{{end}}</span>{{else if $vf.SSL}}<span class="op-tag op-mono">SSL</span>{{else}}<span class="op-faint">—</span>{{end}}</td>
+                <td class="is-shrink"><a class="op-btn op-btn-secondary op-btn-sm" href="/domains/vhosts?domain={{.DomainURL}}">{{template "op_icon" "pencil"}} {{$.T.Get "Edit"}}</a></td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        <div class="op-tfoot"><span>{{len .Domains}} {{.T.Get "domains"}}</span></div>
+    </section>
+    {{else}}
+        {{template "no_domain" .}}
+    {{end}}
+</div>
+
+{{end}}
+
+{{end}}

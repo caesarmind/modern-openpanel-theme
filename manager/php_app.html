@@ -1,0 +1,276 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "flowbite_js"}}
+<script defer src="{{static "vendor/flowbite/flowbite252.min.js"}}"></script>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/php_app.html -->
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('logs', { rawMode: false });
+    });
+</script>
+
+<div class="op-page-head op-cms-head op-rt-head">
+    <div class="op-rt-id">
+        <span class="op-mgr-logo" aria-hidden="true">{{template "op_app_logo" "php"}}</span>
+        <div style="min-width:0">
+            <div class="op-eyebrow">{{.T.Get "PHP application"}}</div>
+            <h1 class="op-title">{{.CurrentDomain}}</h1>
+            <p class="op-meta op-sp-url" x-data><a class="op-link" href="https://{{.CurrentDomain}}" target="_blank" rel="noopener">https://{{.CurrentDomain}}</a><button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy site address"}}" @click="navigator.clipboard && navigator.clipboard.writeText('https://{{.CurrentDomain}}'); showToast({{toJSON (.T.Get "Copied site address.")}}, 'success')">{{template "op_icon" "copy"}}</button></p>
+        </div>
+    </div>
+
+    <div class="op-actions">
+        {{template "temp_link" .}}
+        <a class="op-btn op-btn-secondary" href="https://{{.CurrentDomain}}" target="_blank" rel="noopener">{{template "op_icon" "external"}} {{.T.Get "Open site"}}</a>
+        {{if .UserAllowed.filemanager}}<a class="op-btn op-btn-primary" href="/files/{{replace .Docroot "/var/www/html/" ""}}">{{template "op_icon" "folder"}} {{.T.Get "File Manager"}}</a>{{end}}
+        {{template "op_site_del" (dict "T" .T "Label" (.T.Get "Remove from Site Manager")
+            "Detach" (.T.Get "Remove from Site Manager") "DetachText" (.T.Get "Only the Site Manager entry goes. Files, vendor/, the domain, its PHP version and any database stay. Use Scan on the Sites page to add it back.") "DetachJS" "confirmRemovePHPApp()")}}
+    </div>
+</div>
+
+{{- $php := "" -}}{{if and .PHPVersion (ne .PHPVersion "/")}}{{$php = .PHPVersion}}{{end}}
+<section class="op-card op-sp-strip" aria-label="{{.T.Get "Runtime"}}">
+    <div><span class="op-label">{{template "op_icon" "box"}} {{.T.Get "Runs in"}}</span><b>{{if $php}}php-fpm-{{$php}}{{else}}{{.T.Get "Not set"}}{{end}}</b>{{if .UserAllowed.php}}<a href="/php/domains">{{.T.Get "Change PHP version"}}</a>{{end}}</div>
+    <div><span class="op-label">{{template "op_icon" "download"}} {{.T.Get "Initial project"}}</span><b>{{if .InitialProject}}{{.InitialProject}}{{else}}{{.T.Get "Custom"}}{{end}}</b>{{if .InitialProject}}<a href="https://packagist.org/packages/{{.InitialProject}}" target="_blank" rel="noopener">Packagist</a>{{else}}<span class="op-hint">{{.T.Get "No starter project"}}</span>{{end}}</div>
+    <div><span class="op-label">{{template "op_icon" "chartpie"}} {{.T.Get "Folder size"}}</span><b id="op-sp-size">–</b>{{if .UserAllowed.disk_usage}}<a href="{{.DiskUsageHref}}">{{.T.Get "Disk usage"}}</a>{{end}}</div>
+    <div><span class="op-label">{{template "op_icon" "clock"}} {{.T.Get "Added"}}</span><b>{{if .Container.CreatedDate}}{{replace (replace .Container.CreatedDate "T" " ") "Z" " UTC"}}{{else}}-{{end}}</b><span class="op-hint">{{.T.Get "No container of its own"}}</span></div>
+</section>
+
+<div class="op-content op-wp-layout op-sp-layout">
+
+    <div class="op-wp-main">
+
+        <div class="op-card op-wp-tabs-card op-mgr-rail" x-data="{ activeTab: (new URLSearchParams(window.location.search).get('tab') || 'dashboard').replace(/^remove$/, 'dashboard') }"
+             x-init="$watch('activeTab', t => t === 'logs' && loadPHPAppLogs()); activeTab === 'logs' && setTimeout(loadPHPAppLogs, 0)">
+
+    <div class="op-wp-tabs-bar">
+        <ul id="php-tab" data-tabs-toggle="#php-tab-content" role="tablist" class="op-wp-tabs">
+            <li role="presentation"><a href="#" id="dashboard-tab" data-tabs-target="#dashboard" role="tab" aria-controls="dashboard" aria-selected="true" @click="activeTab = 'dashboard'" :class="activeTab === 'dashboard' && 'is-active'" class="op-wp-tab">{{template "op_icon" "folder"}}<span class="op-wp-tab-label">{{.T.Get "Project"}}</span></a></li>
+            <li role="presentation"><a href="#composer" id="composer-tab" data-tabs-target="#composer" role="tab" aria-controls="composer" aria-selected="false" @click="activeTab = 'composer'" :class="activeTab === 'composer' && 'is-active'" class="op-wp-tab">{{template "op_icon" "box"}}<span class="op-wp-tab-label">{{.T.Get "Composer"}}</span></a></li>
+            <li role="presentation"><a href="#logs" id="logs-tab" data-tabs-target="#logs" role="tab" aria-controls="logs" aria-selected="false" @click="activeTab = 'logs'" :class="activeTab === 'logs' && 'is-active'" class="op-wp-tab">{{template "op_icon" "terminal"}}<span class="op-wp-tab-label">{{.T.Get "Logs"}}</span></a></li>
+            {{template "site_git_tabbtn" .}}
+        </ul>
+    </div>
+
+    <div id="php-tab-content">
+
+        <div class="hidden op-wp-panel" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+            <div class="op-sp-pane" x-data="{ dots: false }">
+                <div class="op-sp-pane-head">
+                    <div><h2>{{.T.Get "Files"}}</h2><p class="op-hint">{{.T.Get "Composer and the web server both work from this folder."}}</p></div>
+                    {{if .UserAllowed.filemanager}}<a class="op-btn op-btn-secondary op-btn-sm" href="/files/{{replace .Docroot "/var/www/html/" ""}}">{{template "op_icon" "folder"}} {{.T.Get "Open in File Manager"}}</a>{{end}}
+                </div>
+                <div class="op-sp-path" x-data><span class="op-mono">{{.Docroot}}</span><button type="button" class="op-icon-btn" aria-label="{{.T.Get "Copy folder path"}}" @click="navigator.clipboard && navigator.clipboard.writeText({{toJSON .Docroot}}); showToast({{toJSON (.T.Get "Copied folder path.")}}, 'success')">{{template "op_icon" "copy"}}</button></div>
+                {{if .Files}}
+                <ul class="op-mgr-files op-sp-tree">
+                    {{range .Files}}<li class="{{if .Dir}}is-dir{{end}}">{{if .Dir}}{{template "op_icon" "folder"}}{{else}}{{template "op_icon" "file"}}{{end}}<span>{{.Name}}{{if .Dir}}/{{end}}</span><span class="op-mono">{{if .Dir}}{{.Modified}}{{else}}{{.Size}}{{end}}</span></li>{{end}}
+                </ul>
+                {{if .HiddenFiles}}<p class="op-hint">{{.T.Get "%(n)s dotfiles not shown" "n" (toString .HiddenFiles)}}</p>{{end}}
+                {{else}}
+                <p class="op-hint">{{.T.Get "The folder is empty."}}</p>
+                {{end}}
+            </div>
+
+            <div class="op-sp-pane">
+                <div class="op-sp-pane-head">
+                    <div><h2>{{.T.Get "Requirements"}}</h2><p class="op-hint">{{.T.Get "What composer.json asks for and what composer.lock installed."}}</p></div>
+                    {{if .UserAllowed.filemanager}}<a href="/file-manager/edit-file/{{replace .Docroot "/var/www/html/" ""}}/composer.json?new=true" target="_blank" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "pencil"}} {{.T.Get "Edit composer.json"}}</a>{{end}}
+                </div>
+                {{if .ComposerRows}}
+                <div class="op-table-wrap">
+                    <table class="op-table is-plain op-sp-req">
+                        <thead><tr><th>{{.T.Get "Package"}}</th><th>{{.T.Get "Constraint"}}</th><th>{{.T.Get "Installed"}}</th></tr></thead>
+                        <tbody>
+                            {{range .ComposerRows}}<tr><td class="op-mono">{{.Name}}{{if .Dev}} <span class="op-badge">dev</span>{{end}}</td><td class="op-mono">{{.Constraint}}</td><td class="op-mono">{{if .Installed}}{{.Installed}}{{else if hasPrefix .Name "ext-"}}{{$.T.Get "built in"}}{{else if eq .Name "php"}}{{if $php}}{{$php}} ({{$.T.Get "container"}}){{else}}-{{end}}{{else}}<span class="op-muted">-</span>{{end}}</td></tr>{{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}
+                <p class="op-meta">{{.T.Get "No composer.json found in the site folder."}}</p>
+                {{end}}
+            </div>
+
+            {{if .Packages}}
+            <div class="op-sp-pane" x-data="{ set: 'prod' }">
+                <div class="op-sp-pane-head">
+                    <div><h2>{{.T.Get "Installed packages"}}</h2><p class="op-hint" id="op-sp-pkgcount"></p></div>
+                    <div class="op-segmented" role="group" aria-label="{{.T.Get "Package set"}}"><button type="button" :aria-pressed="(set === 'prod').toString()" @click="set = 'prod'">{{.T.Get "Production"}}</button><button type="button" :aria-pressed="(set === 'dev').toString()" @click="set = 'dev'">{{.T.Get "Development"}}</button></div>
+                </div>
+                <div class="op-sp-pkgs" id="op-sp-pkgs">
+                    {{range .Packages}}<div {{if .Dev}}data-dev x-show="set === 'dev'" x-cloak{{else}}x-show="set === 'prod'"{{end}}><span title="{{.Name}}">{{.Name}}</span><small>{{.Version}}</small></div>{{end}}
+                </div>
+                <script>
+                (function () {
+                    const box = document.getElementById('op-sp-pkgs');
+                    const dev = box.querySelectorAll('[data-dev]').length, prod = box.children.length - dev;
+                    document.getElementById('op-sp-pkgcount').textContent = {{toJSON (.T.Get "%(prod)s for production, %(dev)s for development")}}.replace('%(prod)s', prod).replace('%(dev)s', dev);
+                })();
+                </script>
+            </div>
+            {{end}}
+        </div>
+
+        <div class="hidden op-wp-panel" id="composer" role="tabpanel" aria-labelledby="composer-tab">
+            <div class="op-sp-pane" x-data="{ optimize: {{if .ComposerOptimizeAutoloader}}true{{else}}false{{end}} }">
+                <div class="op-sp-pane-head">
+                    <div><h2>{{.T.Get "Composer"}}</h2><p class="op-hint">{{.T.Get "Runs inside"}} <span class="op-mono">{{if $php}}php-fpm-{{$php}}{{else}}php-fpm{{end}}</span> {{.T.Get "with --working-dir set to the site folder."}}</p></div>
+                    {{if .UserAllowed.filemanager}}<a href="/file-manager/edit-file/{{replace .Docroot "/var/www/html/" ""}}/composer.json?new=true" target="_blank" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "pencil"}} {{.T.Get "Edit composer.json"}}</a>{{end}}
+                </div>
+                <div class="op-sp-cmds">
+                    <div class="op-sp-cmd"><code>composer install</code><p>{{.T.Get "Installs the exact versions pinned in composer.lock. Safe to run any time, for example after a Git deploy."}}</p><button type="button" onclick="runComposer('install')" id="composer-install-btn" class="op-btn op-btn-primary op-btn-sm">{{template "op_icon" "play"}} {{.T.Get "Run install"}}</button></div>
+                    <div class="op-sp-cmd"><code x-text="'composer update' + (optimize ? ' --optimize-autoloader' : '')">composer update</code><p>{{.T.Get "Pulls the newest versions composer.json allows and rewrites composer.lock. Take a backup first."}}</p><button type="button" onclick="runComposer('update')" id="composer-update-btn" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "refresh"}} {{.T.Get "Run update"}}</button></div>
+                </div>
+                <div class="op-sp-rows">
+                    <div class="op-sp-row"><div><b>{{.T.Get "Optimize the autoloader on update"}}</b><span class="op-hint">{{.T.Get "Adds --optimize-autoloader to the next update. Faster class loading in production."}}</span></div>
+                        <input type="checkbox" id="optimize_autoloader" class="op-sp-switch" role="switch" x-model="optimize" {{if .ComposerOptimizeAutoloader}}checked{{end}} aria-label="{{.T.Get "Optimize the autoloader on update"}}"></div>
+                    <div class="op-sp-row"><div><b>{{.T.Get "Ran composer install after setup"}}</b><span class="op-hint">{{.T.Get "Chosen when the app was added."}}</span></div><span class="op-status {{if .AutorunComposerInstall}}is-success{{else}}is-muted{{end}}">{{if .AutorunComposerInstall}}{{.T.Get "Yes"}}{{else}}{{.T.Get "No"}}{{end}}</span></div>
+                </div>
+                <pre id="composer-output" class="op-mgr-mini" hidden></pre>
+            </div>
+        </div>
+
+        <div class="hidden op-wp-panel" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+            <div class="op-sp-pane">
+                <div class="op-sp-pane-head">
+                    <div><h2>{{.T.Get "Composer runs"}}</h2><p class="op-hint" id="php-app-logs-count">{{.T.Get "Loading..."}}</p></div>
+                    <div class="op-actions"><button type="button" class="op-btn op-btn-secondary op-btn-sm" onclick="copyPHPAppLogs()">{{template "op_icon" "copy"}} {{.T.Get "Copy"}}</button></div>
+                </div>
+                <div class="op-sp-runs" id="php-app-runs"></div>
+                <pre id="php-app-logs" class="op-mgr-mini" hidden></pre>
+            </div>
+        </div>
+
+        {{template "site_git_panel" .}}
+
+    </div>
+
+        </div>
+
+    </div>
+
+    <div class="op-wp-side">
+
+        {{template "waf_panel" .}}
+
+        {{template "visitors" .}}
+
+        {{template "pagespeed_panel" .}}
+
+    </div>
+
+</div>
+
+<script>
+const PHP_APP_SITE_NAME = {{toJSON .Container.SiteName}};
+
+fetch('/json/directory-size?folder=' + encodeURIComponent({{toJSON (replace .Docroot "/var/www/html/" "")}}))
+    .then(r => r.json())
+    .then(d => { if (d && d.size) document.getElementById('op-sp-size').textContent = d.size; })
+    .catch(() => {});
+
+function runComposer(action) {
+    const installBtn = document.getElementById('composer-install-btn');
+    const updateBtn = document.getElementById('composer-update-btn');
+    installBtn.disabled = true;
+    updateBtn.disabled = true;
+    showToast({{toJSON (.T.Get "Running composer")}} + ' ' + action + {{toJSON (.T.Get "... this can take a while.")}}, 'loading');
+
+    const params = new URLSearchParams();
+    params.set('csrf_token', csrf_token);
+    if (action === 'update' && document.getElementById('optimize_autoloader').checked) {
+        params.set('optimize_autoloader', '1');
+    }
+
+    fetch(`/php/manage/composer-${action}/${encodeURIComponent(PHP_APP_SITE_NAME)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+        installBtn.disabled = false;
+        updateBtn.disabled = false;
+        const output = document.getElementById('composer-output');
+        output.hidden = false;
+        output.textContent = data.output || data.error || '';
+        showToast(data.message || data.error, data.error ? 'error' : 'success');
+        _phpAppLogsLoaded = false;
+    })
+    .catch(err => {
+        installBtn.disabled = false;
+        updateBtn.disabled = false;
+        showToast({{toJSON (.T.Get "Request failed.")}}, 'error');
+        console.error(err);
+    });
+}
+
+// the log is "=== composer <action> - <time> ===" blocks, shown newest first
+let _phpAppLogsLoaded = false;
+function loadPHPAppLogs() {
+    if (_phpAppLogsLoaded) return;
+    _phpAppLogsLoaded = true;
+    const box = document.getElementById('php-app-runs'), raw = document.getElementById('php-app-logs'), count = document.getElementById('php-app-logs-count');
+    fetch(`/php/manage/logs/${encodeURIComponent(PHP_APP_SITE_NAME)}`)
+        .then(res => { if (!res.ok) throw new Error(res.status); return res.text(); })
+        .then(text => {
+            window.__phpAppLogs = text;
+            const runs = [];
+            let cur = null;
+            text.split('\n').forEach(line => {
+                const m = line.match(/^=== composer (.+?) - (\S+) ===$/);
+                if (m) { cur = { action: m[1], at: m[2], lines: [] }; runs.push(cur); return; }
+                if (cur) cur.lines.push(line); else if (line.trim()) { cur = { action: '', at: '', lines: [line] }; runs.push(cur); }
+            });
+            box.innerHTML = '';
+            if (!runs.length) { count.textContent = {{toJSON (.T.Get "Nothing logged yet.")}}; return; }
+            count.textContent = {{toJSON (.T.Get "%(n)s runs logged for this app, newest first")}}.replace('%(n)s', runs.length);
+            runs.reverse().forEach((r, i) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'op-sp-run';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('aria-expanded', i === 0 ? 'true' : 'false');
+                const b = document.createElement('b'); b.textContent = r.action ? 'composer ' + r.action : {{toJSON (.T.Get "Log")}};
+                const sm = document.createElement('small'); sm.textContent = r.at.replace('T', ' ').replace('Z', ' UTC');
+                btn.append(b, sm);
+                const pre = document.createElement('pre');
+                pre.className = 'op-mgr-mini';
+                pre.textContent = r.lines.join('\n').trim();
+                pre.hidden = i !== 0;
+                btn.addEventListener('click', () => { pre.hidden = !pre.hidden; btn.setAttribute('aria-expanded', String(!pre.hidden)); });
+                wrap.append(btn, pre);
+                box.appendChild(wrap);
+            });
+        })
+        .catch(() => { _phpAppLogsLoaded = false; count.textContent = {{toJSON (.T.Get "Failed to load logs.")}}; });
+}
+
+function copyPHPAppLogs() {
+    if (!window.__phpAppLogs) return;
+    navigator.clipboard && navigator.clipboard.writeText(window.__phpAppLogs);
+    showToast({{toJSON (.T.Get "Logs copied to clipboard.")}}, 'success');
+}
+
+function confirmRemovePHPApp() {
+    showToast({{toJSON (.T.Get "Application removal started. Please wait.")}}, 'loading');
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', `/php/manage/delete/${encodeURIComponent(PHP_APP_SITE_NAME)}`, true);
+    xhr.setRequestHeader("X-CSRF-Token", csrf_token);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+            window.location.href = '/sites';
+        }
+    };
+    xhr.send('csrf_token=' + encodeURIComponent(csrf_token));
+}
+</script>
+
+<!-- END templates/manager/php_app.html -->
+{{end}}

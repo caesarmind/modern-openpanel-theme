@@ -1,0 +1,93 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mysql/assign.html -->
+<div class="op-content">
+{{template "db_assign_head" .}}
+
+<div class="op-wiz-grid" x-data="mysqlAssign()" x-init="load()">
+<section class="op-card" id="toAddActive" aria-label="{{.T.Get "Assign User to Database"}}">
+  <form autocomplete="off" method="POST" @submit="if (!ready()) { $event.preventDefault(); return } busy = true">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+    <input type="hidden" name="db_host" value="%"/>
+    <ol class="op-wiz-steps">
+      {{template "db_assign_pick" .}}
+      <li class="op-section">
+        <span class="op-step-mark" :class="ready() &amp;&amp; 'is-ok'"><span x-show="!ready()">3</span><span x-show="ready()" x-cloak style="display:inline-flex">{{template "op_icon" "check"}}</span></span>
+        <div class="op-col" style="gap:12px;min-width:0">
+          <div class="op-priv-head">
+            <div><h3>{{.T.Get "Choose privileges"}}</h3><p class="op-meta">{{.T.Get "Most apps need all of them."}}</p></div>
+            <label class="op-check-label op-priv-all"><input type="checkbox" class="op-check" :checked="isAll()" @change="toggleAll($event.target.checked)"> {{.T.Get "All privileges"}}</label>
+            <template x-for="p in (isAll() ? ['ALL PRIVILEGES'] : privs)" :key="p"><input type="hidden" name="privileges" :value="p"></template>
+          </div>
+          <div class="op-priv-groups">
+            {{range .PrivilegeGroups}}
+            <div class="op-priv-group" role="group" aria-label="{{$.T.Get .Label}}"><b>{{$.T.Get .Label}}</b>
+              {{range .Privs}}<label class="op-check-label"><input type="checkbox" class="op-check" value="{{.}}" :checked="has({{toJSON .}})" @change="toggle({{toJSON .}}, $event.target.checked)"><span>{{.}}</span></label>{{end}}
+            </div>
+            {{end}}
+          </div>
+          <span class="op-hint is-danger" x-show="!privs.length" x-cloak>{{.T.Get "At least one privilege must be selected."}}</span>
+          <div class="op-field"><span class="op-label">{{.T.Get "Runs as"}}</span><div class="op-copybox"><span class="op-mono" x-text="preview()"></span><button class="op-icon-btn" type="button" :data-op-copy="preview()" aria-label="{{.T.Get "Copy statement"}}" title="{{.T.Get "Copy"}}">{{template "op_icon" "copy"}}</button></div></div>
+        </div>
+      </li>
+    </ol>
+    <div class="op-form-foot">
+      <a href="/mysql/users" class="op-btn op-btn-secondary">{{template "op_icon" "arrowleft"}} {{.T.Get "Back to Users"}}</a>
+      <button type="submit" class="op-btn op-btn-primary" :disabled="!ready() || busy" x-text="busy ? {{toJSON (.T.Get "Saving...")}} : {{toJSON (.T.Get "Save Privileges")}}">{{.T.Get "Save Privileges"}}</button>
+    </div>
+  </form>
+</section>
+{{template "db_assign_aside" .}}
+</div>
+
+<script>
+  function mysqlAssign() {
+    const all = {{toJSON .Privileges}}.filter((p) => p !== 'ALL PRIVILEGES');
+    return Object.assign(dbAssignBase(), {
+      privs: ['ALL PRIVILEGES'],
+      current: null,
+      isAll() { return this.privs.includes('ALL PRIVILEGES'); },
+      has(p) { return this.isAll() || this.privs.includes(p); },
+      toggleAll(on) { this.privs = on ? ['ALL PRIVILEGES'] : []; },
+      toggle(p, on) {
+        const from = this.isAll() ? all.slice() : this.privs;
+        const list = on ? [...new Set([...from, p])] : from.filter((x) => x !== p);
+        this.privs = list.length === all.length ? ['ALL PRIVILEGES'] : list;
+      },
+      privSQL() { return this.isAll() ? 'ALL PRIVILEGES' : all.filter((p) => this.privs.includes(p)).join(', '); },
+      ready() { return !!this.user && !!this.db && this.privs.length > 0; },
+      preview() { return 'GRANT ' + (this.privSQL() || '[privileges]') + ' ON `' + (this.db || '[database]') + "`.* TO '" + (this.user || '[user]') + "'@'%';"; },
+      // what the user has on this database now, so saving starts from it
+      load() {
+        this.$watch('user', () => this.fetchPrivs());
+        this.$watch('db', () => this.fetchPrivs());
+        this.fetchPrivs();
+      },
+      fetchPrivs() {
+        this.current = null;
+        if (!this.user || !this.db) return;
+        const u = this.user, d = this.db;
+        fetch('/mysql/privileges/' + encodeURIComponent(u) + '/' + encodeURIComponent(d))
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => {
+            if (!data || u !== this.user || d !== this.db) return;
+            const got = (data.privileges || []).filter((p) => p === 'ALL PRIVILEGES' || all.includes(p));
+            this.current = got.length ? (got.includes('ALL PRIVILEGES') ? 'ALL PRIVILEGES' : got.join(', ')) : '';
+            this.privs = got.length ? (got.includes('ALL PRIVILEGES') ? ['ALL PRIVILEGES'] : got) : ['ALL PRIVILEGES'];
+          })
+          .catch(() => {});
+      },
+      currentText() {
+        if (this.current === null) return '';
+        return this.current ? {{toJSON (.T.Get "Has these privileges now:")}} + ' ' + this.current + '. ' + {{toJSON (.T.Get "Saving replaces them.")}} : {{toJSON (.T.Get "No privileges on this database yet.")}};
+      }
+    });
+  }
+</script>
+</div>
+
+<!-- END templates/mysql/assign.html -->
+{{end}}

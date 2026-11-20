@@ -1,0 +1,12 @@
+{{define "howto"}}{{if .HowToGuides}}
+<!-- START templates/dashboard/howto.html -->
+<section id="dashboard_howto" class="op-card">
+    <div id="dashboard_howto_title" class="op-card-head"><h2>{{.T.Get "General How-to"}}</h2>{{if .KnowledgeBaseLink}}<a href="{{.KnowledgeBaseLink}}" target="_blank" rel="noopener">{{.T.Get "Knowledge base"}}</a>{{end}}</div>
+    <ul id="dashboard_howto_data" class="op-link-list">
+        {{range .HowToTopics}}
+        <li><a href="{{.Link}}" target="_blank" rel="noopener">{{template "op_icon" "book"}} <span>{{$.T.Get .Title}}</span></a></li>
+        {{end}}
+    </ul>
+</section>
+<!-- END templates/dashboard/howto.html -->
+{{end}}{{end}}

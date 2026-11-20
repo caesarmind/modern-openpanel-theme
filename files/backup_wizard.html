@@ -1,0 +1,67 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/backup_wizard.html -->
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Backup Wizard"}}</h1>
+            <p class="op-meta">{{.T.Get "Create and download backups of your account."}}</p>
+        </div>
+    </div>
+
+    {{if .InProgress}}
+    <div class="op-alert" role="status" id="backup-progress-banner"
+         x-data="{ started: '{{.InProgressStarted}}', size: '{{.InProgressSize}}' }"
+         x-init="
+            const poll = () => fetch('/backup-wizard/status').then(r => r.json()).then(d => {
+                if (!d.in_progress) { location.reload(); }
+                else {
+                    if (d.in_progress_size) size = d.in_progress_size;
+                    setTimeout(() => opVisible(poll), 5000);
+                }
+            }).catch(() => setTimeout(() => opVisible(poll), 10000));
+            setTimeout(() => opVisible(poll), 5000);
+         ">{{template "op_icon" "refresh"}}<span><b>{{.T.Get "Backup in progress"}}</b><br>{{.T.Get "Your backup is currently being created. This page will refresh automatically when it completes."}}
+        <span class="op-mono"><template x-if="started"><span>{{.T.Get "Started"}}: <span x-text="started"></span></span></template><template x-if="size"><span> · {{.T.Get "Size"}}: <span x-text="size"></span></span></template></span></span></div>
+    {{end}}
+
+    <section class="op-card">
+        <div class="op-card-head"><div><h2>{{.T.Get "Back Up"}}</h2><p class="op-meta">{{.T.Get "This feature allows you to download a compressed copy of all your files."}}</p></div></div>
+        {{if .BackupIncludes}}
+        <p class="op-meta" style="margin:0 0 10px">{{.T.Get "The system will include the following items in the backup file:"}}</p>
+        <ul class="op-bk-items">
+            {{range .BackupIncludes}}<li class="op-check-row"><span style="color:var(--color-accent-text)">{{template "op_icon" "check"}}</span><span>{{.}}</span></li>{{end}}
+        </ul>
+        {{end}}
+        <form method="POST" action="/backup-wizard/create">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <button id="generate-backup-btn" type="submit" {{if .InProgress}}disabled{{end}} class="op-btn op-btn-primary">{{template "op_icon" "archive"}} {{if .InProgress}}{{.T.Get "Backup in progress…"}}{{else}}{{.T.Get "Generate Backup"}}{{end}}</button>
+        </form>
+    </section>
+
+    <section id="existing-backups-section" class="op-card">
+        <div class="op-card-head"><div><h2>{{.T.Get "Existing Backups"}}</h2><p class="op-meta">{{.T.Get "Download previously generated backups."}}</p></div>{{if .Backups}}<span class="op-badge is-accent">{{len .Backups}}</span>{{end}}</div>
+        {{if not .Backups}}
+        <div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "archive"}}</span><b>{{.T.Get "No backups found"}}</b><span class="op-hint">{{.T.Get "Generate your first backup above."}}</span></div>
+        {{else}}
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th>{{.T.Get "Filename"}}</th><th>{{.T.Get "Size"}}</th><th>{{.T.Get "Created"}}</th><th class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th></tr></thead>
+            <tbody>
+            {{range .Backups}}
+            <tr>
+                <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "archive"}}</span><div style="min-width:0"><b class="op-mono" style="overflow-wrap:anywhere">{{.Name}}</b></div></div></td>
+                <td data-label="{{$.T.Get "Size"}}"><span class="op-mono">{{.Size}}</span></td>
+                <td data-label="{{$.T.Get "Created"}}"><span class="op-mono">{{.Mtime}}</span></td>
+                <td class="is-shrink">{{if .InProgress}}<span aria-disabled="true" class="op-btn op-btn-secondary op-btn-sm">{{$.T.Get "In progress…"}}</span>{{else}}<a href="/backup-wizard/download/{{.Name}}" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "download"}} {{$.T.Get "Download"}}</a>{{end}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        {{end}}
+    </section>
+</div>
+<!-- END templates/files/backup_wizard.html -->
+{{end}}

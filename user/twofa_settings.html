@@ -1,0 +1,114 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/user/twofa_settings.html -->
+<div class="op-content">
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Two-Factor Authentication"}}</h1>
+        <p class="op-meta">{{.T.Get "2FA is currently"}}
+            {{if .TwofaEnabled}}<span class="op-badge is-success">{{.T.Get "enabled"}}</span>{{else}}<span class="op-badge is-danger">{{.T.Get "disabled"}}</span>{{end}}
+            {{.T.Get "for your account."}}</p>
+    </div>
+    <div class="op-actions">
+        {{if .TwofaEnabled}}
+        <form method="POST" action="/account/2fa">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <button type="submit" class="op-btn op-btn-secondary op-btn-dangertext">{{.T.Get "Click to disable 2FA"}}</button>
+        </form>
+        {{else if .OTPSecret}}
+        <form method="POST" action="/account/2fa">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <button type="submit" class="op-btn op-btn-secondary">{{.T.Get "Click to Cancel"}}</button>
+        </form>
+        {{else}}
+        <form method="POST" action="/account/2fa">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <input class="hidden form-check-input" type="checkbox" id="twofa_active" name="twofa_active" checked>
+            <button type="submit" class="op-btn op-btn-primary">{{template "op_icon" "lock"}} {{.T.Get "Click to enable 2FA"}}</button>
+        </form>
+        {{end}}
+    </div>
+</div>
+
+<section class="op-card" id="toAddActive">
+    {{if .TwofaEnabled}}
+    <div class="op-empty">
+        <span class="op-ico-tile" style="--hue:var(--color-success)">{{template "op_icon" "shieldcheck"}}</span>
+        <b>{{.T.Get "Two-factor authentication is on"}}</b>
+        <p class="op-hint">{{.T.Get "Every login asks for a code from your authenticator app after the password."}}</p>
+    </div>
+    {{else if .OTPSecret}}
+    <div x-data="{ step: 1 }">
+        <ol class="op-stepper" style="margin-bottom:20px">
+            <li :class="step >= 1 && 'is-done'" :aria-current="step === 1 ? 'step' : null"><b>{{.T.Get "Step"}} 1</b>{{.T.Get "Scan QR Code"}}</li>
+            <li :class="step >= 2 && 'is-done'" :aria-current="step === 2 ? 'step' : null"><b>{{.T.Get "Step"}} 2</b>{{.T.Get "Remove OTP code"}}</li>
+        </ol>
+
+        <div class="op-section" x-show="step === 1">
+            <div>
+                <h3>{{.T.Get "Scan QR Code"}}</h3>
+                <p>{{.T.Get "Scan the QR code with your 2FA device or click on the link below to display OTP code instead."}}</p>
+            </div>
+            <div>
+                <script src="{{static "vendor/qrcodejs/qrcode.min.js"}}"></script>
+                <span class="op-twofa-qr" id="qrcode"></span>
+                <script>
+                  var username = '{{.CurrentUsername}}';
+                  var otp_secret = '{{.OTPSecret}}';
+                  var otpUri = 'otpauth://totp/' + username + '?secret=' + otp_secret + '&issuer=' + encodeURIComponent('{{.TwofaIssuer}}');
+                  var qrcode = new QRCode(document.getElementById('qrcode'), {
+                    text: otpUri,
+                    width: 140,
+                    height: 140,
+                  });
+                </script>
+                <p style="margin:12px 0 0"><a href="#" id="showLink" style="color:var(--color-accent-text)">{{.T.Get "Click here to display OTP code"}}</a></p>
+                <pre id="initiallyhiddencode" class="op-mono op-twofa-secret" style="display: none;">{{.OTPSecret}}</pre>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var showLink = document.getElementById('showLink');
+                        var initiallyHiddenCode = document.getElementById('initiallyhiddencode');
+                        showLink.addEventListener('click', function (event) {
+                            event.preventDefault();
+                            initiallyHiddenCode.style.display = initiallyHiddenCode.style.display === 'none' ? 'block' : 'none';
+                        });
+                    });
+                </script>
+                <button type="button" class="op-btn op-btn-primary" style="margin-top:16px" @click="step = 2">{{.T.Get "Next"}}</button>
+            </div>
+        </div>
+
+        <div class="op-section" x-show="step === 2" x-cloak>
+            <div>
+                <h3>{{.T.Get "Remove OTP code"}}</h3>
+                <p>{{.T.Get "I confirm that the OTP code is configured in my application and confirm to permanently delete the OTP secret."}}</p>
+            </div>
+            <form method="POST" action="/account/2fa" class="op-col" style="gap:12px;max-width:360px">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <input class="form-check-input" type="checkbox" id="setup_confirmed" name="setup_confirmed" checked hidden>
+                <label class="op-field" for="otp_code">
+                    <span class="op-label">{{.T.Get "Enter the 6-digit code from your app to confirm"}}</span>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" id="otp_code" name="otp_code" required class="op-input op-mono" style="letter-spacing:.2em">
+                </label>
+                <div class="op-actions">
+                    <button type="button" class="op-btn op-btn-secondary" @click="step = 1">{{.T.Get "Back"}}</button>
+                    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Confirm"}}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {{else}}
+    <div class="op-empty">
+        <span class="op-ico-tile">{{template "op_icon" "lock"}}</span>
+        <b>{{.T.Get "Two-factor authentication is off"}}</b>
+        <p class="op-hint">{{.T.Get "To enable 2FA for your account you will need an application that manages 2FA codes, such as"}} <a target="_blank" href="https://support.google.com/accounts/answer/1066447?hl=en" rel="noopener noreferrer" style="color:var(--color-accent-text)">{{.T.Get "Google Authenticator"}}</a>.</p>
+    </div>
+    {{end}}
+</section>
+</div>
+<!-- END templates/user/twofa_settings.html -->
+{{end}}

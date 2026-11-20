@@ -1,0 +1,23 @@
+{{define "customsection"}}{{if .CustomSectionItems}}
+<section class="op-card op-dash-section" style="--hue:var(--color-hue-cyan)"
+    x-data='{
+        open: (function() {
+            const s = localStorage.getItem("section_custom");
+            return s === null ? true : s === "true";
+        })(),
+        toggleOpen() {
+            this.open = !this.open;
+            localStorage.setItem("section_custom", this.open);
+        }
+    }'>
+    <div class="op-card-head">
+        <h2 class="op-with-icon"><span class="op-cat-dot"></span>{{if .CustomSectionTitle}}{{.T.Get .CustomSectionTitle}}{{else}}{{.T.Get "Custom"}}{{end}}</h2>
+        <button type="button" class="op-chev" @click="toggleOpen" :aria-expanded="open.toString()" aria-controls="section-icons-custom" :aria-label="open ? '{{.T.Get "Hide icons"}}' : '{{.T.Get "Show icons"}}'">{{template "op_icon" "up"}}</button>
+    </div>
+    <div id="section-icons-custom" class="op-tool-grid" :class="$store.dashboardIconView && $store.dashboardIconView.value === 'list' && 'is-list'" x-show="open" x-collapse>
+        {{range .CustomSectionItems}}
+        <a class="op-tool" href="{{.URL}}" {{if hasPrefix .URL "http"}}target="_blank" rel="noopener"{{end}}><span class="op-ico-tile">{{if hasPrefix .Icon "bi bi-"}}{{template "dash_icon" (replace .Icon "bi " "")}}{{else}}<i class="{{.Icon}}" aria-hidden="true"></i>{{end}}</span><span>{{$.T.Get .Label}}</span></a>
+        {{end}}
+    </div>
+</section>
+{{end}}{{end}}

@@ -1,0 +1,220 @@
+{{define "alpine_plugins"}}
+    <script defer src="{{static "vendor/alpinejs/alpinejs3xx-collapse.min.js"}}"></script>
+{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "dash_hue"}}{{if eq . "files" "backups"}}cyan{{else if eq . "domains"}}blue{{else if eq . "websites"}}green{{else if eq . "emails"}}orange{{else if eq . "mysql" "postgresql" "mongodb"}}indigo{{else if eq . "php" "webserver"}}purple{{else if eq . "docker" "cache"}}yellow{{else if eq . "security" "advanced" "processes"}}red{{else}}blue{{end}}{{end}}
+
+{{/* the section's Bootstrap icon as the matching Tabler one where the kit has it */}}
+{{define "dash_icon"}}{{$n := .}}
+{{- if eq $n "bi-globe"}}{{template "op_icon" "globe"}}
+{{- else if eq $n "bi-folder" "bi-folder-fill" "bi-folder2" "bi-folder2-open" "bi-folder-check" "bi-folder-plus"}}{{template "op_icon" "folder"}}
+{{- else if eq $n "bi-upload" "bi-cloud-upload"}}{{template "op_icon" "upload"}}
+{{- else if eq $n "bi-download" "bi-cloud-arrow-down"}}{{template "op_icon" "download"}}
+{{- else if eq $n "bi-trash3"}}{{template "op_icon" "trash"}}
+{{- else if eq $n "bi-envelope" "bi-at" "bi-envelope-at" "bi-envelope-check" "bi-envelope-arrow-up" "bi-envelope-arrow-down"}}{{template "op_icon" "mail"}}
+{{- else if eq $n "bi-database" "bi-database-add" "bi-database-fill-add" "bi-database-lock" "bi-database-fill-lock" "bi-database-slash"}}{{template "op_icon" "db"}}
+{{- else if eq $n "bi-people" "bi-person-circle" "bi-person-gear"}}{{template "op_icon" "user"}}
+{{- else if eq $n "bi-lock" "bi-shield-lock" "bi-fingerprint"}}{{template "op_icon" "lock"}}
+{{- else if eq $n "bi-link-45deg"}}{{template "op_icon" "link"}}
+{{- else if eq $n "bi-arrow-repeat" "bi-arrow-counterclockwise"}}{{template "op_icon" "refresh"}}
+{{- else if eq $n "bi-file-text"}}{{template "op_icon" "dns"}}
+{{- else if eq $n "bi-box-arrow-up-right" "bi-box-arrow-in-right"}}{{template "op_icon" "out"}}
+{{- else if eq $n "bi-gear" "bi-toggles"}}{{template "op_icon" "settings"}}
+{{- else if eq $n "bi-terminal"}}{{template "op_icon" "terminal"}}
+{{- else if eq $n "bi-star"}}{{template "op_icon" "star"}}
+{{- else if eq $n "bi-wordpress"}}{{template "op_icon" "wordpress"}}
+{{- else if eq $n "bi-filetype-php"}}{{template "op_icon" "php"}}
+{{- else if eq $n "bi-cpu"}}{{template "op_icon" "cpu"}}
+{{- else if eq $n "bi-boxes" "bi-box-seam"}}{{template "op_icon" "box"}}
+{{- else if eq $n "bi-ban" "bi-ban-fill"}}{{template "op_icon" "ban"}}
+{{- else if eq $n "bi-search" "bi-upc-scan" "bi-search-heart"}}{{template "op_icon" "search"}}
+{{- else if eq $n "bi-key" "bi-key-fill"}}{{template "op_icon" "key"}}
+{{- else if eq $n "bi-journal-text" "bi-journal"}}{{template "op_icon" "logs"}}
+{{- else if eq $n "bi-bar-chart" "bi-bar-chart-line" "bi-graph-up" "bi-speedometer2" "bi-activity"}}{{template "op_icon" "chart"}}
+{{- else if eq $n "bi-info-square"}}{{template "op_icon" "info"}}
+{{- else if eq $n "bi-funnel"}}{{template "op_icon" "filter"}}
+{{- else if eq $n "bi-cloud" "bi-cloud-check"}}{{template "op_icon" "cloud"}}
+{{- else if eq $n "bi-app-indicator" "bi-window-stack"}}{{template "op_icon" "browser"}}
+{{- else if eq $n "bi-hdd-network" "bi-hdd-network-fill" "bi-hdd-stack"}}{{template "op_icon" "server"}}
+{{- else if eq $n "bi-git" "bi-code-square" "bi-braces"}}{{template "op_icon" "code"}}
+{{- else if eq $n "bi-file-binary" "bi-file-binary-fill"}}{{template "op_icon" "file"}}
+{{- else if eq $n "bi-folder-symlink" "bi-folder-symlink-fill"}}{{template "op_icon" "ftp"}}
+{{- else if eq $n "bi-grid-3x3-gap" "bi-puzzle"}}{{template "op_icon" "apps"}}
+{{- else if eq $n "bi-bell"}}{{template "op_icon" "bell"}}
+{{- else if eq $n "bi-brush"}}{{template "op_icon" "brush"}}
+{{- else if eq $n "bi-cart" "bi-cart3"}}{{template "op_icon" "cart"}}
+{{- else if eq $n "bi-chat-dots" "bi-chat-square-text"}}{{template "op_icon" "message"}}
+{{- else if eq $n "bi-droplet"}}{{template "op_icon" "droplet"}}
+{{- else if eq $n "bi-images"}}{{template "op_icon" "photo"}}
+{{- else if eq $n "bi-mortarboard"}}{{template "op_icon" "school"}}
+{{- else if eq $n "bi-robot"}}{{template "op_icon" "robot"}}
+{{- else if eq $n "bi-toggle2-off" "bi-toggle2-on"}}{{template "op_icon" "toggle"}}
+{{- else if eq $n "bi-translate"}}{{template "op_icon" "language"}}
+{{- else if eq $n "bi-door-open"}}{{template "op_icon" "out"}}
+{{- else if eq $n "bi-arrow-left-right"}}{{template "op_icon" "swap"}}
+{{- else if eq $n "bi-calendar2-week"}}{{template "op_icon" "calendar"}}
+{{- else if eq $n "bi-clock"}}{{template "op_icon" "clock"}}
+{{- else if eq $n "bi-bug"}}{{template "op_icon" "bug"}}
+{{- else if eq $n "bi-book" "bi-journal-bookmark"}}{{template "op_icon" "book"}}
+{{- else if eq $n "bi-shield-exclamation"}}{{template "op_icon" "shield"}}
+{{- else if eq $n "bi-lightning-charge" "bi-lightning-charge-fill"}}{{template "op_icon" "bolt"}}
+{{- else if eq $n "bi-filetype-java" "bi-filetype-js" "bi-filetype-py" "bi-filetype-rb"}}{{template "op_icon" "code"}}
+{{- else if eq $n "bi-diagram-3"}}{{template "op_icon" "router"}}
+{{- else if eq $n "bi-folder-x"}}{{template "op_icon" "file"}}
+{{- else if eq $n "bi-person-exclamation"}}{{template "op_icon" "history"}}
+{{- else if eq $n "bi-textarea-t"}}{{template "op_icon" "stack"}}
+{{- else}}<i class="bi {{$n}}" aria-hidden="true"></i>
+{{- end}}{{end}}
+
+{{/* one tile, dict "Item", "T", "UpsellPlanName", "UpsellURL" */}}
+{{define "dash_tile"}}{{with .Item}}
+{{if .Disabled}}
+<a class="op-tool is-locked" title="{{if $.UpsellPlanName}}{{$.T.Get "Upgrade to"}} {{$.UpsellPlanName}} {{$.T.Get "to use this feature."}}{{else}}{{$.T.Get "Not included in your plan. Contact your administrator to enable it."}}{{end}}" {{if $.UpsellURL}}href="/dashboard/upgrade"{{else}}href="#" onclick="return false;"{{end}} data-label="{{lower .Label}}"><span class="op-ico-tile">{{template "dash_icon" .Icon}}</span><span>{{.Label}}</span></a>
+{{else}}
+<a class="op-tool" href="{{.Href}}" {{if .Target}}target="{{.Target}}"{{end}} data-label="{{lower .Label}}"><span class="op-ico-tile">{{template "dash_icon" .Icon}}</span><span>{{.Label}}</span></a>
+{{end}}
+{{end}}{{end}}
+
+{{define "content"}}
+<!-- START templates/dashboard/dashboard.html -->
+{{$root := .}}
+<div class="op-content op-icons-line" x-data="{
+        view: ['overview', 'tools'].find(v => v === new URLSearchParams(location.search).get('view')) || ['overview', 'tools'].find(v => { try { return v === localStorage.getItem('dashboard_view') } catch (e) { return false } }) || 'overview',
+        find: '',
+        setView(v) { this.view = v; try { localStorage.setItem('dashboard_view', v) } catch (e) {} }
+    }" @dashboard-view.window="setView($event.detail)">
+
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{.HostingPlanName}}{{if and .HostingPlanName .IPAddress}} · {{end}}{{.IPAddress}}</div>
+            <h1 class="op-title">{{.T.Get "Welcome back,"}} {{.CurrentUsername}}</h1>
+            {{if .LastIP}}<p class="op-meta">{{.T.Get "Last login from"}} <span class="op-mono">{{.LastIP}}</span>{{if .LastLoginAgo}} · <span title="{{.LastLoginTime}}">{{.LastLoginAgo}}</span>{{end}}</p>{{end}}
+        </div>
+        {{if or .UserAllowed.domains .UserAllowed.autoinstaller}}
+        <div class="op-actions" :style="view !== 'overview' && 'visibility:hidden'" :aria-hidden="(view !== 'overview').toString()">
+            {{if .UserAllowed.domains}}<a class="op-btn op-btn-ghost" href="/domains/new">{{.T.Get "Add Domain"}}</a>{{end}}
+            {{if .UserAllowed.autoinstaller}}<a class="op-btn op-btn-primary" href="/auto-installer">{{template "op_icon" "plus"}} {{.T.Get "New Website"}}</a>{{end}}
+        </div>
+        {{end}}
+        <div class="op-segmented" role="group" aria-label="{{.T.Get "Dashboard view"}}">
+            <button type="button" :aria-pressed="(view === 'overview').toString()" @click="setView('overview')">{{template "op_icon" "dash"}} {{.T.Get "Overview"}}</button>
+            <button type="button" :aria-pressed="(view === 'tools').toString()" @click="setView('tools')">{{template "op_icon" "apps"}} {{.T.Get "Tools"}}</button>
+        </div>
+    </div>
+
+    {{template "custommessage" .}}
+
+{{with .PlanTiles}}
+    <section class="op-kpis" aria-label="{{$root.T.Get "Plan usage"}}" x-show="view === 'overview'">
+    {{range .}}
+        <a class="op-kpi" href="{{.Href}}">
+            <div class="op-kpi-label">{{template "op_icon" .Icon}} {{.Label}}</div>
+            <div class="op-kpi-value">{{.Used}} <small>/ {{if .Limit}}{{.Limit}}{{else}}∞{{end}}</small></div>
+            <div class="op-progress{{if ge .Pct 90}} is-danger{{else if ge .Pct 70}} is-warning{{end}}"><span style="width:{{.Pct}}%"></span></div>
+        </a>
+    {{end}}
+    </section>
+{{end}}
+
+    <label class="op-find" x-show="view === 'tools'" x-cloak>{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="find" x-ref="find" placeholder="{{.T.Get "Find a tool: DNS, PHP version, backups..."}}" aria-label="{{.T.Get "Find a tool"}}"></label>
+
+    <div :class="view === 'tools' ? 'op-tools-grid' : 'op-dash-grid'" class="op-dash-grid">
+        <div class="op-col">
+
+            <div class="op-col" x-show="view === 'overview'">
+                <section class="op-card">
+                    <div class="op-card-head"><h2>{{$root.T.Get "Websites"}}</h2><a href="/sites">{{$root.T.Get "View all"}}</a></div>
+{{with .Websites}}
+                    <div class="op-table-wrap"><table class="op-table"><thead><tr><th>{{$root.T.Get "Site"}}</th><th>{{$root.T.Get "Runs on"}}</th><th>{{$root.T.Get "Status"}}</th><th class="is-shrink"><span class="op-sr">{{$root.T.Get "Actions"}}</span></th></tr></thead><tbody>
+                    {{range .}}
+                        <tr data-href="{{.Href}}">
+                            <td class="op-cell-title"><div class="op-row-title"><span class="op-ico-tile" style="--hue:var(--color-hue-{{.TileHue}})" title="{{.Type}}" aria-label="{{.Type}}" role="img">{{template "op_icon" .TileIcon}}</span><div style="min-width:0"><b class="op-wrap"><a class="op-site-link" href="{{.Href}}">{{.Name}}</a></b></div></div></td>
+                            <td data-label="{{$root.T.Get "Runs on"}}"><span class="op-mono op-dash-runs">{{.RunsOn}}</span></td>
+                            <td data-label="{{$root.T.Get "Status"}}">{{if .Suspended}}<span class="op-status is-danger">{{$root.T.Get "Suspended"}}</span>{{else if eq .StateLabel "Running"}}<span class="op-status is-success">{{$root.T.Get "Running"}}</span>{{else if .StateLabel}}<span class="op-status is-muted">{{$root.T.Get "Stopped"}}</span>{{else}}<span class="op-status is-success">{{$root.T.Get "Active"}}</span>{{end}}</td>
+                            <td class="is-shrink op-cell-menu" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                                <button class="op-icon-btn" type="button" aria-label="{{$root.T.Get "Actions for"}} {{.Name}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                                <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                    <a href="{{.Href}}">{{template "op_icon" "settings"}} {{$root.T.Get "Manage"}}</a>
+                                    <a href="https://{{.Name}}" target="_blank" rel="noopener">{{template "op_icon" "out"}} {{$root.T.Get "Open site"}}</a>
+                                    {{if $root.UserAllowed.filemanager}}<a href="/files/{{.Name}}">{{template "op_icon" "folder"}} {{$root.T.Get "File Manager"}}</a>{{end}}
+                                    {{if $root.UserAllowed.dns}}<a href="/domains/edit-dns-zone/{{.Name}}">{{template "op_icon" "dns"}} {{$root.T.Get "DNS zone"}}</a>{{end}}
+                                    {{if $root.UserAllowed.ssl}}<a href="/domains/ssl?domain_name={{.Name}}">{{template "op_icon" "lock"}} {{$root.T.Get "SSL"}}</a>{{end}}
+                                </div>
+                            </td>
+                        </tr>
+                    {{end}}
+                    </tbody></table></div>
+{{else}}
+                    <div class="op-empty">
+                        <span class="op-ico-tile">{{template "op_icon" "browser"}}</span>
+                        <b>{{$root.T.Get "No websites yet."}}</b>
+                        {{if $root.UserAllowed.autoinstaller}}<a class="op-btn op-btn-secondary op-btn-sm" href="/auto-installer">{{template "op_icon" "plus"}} {{$root.T.Get "Install an app"}}</a>{{end}}
+                    </div>
+{{end}}
+                </section>
+{{with .QuickActions}}
+                <section class="op-card">
+                    <div class="op-card-head"><h2>{{$root.T.Get "Quick actions"}}</h2><a href="#" @click.prevent="setView('tools')">{{$root.T.Get "All tools"}}</a></div>
+                    <div class="op-chips">
+                    {{range .}}<a class="op-chip" href="{{.Href}}" {{if .Target}}target="{{.Target}}"{{end}}>{{template "dash_icon" .Icon}} {{.Label}}</a>{{end}}
+                    </div>
+                </section>
+{{end}}
+            </div>
+
+            <div class="op-col" x-show="view === 'tools'" x-cloak>
+                {{range .Sections}}{{if .Items}}
+                <section class="op-card" style="--hue:var(--color-hue-{{template "dash_hue" .Key}})" data-labels="{{range .Items}}{{lower .Label}}|{{end}}" x-data="{ open: true }" x-show="!find || $el.dataset.labels.includes(find.toLowerCase())">
+                    <div class="op-card-head"><h2 class="op-with-icon"><span class="op-cat-dot"></span>{{.Title}} <span class="op-count">{{len .Items}}</span></h2><button class="op-chev" type="button" :aria-expanded="open.toString()" @click="open = !open" :aria-label="open ? '{{$root.T.Get "Hide icons"}}' : '{{$root.T.Get "Show icons"}}'">{{template "op_icon" "up"}}</button></div>
+                    <div class="op-tool-grid" x-show="open || find">
+                        {{range .Items}}<div class="op-tool-wrap" x-show="!find || $el.firstElementChild.dataset.label.includes(find.toLowerCase())">{{template "dash_tile" (dict "Item" . "T" $root.T "UpsellPlanName" $root.UpsellPlanName "UpsellURL" $root.UpsellURL)}}</div>{{end}}
+                    </div>
+                </section>
+                {{end}}{{end}}
+                <div class="op-empty" x-show="find && ![...$el.parentElement.querySelectorAll('[data-labels]')].some(s => s.dataset.labels.includes(find.toLowerCase()))" x-cloak>
+                    <span class="op-ico-tile">{{template "op_icon" "search"}}</span>
+                    <b>{{.T.Get "No tool matches"}}</b>
+                    <span class="op-hint">{{.T.Get "Try another word."}}</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="op-col">
+            <div class="op-col" x-show="view === 'overview'">{{template "twofa" .}}</div>
+            {{template "information" .}}
+            {{template "usage" .}}
+            {{template "howto" .}}
+        </div>
+    </div>
+</div>
+
+{{template "onboarding" .}}
+
+{{if and .UserAllowed.summary (not .OnboardingShow)}}
+<script>
+// once a day, tell the user when yesterday's summary found something
+document.addEventListener('DOMContentLoaded', function() {
+    let shown = null;
+    try { shown = localStorage.getItem('summary_toast_date'); } catch (e) {}
+    fetch('/summary/latest.json', { credentials: 'same-origin' })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => {
+            if (!d || !d.found || d.date === shown || (d.attention + d.look) === 0) return;
+            try { localStorage.setItem('summary_toast_date', d.date); } catch (e) {}
+            const parts = [];
+            if (d.attention) parts.push({{.T.Get "Needs your attention"}} + ': ' + d.attention);
+            if (d.look) parts.push({{.T.Get "Worth a look"}} + ': ' + d.look);
+            const msg = {{.T.Get "Yesterday's summary found something to check."}} + '\n' + parts.join(' · ');
+            setTimeout(() => showToast(msg, d.attention ? 'warning' : 'info', true, { label: {{.T.Get "View summary"}}, href: d.url }), 800);
+        })
+        .catch(() => {});
+});
+</script>
+{{end}}
+
+
+<!-- END templates/dashboard/dashboard.html -->
+{{end}}

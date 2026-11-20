@@ -1,0 +1,19 @@
+{{define "twofa"}}{{if and .UserAllowed.twofa (eq .TwofaNag "yes")}}
+<!-- START templates/dashboard/twofa.html -->
+<section id="dashboard_twofa" class="op-card">
+    {{if not .TwofaEnabled}}<div class="op-glow" style="right:-240px;top:-280px"></div>{{end}}
+    <div class="op-card-head" id="dashboard_twofa_title">
+        <h2>{{.T.Get "Two-Factor Authentication"}}</h2>
+        {{if .TwofaEnabled}}<span class="op-status is-success">{{.T.Get "On"}}</span>{{else}}<span class="op-status is-warning">{{.T.Get "Off"}}</span>{{end}}
+    </div>
+    <div id="dashboard_twofa_content">
+        <p class="op-meta" style="margin:0 0 12px">{{.TwofaStatusMessage}}</p>
+        <form method="POST" action="/account/2fa">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            {{if not .TwofaEnabled}}<input type="checkbox" id="twofa_active" name="twofa_active" checked hidden>{{end}}
+            <button class="op-btn {{if .TwofaEnabled}}op-btn-secondary{{else}}op-btn-primary{{end}}" type="submit">{{template "op_icon" "shield"}} {{if .TwofaEnabled}}{{.T.Get "Click to disable 2FA"}}{{else}}{{.T.Get "Click to Enable"}}{{end}}</button>
+        </form>
+    </div>
+</section>
+<!-- END templates/dashboard/twofa.html -->
+{{end}}{{end}}

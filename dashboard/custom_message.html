@@ -1,0 +1,6 @@
+{{define "custommessage"}}<!-- START templates/dashboard/custom_message.html -->
+{{if .CustomMessage}}
+    <div class="op-alert" role="note">{{template "op_icon" "info"}}<span>{{.CustomMessage}}</span></div>
+{{end}}
+<!-- END templates/dashboard/custom_message.html -->
+{{end}}

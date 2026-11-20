@@ -1,0 +1,41 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/import.html -->
+<div class="op-content">
+
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Import Emails"}}</h1>
+        <p class="op-meta">{{.T.Get "Import email accounts from .xls or .csv files."}}</p>
+    </div>
+    <div class="op-actions">
+        <a href="https://openpanel.com/docs/panel/emails/import/#how-to-import-email-addresses" target="_blank" rel="noopener" class="op-btn op-btn-secondary">{{template "op_icon" "book"}} {{.T.Get "Documentation"}}</a>
+    </div>
+</div>
+
+<section class="op-card CrawlerStatusCard" id="toAddActive">
+    <form method="POST" enctype="multipart/form-data" x-data="{ file: '' }">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+        <div class="op-section">
+            <div><h3>{{.T.Get "Upload File"}} <span style="color:var(--color-danger)">*</span></h3><p>{{.T.Get "One account per row: email, password and quota. You confirm the list before anything is created."}}</p></div>
+            <div class="op-col" style="gap:12px">
+                <label class="op-drop" :class="file && 'is-picked'">
+                    <input type="file" name="file" accept=".csv, .xls, .xlsx" required @change="file = $event.target.files.length ? $event.target.files[0].name : ''" aria-label="{{.T.Get "Upload File"}}">
+                    <span class="op-drop-ico">{{template "op_icon" "upload"}}</span>
+                    <span class="op-drop-text"><b x-text="file || '{{.T.Get "Choose a file"}}'">{{.T.Get "Choose a file"}}</b><span>{{.T.Get "CSV, XLSX or XLS files only."}}</span></span>
+                </label>
+                <div class="op-actions">
+                    <a href="/emails" class="op-btn op-btn-secondary">{{.T.Get "Back to Emails"}}</a>
+                    <button type="submit" class="op-btn op-btn-primary" :disabled="!file">{{template "op_icon" "upload"}} {{.T.Get "Upload"}}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</section>
+
+</div>
+<!-- END templates/emails/import.html -->
+{{end}}

@@ -1,0 +1,31 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* ojs's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from ojs/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Open source software for managing and publishing scholarly journals.")}},
+  adminPath: '/index.php/index/login',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['ojs_version', 'admin_username', 'db_name'],
+  fields: [
+    K.version('ojs_version', function () {
+      var re = /^(?:ojs-)?(\d+)_(\d+)_(\d+)-(\d+)$/;
+      var pages = [1, 2, 3].map(function (p) { return fetch('https://api.github.com/repos/pkp/ojs/tags?per_page=100&page=' + p).then(function (r) { return r.json(); }).catch(function () { return []; }); });
+      return Promise.all(pages).then(function (all) {
+        var tags = [].concat.apply([], all.map(function (d) { return Array.isArray(d) ? d : []; }));
+        var seen = {};
+        return tags.map(function (t) { return t.name; })
+          .filter(function (n) { return re.test(n) && !/rc|beta|alpha/i.test(n); })
+          .map(function (n) { return n.match(re).slice(1).join('.').replace(/\.(\d+)$/, '-$1'); })
+          .filter(function (v) { if (seen[v]) return false; seen[v] = 1; return true; })
+          .sort(function (a, b) { var x = a.split(/[.-]/).map(Number), y = b.split(/[.-]/).map(Number); for (var i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); } return 0; })
+          .slice(0, 15);
+      });
+    }),
+    K.user(), K.email(), K.pass()
+  ].concat(K.db('ojs')),
+  run: [K.run.pre, K.run.php, K.run.dl('OJS'), K.run.ex(['Linking web root']), K.run.db, K.run.step({{toJSON (.T.Get "Running the OJS CLI installer")}}, ["Ensuring PHP 'ftp' extension", 'Running OJS CLI installer', 'Finalizing configuration', 'Setting permissions on OJS files directory', 'Deploying admin login helper']), K.run.save(['Registering cron job'])],
+  creds: K.creds()
+}{{end}}

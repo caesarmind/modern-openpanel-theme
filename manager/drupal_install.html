@@ -1,0 +1,19 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* drupal's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from drupal/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Drupal content management system (CMS).")}},
+  adminPath: '/user/login',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['site_name', 'drupal_version', 'admin_username', 'db_name'],
+  fields: [
+    K.text('site_name', {{toJSON (.T.Get "Website name")}}, { required: true, placeholder: {{toJSON (.T.Get "My Drupal Site")}} }),
+    K.version('drupal_version', function () { return K.gh('https://api.github.com/repos/drupal/drupal/tags?per_page=100', /^\d+\.\d+\.\d+$/, function (t) { return t.name; }); }),
+    K.email(), K.user(), K.pass()
+  ].concat(K.db('drupal')),
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Creating the Composer project")}}, ['Creating Composer project', 'Requiring drush', 'Linking web root', 'Setting files permissions']), K.run.db, K.run.step({{toJSON (.T.Get "Running drush site:install")}}, ['Running drush site:install']), K.run.save()],
+  creds: K.creds()
+}{{end}}

@@ -1,0 +1,17 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* sofawiki's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from sofawiki/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "File-based wiki software, no database required.")}},
+  php: { max: '7.4', block: true },
+  note: {{toJSON (.T.Get "SofaWiki has no database and no CLI installer. After the files are in place, open the site to finish its own setup (folder rights, then a login).")}},
+  doneNote: {{toJSON (.T.Get "Open the site to finish SofaWiki's own setup wizard: folder rights first, then the login and main page.")}},
+  steps: [K.steps.where, K.step('site', { label: {{toJSON (.T.Get "Details")}}, title: {{toJSON (.T.Get "Details")}}, desc: {{toJSON (.T.Get "SofaWiki creates its admin account in its own setup wizard after the install.")}} }), K.steps.review],
+  summary: ['admin_email'],
+  fields: [K.email({ required: false, label: {{toJSON (.T.Get "Email")}}, half: false, hint: {{toJSON (.T.Get "For your own records in Site Manager only, SofaWiki has no admin account to create yet.")}} })],
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Downloading and extracting SofaWiki")}}, ['Downloading and extracting SofaWiki', 'Setting files permissions']), K.run.save()],
+  creds: []
+}{{end}}

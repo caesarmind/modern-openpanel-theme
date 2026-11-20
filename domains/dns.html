@@ -1,0 +1,640 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/domains/dns.html -->
+<div class="op-content" x-data="{ reset: false }">
+
+{{if .Domain}}
+
+{{if .Issues}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof reportHealthIssues === 'function') {
+        reportHealthIssues({{toJSON (printf "dns-zone:%s" .Domain)}}, {{toJSON .Issues}}, 0);
+    }
+});
+</script>
+{{end}}
+
+{{if eq .ViewMode "table"}}
+
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow"><span id="total_records_count">{{.TotalRecords}}</span> {{.T.Get "records"}}</div>
+            <h1 class="op-title">{{.T.Get "Edit DNS for"}} <span class="punycode">{{.Domain}}</span></h1>
+            <p class="op-meta">{{.T.Get "Changes go live once the old record's TTL runs out."}}</p>
+        </div>
+        <div class="op-actions">
+            {{if gt (len .Domains) 1}}<label class="op-field" style="min-width:240px"><span class="sr-only">{{.T.Get "Domain"}}</span><select class="op-select" aria-label="{{.T.Get "Domain"}}" onchange="if (this.value) window.location.href = '/domains/edit-dns-zone/' + this.value">{{range .Domains}}<option class="punycode" value="{{.DomainURL}}" {{if eq .DomainURL $.Domain}}selected{{end}}>{{.DomainURL}}</option>{{end}}</select></label>{{end}}
+            <a class="op-btn op-btn-secondary" href="/domains/edit-dns-zone/{{.Domain}}?view=code">{{template "op_icon" "code"}} {{.T.Get "Edit DNS File"}}</a>
+            <a class="op-btn op-btn-secondary" href="/domains/export-dns-zone/{{.Domain}}" target="_blank">{{template "op_icon" "download"}} {{.T.Get "Export Zone"}}</a>
+            <button class="op-btn op-btn-danger" type="button" @click="reset = true">{{template "op_icon" "refresh"}} {{.T.Get "Reset Zone"}}</button>
+        </div>
+    </div>
+    <input type="text" id="serial_number_current" value="{{.Serial}}" hidden>
+    <a href="/domains/edit-dns-zone" class="op-backlink">{{template "op_icon" "arrowleft"}} {{.T.Get "All zones"}}</a>
+
+{{range .Issues}}
+    <div class="op-alert {{if eq .Severity "error"}}is-danger{{else}}is-warning{{end}}" role="status">{{template "op_icon" "alert"}}<span>{{.Message}}</span></div>
+{{end}}
+
+    <section class="op-card" id="addRecordRow">
+        <div class="op-card-head"><h2>{{.T.Get "Add a record"}}</h2><span class="op-hint">{{.T.Get "Use @ for"}} <span class="punycode">{{.Domain}}</span> {{.T.Get "itself"}}</span></div>
+        <form class="op-dns-add" method="POST" action="/domains/dns/add-record/">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <input type="hidden" name="IN" value="IN">
+            <input type="hidden" name="Domain" value="{{.Domain}}">
+            <label class="op-field"><span class="op-label">{{.T.Get "Type"}}</span>
+                <select name="Type" class="op-select" required onchange="updateForm()">
+                    {{range .RecordTypes}}<option value="{{.}}">{{$.T.Get .}}</option>{{end}}
+                </select>
+            </label>
+            <label class="op-field"><span class="op-label">{{.T.Get "Name"}}</span>
+                <input type="text" name="Name" class="op-input op-mono" placeholder="www" required pattern="^[A-Za-z0-9.@_-]+$" title="{{.T.Get "Only letters, numbers, and the characters . @ _ - are allowed."}}">
+            </label>
+            <div class="op-field"><span class="op-label">{{.T.Get "Record"}}</span>
+                <div class="op-row" style="flex-wrap:nowrap">
+                    <input type="text" name="Priority" class="op-input op-mono" placeholder="0" aria-label="{{.T.Get "Priority"}}" style="display:none;width:72px;flex:none">
+                    <input type="text" name="Record" class="op-input op-mono" aria-label="{{.T.Get "Record"}}" required>
+                </div>
+            </div>
+            <label class="op-field"><span class="op-label">{{.T.Get "TTL"}}</span>
+                <input type="number" name="TTL" class="op-input op-mono" required min="60" value="14400">
+            </label>
+            <button type="submit" class="op-btn op-btn-primary" id="save-row">{{template "op_icon" "plus"}} {{.T.Get "Add Record"}}</button>
+
+            <div id="dmarc_helper" class="op-dns-tlsa" style="display:none;">
+                <label class="op-field"><span class="op-label">{{.T.Get "Policy for mail that fails the check"}}</span>
+                    <select id="dmarc_policy" class="op-select" onchange="dmarcBuild()">
+                        <option value="none">{{.T.Get "none: only report"}}</option>
+                        <option value="quarantine">{{.T.Get "quarantine: send to spam"}}</option>
+                        <option value="reject">{{.T.Get "reject: refuse the message"}}</option>
+                    </select>
+                </label>
+                <label class="op-field"><span class="op-label">{{.T.Get "Email for reports (optional)"}}</span>
+                    <input type="email" id="dmarc_rua" class="op-input op-mono" data-no-live-validate oninput="dmarcBuild()" placeholder="postmaster@{{.Domain}}">
+                </label>
+            </div>
+
+            <div id="tlsa_helper" class="op-dns-tlsa" style="display:none;">
+                <div class="op-row">
+                    <button type="button" id="tlsa_generate_btn" class="op-btn op-btn-sm op-btn-secondary">{{template "op_icon" "key"}} {{.T.Get "Generate from existing SSL cert"}}</button>
+                    <span id="tlsa_cert_type" class="op-hint"></span>
+                </div>
+                <div id="tlsa_hash_choice" class="op-options-list" style="display:none;">
+                    <label><input type="radio" name="tlsa_hash_type" value="311"> <span><b class="op-mono">3 1 1</b> {{.T.Get "Public key hash (SHA-256)"}} <span class="op-hint op-mono" id="tlsa_hash_311_preview"></span></span></label>
+                    <label><input type="radio" name="tlsa_hash_type" value="301"> <span><b class="op-mono">3 0 1</b> {{.T.Get "Full certificate hash (SHA-256)"}} <span class="op-hint op-mono" id="tlsa_hash_301_preview"></span></span></label>
+                </div>
+                <div class="op-row">
+                    <label class="op-row"><span class="op-hint">{{.T.Get "Port"}}</span><input type="number" id="tlsa_port" value="443" min="1" max="65535" class="op-input op-mono" style="width:90px"></label>
+                    <label class="op-row"><span class="op-hint">{{.T.Get "Protocol"}}</span><select id="tlsa_protocol" class="op-select" style="width:96px"><option value="tcp">TCP</option><option value="udp">UDP</option></select></label>
+                </div>
+                <p id="tlsa_renewal_warning" class="op-hint" style="display:none;margin:0"></p>
+            </div>
+        </form>
+    </section>
+
+    <section class="op-card" aria-label="{{.T.Get "Records Table"}}" x-data="{ searchQuery: '', type: 'all', counts: {}, shown: {{len .Rows}} }"
+        x-init="$el.querySelectorAll('tbody tr[data-type]').forEach(r => counts[r.dataset.type] = (counts[r.dataset.type] || 0) + 1); $watch('searchQuery', () => $nextTick(() => shown = [...$el.querySelectorAll('tbody tr[data-type]')].filter(r => r.style.display !== 'none').length)); $watch('type', () => $nextTick(() => shown = [...$el.querySelectorAll('tbody tr[data-type]')].filter(r => r.style.display !== 'none').length))">
+        <div class="op-filter-row" style="margin-bottom:12px">
+            <button class="op-filter" type="button" :class="type === 'all' && 'is-set'" @click="type = 'all'">{{.T.Get "All"}} <b class="op-count">{{len .Rows}}</b></button>
+            <template x-for="t in Object.keys(counts).sort()" :key="t">
+                <button class="op-filter" type="button" :class="type === t && 'is-set'" @click="type = t"><span x-text="t"></span> <b class="op-count" x-text="counts[t]"></b></button>
+            </template>
+        </div>
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search records"}}" aria-label="{{.T.Get "Search records"}}"></label>
+        </div>
+
+{{template "bulk_open" (dict "T" .T "Table" "#dns-records-table" "Endpoint" (printf "/domains/dns/bulk/%s" .Domain))}}
+        <div class="op-table-wrap">
+        <table class="op-table" id="dns-records-table">
+            <thead>
+                <tr>
+                    <th class="is-shrink"><input type="checkbox" class="op-check" :checked="bulkAllChecked" :indeterminate="bulkSomeChecked" @change="bulkToggleAll($event.target.checked)" aria-label="{{.T.Get "Select all"}}"></th>
+                    <th>{{.T.Get "Record"}}</th>
+                    <th>{{.T.Get "Content"}}</th>
+                    <th class="is-num">{{.T.Get "TTL"}}</th>
+                    <th class="is-shrink"><span class="op-sr">{{.T.Get "Actions"}}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+{{range .Rows}}
+                <tr class="domain_row" data-name="{{.Name}}" data-ttl="{{.TTL}}" data-type="{{.Type}}" data-value="{{.DisplayValue}}" data-line="{{.RawLine}}" data-line-number="{{.LineNumber}}" data-end-line-number="{{.EndLineNumber}}"
+                    data-search="{{lower (printf "%s %s %s %s" .Name .TTL .Type .DisplayValue)}}"
+                    x-show="(type === 'all' || type === $el.dataset.type) && (searchQuery === '' || $el.dataset.search.includes(searchQuery.toLowerCase()))"
+                    :aria-selected="!!bulkSelected[{{toJSON .BulkKey}}]">
+                    <td class="is-shrink"><input type="checkbox" class="op-check bulk-select-box" value="{{.BulkKey}}" data-bulk-skip="" :checked="!!bulkSelected[{{toJSON .BulkKey}}]" @change="bulkToggle($event.target)" aria-label="{{$.T.Get "Select"}} {{.Name}} {{.Type}}"></td>
+                    <td>
+                        <div class="op-row-title">
+                            <span class="op-type" style="--hue:var(--color-hue-{{template "dns_hue" .Type}})">{{.Type}}</span>
+                            <div style="min-width:0"><b><span class="op-mono" style="font-size:13px">{{.Name}}</span></b>{{if and .Name (ne .Name "@") (not (hasSuffix .Name "."))}}<span class="op-sub op-mono punycode" style="overflow-wrap:anywhere">{{.Name}}.{{$.Domain}}</span>{{end}}</div>
+                        </div>
+                    </td>
+                    <td data-label="{{$.T.Get "Content"}}">
+                        <span class="op-dns-value op-mono">{{.DisplayValue}}</span>
+                        {{if .Comment}}<span class="op-sub" title="{{.Comment}}">; {{.Comment}}</span>{{end}}
+                    </td>
+                    <td data-label="{{$.T.Get "TTL"}}" class="is-num"><span class="op-mono">{{.TTL}}</span></td>
+                    <td class="is-shrink op-cell-menu" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false" @scroll.window="open = false" @resize.window="open = false">
+                        <button x-ref="btn" class="op-icon-btn" type="button" :aria-expanded="open.toString()" @click="toggle()" aria-label="{{$.T.Get "Actions for"}} {{.Name}} {{.Type}}">{{template "op_icon" "dots"}}</button>
+                        <div x-ref="menu" class="op-menu" x-show="open" x-cloak>
+                            {{if index $.EditableType .Type}}<button type="button" class="edit-button" @click="open = false">{{template "op_icon" "pencil"}} {{$.T.Get "Edit"}}</button>
+                            <hr>{{end}}
+                            <button type="button" class="delete-button is-danger">{{template "op_icon" "trash"}} <span>{{$.T.Get "Delete"}}</span></button>
+                        </div>
+                    </td>
+                </tr>
+{{end}}
+            </tbody>
+        </table>
+        </div>
+        <div class="op-empty" x-show="shown === 0" x-cloak>
+            <span class="op-ico-tile">{{template "op_icon" "search"}}</span>
+            <b>{{.T.Get "Nothing matches"}}</b>
+            <span class="op-hint">{{.T.Get "Try another search or record type."}}</span>
+        </div>
+{{template "bulk_bar" .}}
+</div>
+        <div class="op-tfoot"><span><b x-text="shown"></b> {{.T.Get "of"}} {{len .Rows}} {{.T.Get "records"}}</span></div>
+    </section>
+
+<script>
+    const dnsI18n = {
+        confirm: {{toJSON (.T.Get "Confirm")}},
+        del: {{toJSON (.T.Get "Delete")}},
+        save: {{toJSON (.T.Get "Save")}},
+        cancel: {{toJSON (.T.Get "Cancel")}},
+        name: {{toJSON (.T.Get "Name")}},
+        type: {{toJSON (.T.Get "Type")}},
+        record: {{toJSON (.T.Get "Record")}},
+        priority: {{toJSON (.T.Get "Priority")}},
+        ttl: {{toJSON (.T.Get "TTL")}},
+        unexpectedError: {{toJSON (.T.Get "An unexpected error occurred. Please try again.")}}
+    };
+    const dnsEditTypes = {{toJSON .EditTypes}};
+    // what the DMARC helper wrote, so leaving it only clears its own values
+    var dmarcFilled = { record: "" };
+
+    function dmarcBuild() {
+        var rua = document.getElementById("dmarc_rua").value.trim();
+        var record = "v=DMARC1; p=" + document.getElementById("dmarc_policy").value;
+        if (rua) record += "; rua=mailto:" + rua;
+        document.getElementsByName("Record")[0].value = record;
+        dmarcFilled.record = record;
+    }
+
+    function updateForm() {
+        var selectedType = document.getElementsByName("Type")[0].value;
+        var recordInput = document.getElementsByName("Record")[0];
+        var priorityInput = document.getElementsByName("Priority")[0];
+        var nameInput = document.getElementsByName("Name")[0];
+        var tlsaHelper = document.getElementById("tlsa_helper");
+
+        tlsaHelper.style.display = "none";
+        var warningEl = document.getElementById("tlsa_renewal_warning");
+        if (warningEl) { warningEl.style.display = "none"; }
+
+        var dmarcHelper = document.getElementById("dmarc_helper");
+        dmarcHelper.style.display = selectedType === "DMARC" ? "flex" : "none";
+        if (selectedType !== "DMARC" && dmarcFilled.record) {
+            if (recordInput.value === dmarcFilled.record) recordInput.value = "";
+            if (nameInput.value === "_dmarc") nameInput.value = "";
+            dmarcFilled.record = "";
+        }
+
+        recordInput.required = true;
+
+        if (selectedType === "A") {
+            recordInput.placeholder = "IPv4 {{.T.Get "Address"}}";
+            recordInput.pattern = "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$";
+        } else if (selectedType === "AAAA") {
+            recordInput.placeholder = "IPv6 {{.T.Get "Address"}}";
+            recordInput.pattern = "^(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:(?:[0-9A-Fa-f]{1,4}:){6}|::(?:[0-9A-Fa-f]{1,4}:){5}|(?:[0-9A-Fa-f]{1,4}:){4}(?::[0-9A-Fa-f]{1,4})?|(?:[0-9A-Fa-f]{1,4}:){3}(?::[0-9A-Fa-f]{1,4}){0,2}|(?:[0-9A-Fa-f]{1,4}:){2}(?::[0-9A-Fa-f]{1,4}){0,3}|[0-9A-Fa-f]{1,4}:(?:(?::[0-9A-Fa-f]{1,4}){0,4})|:(?:(?::[0-9A-Fa-f]{1,4}){0,5})|::(?:(?::[0-9A-Fa-f]{1,4}){0,6})))$";
+        } else if (selectedType === "CNAME") {
+            recordInput.placeholder = "{{.T.Get "Domain"}}";
+            recordInput.pattern = "^[A-Za-z0-9.-]+$";
+        } else if (selectedType === "TXT") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "";
+        } else if (selectedType === "TLSA") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "3 1 1 <hash> {{.T.Get "or use Generate button below"}}";
+            if (!nameInput.value || nameInput.value === "@") {
+                nameInput.value = "_443._tcp";
+            }
+            tlsaHelper.style.display = "flex";
+        } else if (selectedType === "HTTPS") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = '1 . alpn="h2,h3"';
+        } else if (selectedType === "SVCB") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "1 svc.{{.Domain}}. port=8443";
+        } else if (selectedType === "NS") {
+            recordInput.placeholder = "ns1.example.net";
+            recordInput.pattern = "^[A-Za-z0-9._-]+$";
+            nameInput.placeholder = "{{.T.Get "Subdomain"}}";
+        } else if (selectedType === "SSHFP") {
+            recordInput.placeholder = "4 2 <{{.T.Get "fingerprint"}}>";
+            recordInput.pattern = "^[0-9]+ [0-9]+ [0-9A-Fa-f]+$";
+        } else if (selectedType === "URI") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "10 1 https://{{.Domain}}/";
+        } else if (selectedType === "DMARC") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "v=DMARC1; p=none";
+            if (!nameInput.value || nameInput.value === "@") nameInput.value = "_dmarc";
+            dmarcBuild();
+        } else if (selectedType === "CAA") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = '0 issue "letsencrypt.org"';
+        } else if (selectedType === "SRV") {
+            recordInput.removeAttribute("pattern");
+            recordInput.placeholder = "0 5 5060 sip.{{.Domain}}.";
+        } else {
+            recordInput.placeholder = "";
+            // an empty pattern only matches an empty value, so the browser would block the submit
+            recordInput.removeAttribute("pattern");
+        }
+
+        if (selectedType === "MX") {
+            priorityInput.style.display = "block";
+            recordInput.placeholder = "{{.T.Get "Domain"}}";
+            recordInput.pattern = "^[A-Za-z0-9.-]+$";
+            priorityInput.value = "0";
+            priorityInput.placeholder = "{{.T.Get "Priority"}}";
+            priorityInput.required = true;
+        } else {
+            priorityInput.style.display = "none";
+            priorityInput.required = false;
+        }
+    }
+
+    function editRowUpdateType(selectEl) {
+        var priorityInput = selectEl.closest('tr').querySelector('input[name="priority"]');
+        if (priorityInput) priorityInput.style.display = selectEl.value === 'MX' ? '' : 'none';
+    }
+
+    updateForm();
+
+    function tlsaUpdateName() {
+        var port = document.getElementById("tlsa_port").value;
+        var protocol = document.getElementById("tlsa_protocol").value;
+        document.getElementsByName("Name")[0].value = "_" + port + "._" + protocol;
+    }
+
+    document.getElementById("tlsa_port").addEventListener("input", tlsaUpdateName);
+    document.getElementById("tlsa_protocol").addEventListener("change", tlsaUpdateName);
+
+    document.querySelectorAll('input[name="tlsa_hash_type"]').forEach(function(radio) {
+        radio.addEventListener("change", function() {
+            var recordInput = document.getElementsByName("Record")[0];
+            if (this.value === "311" && window._tlsa_hash_311) {
+                recordInput.value = "3 1 1 " + window._tlsa_hash_311;
+            } else if (this.value === "301" && window._tlsa_hash_301) {
+                recordInput.value = "3 0 1 " + window._tlsa_hash_301;
+            }
+        });
+    });
+
+    document.getElementById("tlsa_generate_btn").addEventListener("click", function() {
+        var btn = this;
+        var label = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = "{{.T.Get "Fetching..."}}";
+
+        fetch("/domains/dns/tlsa-hash/{{.Domain}}", {
+            headers: { "X-CSRF-Token": csrf_token }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = label;
+            if (data.error) {
+                showToast(data.error, "error");
+                return;
+            }
+
+            window._tlsa_hash_311 = data.hash_311;
+            window._tlsa_hash_301 = data.hash_301;
+
+            document.getElementById("tlsa_cert_type").textContent = data.type === "custom"
+                ? "{{.T.Get "Custom certificate"}}"
+                : "{{.T.Get "Lets Encrypt certificate"}}";
+
+            var warning = document.getElementById("tlsa_renewal_warning");
+            warning.className = data.type === "letsencrypt" ? "op-hint is-warning" : "op-hint";
+            warning.textContent = data.type === "letsencrypt"
+                ? "{{.T.Get "Caddy autorenews Lets Encrypt certificates with a new keypair. This record will go stale after the next renewal — regenerate it then."}}"
+                : "{{.T.Get "Using a custom certificate. Regenerate this record whenever you replace the certificate."}}";
+            warning.style.display = "block";
+
+            document.getElementById("tlsa_hash_311_preview").textContent = data.hash_311;
+            document.getElementById("tlsa_hash_301_preview").textContent = data.hash_301;
+
+            document.getElementsByName("Record")[0].value = "3 1 1 " + data.hash_311;
+            document.querySelector('input[name="tlsa_hash_type"][value="311"]').checked = true;
+            document.getElementById("tlsa_hash_choice").style.display = "flex";
+        })
+        .catch(function() {
+            showToast("{{.T.Get "Failed to fetch SSL certificate info."}}", "error");
+            btn.disabled = false;
+            btn.innerHTML = label;
+        });
+    });
+
+    // record cells, without the bulk checkbox cell and the actions menu
+    function dnsCells(row) {
+        return Array.from(row.children).filter(td => !td.querySelector('input.bulk-select-box') && !td.classList.contains('op-cell-menu') && !td.classList.contains('dns-edit'));
+    }
+
+    function dnsEsc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function dnsCloseEdit(row) {
+        row.querySelectorAll('td.dns-edit').forEach(td => td.remove());
+        Array.from(row.children).forEach(td => td.hidden = false);
+    }
+
+    document.addEventListener('click', function(e) {
+        var deleteButton = e.target.closest('.delete-button');
+        if (!deleteButton) return;
+        var row = deleteButton.closest('tr');
+        var label = deleteButton.querySelector('span');
+
+        if (deleteButton.dataset.armed) {
+            sendDeleteRequest(row);
+            return;
+        }
+        deleteButton.dataset.armed = '1';
+        label.textContent = dnsI18n.confirm;
+        setTimeout(function() {
+            delete deleteButton.dataset.armed;
+            label.textContent = dnsI18n.del;
+        }, 5000);
+    });
+
+    function sendDeleteRequest(row) {
+        showToast({{toJSON (.T.Get "Deleting record, please wait.")}}, 'loading');
+
+        fetch(`/domains/dns/delete-record/${row.dataset.lineNumber - 1}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-Token': csrf_token,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({ domain: {{.Domain}}, endRowId: row.dataset.endLineNumber }).toString()
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.message === "Row deleted successfully") {
+                showToast({{toJSON (.T.Get "Record deleted successfully.")}}, 'success');
+                row.remove();
+                const total = document.getElementById('total_records_count');
+                const n = parseInt(total.innerText);
+                if (!isNaN(n) && n > 0) total.innerText = n - 1;
+            } else {
+                showToast({{toJSON (.T.Get "Error occurred deleting the record. Please refresh the page and try again. If the issue persists, try editing the zone file directly.")}}, 'error');
+            }
+        })
+        .catch(function() {
+            showToast({{toJSON (.T.Get "An unexpected error occurred.")}}, 'error');
+        });
+    }
+
+    // edit swaps the record cells for inputs in place, cancel puts them back
+    document.addEventListener('click', function(e) {
+        var editButton = e.target.closest('.edit-button');
+        if (!editButton) return;
+        var row = editButton.closest('.domain_row');
+        if (row.querySelector('td.dns-edit')) return;
+        var type = row.dataset.type;
+        // shown as stored, the final dot is what makes a target absolute
+        var value = row.dataset.value.trim();
+        var priority = '';
+        if (type === 'MX') {
+            var m = value.match(/^(\d+)\s+/);
+            priority = m ? m[1] : '';
+            value = value.replace(/^(\d+)\s+/, '');
+        }
+        row.dataset.originalTarget = value;
+        var types = dnsEditTypes.slice();
+        if (!types.includes(type)) types.push(type);
+        var cells = dnsCells(row);
+        var menuCell = row.querySelector('td.op-cell-menu');
+        cells.concat(menuCell ? [menuCell] : []).forEach(td => td.hidden = true);
+
+        var html = `
+            <td class="dns-edit"><div class="op-row" style="flex-wrap:nowrap">
+                <select name="field3" class="op-select" style="width:96px;flex:none" aria-label="${dnsI18n.type}" onchange="editRowUpdateType(this)">${types.map(t => `<option value="${t}"${t === type ? ' selected' : ''}>${t}</option>`).join('')}</select>
+                <input type="text" class="op-input op-mono" name="field1" aria-label="${dnsI18n.name}" value="${dnsEsc(row.dataset.name.replace(/\.$/, ''))}">
+            </div></td>
+            <td class="dns-edit" data-label="${dnsI18n.record}"><div class="op-row" style="flex-wrap:nowrap">
+                <input type="number" name="priority" min="0" max="65535" class="op-input op-mono" style="width:80px;flex:none${type === 'MX' ? '' : ';display:none'}" aria-label="${dnsI18n.priority}" value="${dnsEsc(priority || '0')}">
+                <input type="text" class="op-input op-mono" name="field4" aria-label="${dnsI18n.record}" value="${dnsEsc(value)}">
+            </div></td>
+            <td class="dns-edit is-num" data-label="${dnsI18n.ttl}"><input type="number" min="0" max="2147483647" class="op-input op-mono" style="width:100px" name="field2" aria-label="${dnsI18n.ttl}" value="${dnsEsc(row.dataset.ttl)}"></td>
+            <td class="dns-edit is-shrink"><div class="op-row" style="flex-wrap:nowrap">
+                <button type="button" class="op-btn op-btn-sm op-btn-primary save-button">${dnsI18n.save}</button>
+                <button type="button" class="op-btn op-btn-sm op-btn-secondary cancel-button">${dnsI18n.cancel}</button>
+            </div></td>`;
+        (menuCell || cells[cells.length - 1]).insertAdjacentHTML('afterend', html);
+        row.querySelector('input[name="field4"]').focus();
+    });
+
+    document.addEventListener('click', function(e) {
+        var cancelButton = e.target.closest('.cancel-button');
+        if (!cancelButton) return;
+        dnsCloseEdit(cancelButton.closest('.domain_row'));
+    });
+
+    document.addEventListener('click', function(e) {
+        var saveButton = e.target.closest('.save-button');
+        if (!saveButton) return;
+        var row = saveButton.closest('.domain_row');
+        var domain = {{.Domain}};
+        var lineNumber = row.dataset.lineNumber;
+        var updatedField1 = row.querySelector('input[name="field1"]').value;
+        var updatedField2 = row.querySelector('input[name="field2"]').value;
+        var updatedField3 = row.querySelector('select[name="field3"]').value;
+        var updatedField4 = row.querySelector('input[name="field4"]').value;
+        var priorityInput = row.querySelector('input[name="priority"]');
+        var priority = (priorityInput ? priorityInput.value : '') || '0';
+
+        if (updatedField1.endsWith(domain)) {
+            updatedField1 += '.';
+        }
+        if (updatedField3 === 'TXT') {
+            // the table shows TXT without quotes, saved bare a ; would cut the value off
+            if (!(updatedField4.startsWith('"') && updatedField4.endsWith('"'))) {
+                updatedField4 = '"' + updatedField4 + '"';
+            }
+        } else if (['CNAME', 'MX', 'NS'].includes(updatedField3)) {
+            // a typed hostname is absolute, an untouched relative target has to stay relative
+            if (updatedField4 !== row.dataset.originalTarget && updatedField4.includes('.') && !updatedField4.endsWith('.')) {
+                updatedField4 += '.';
+            }
+        } else if (updatedField4.endsWith(domain)) {
+            updatedField4 += '.';
+        }
+        if (updatedField3 === 'MX') {
+            updatedField4 = priority + ' ' + updatedField4;
+        }
+
+        if (updatedField3 === 'CNAME') {
+            var duplicate = Array.from(document.querySelectorAll('.domain_row')).some(function(other) {
+                return other !== row && other.dataset.type === 'CNAME' && other.dataset.name === updatedField1;
+            });
+            if (duplicate) {
+                showToast({{toJSON (.T.Get "A CNAME record with this name already exists.")}}, 'warning');
+                return;
+            }
+        }
+
+        fetch(`/domains/dns/update-record/${lineNumber}/${domain}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-Token': csrf_token,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                newContent: `${updatedField1} ${updatedField2} IN ${updatedField3} ${updatedField4}`,
+                serial: document.querySelector('#serial_number_current').value,
+                endRowId: row.dataset.endLineNumber || lineNumber
+            }).toString()
+        })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                showToast((data && data.message) || dnsI18n.unexpectedError, 'danger');
+                return;
+            }
+            if (data.updated_row) {
+                showToast({{toJSON (.T.Get "Record updated successfully.")}}, 'success');
+                window.location.reload();
+            } else if (data.error) {
+                showToast(data.error, 'danger');
+            }
+        })
+        .catch(function() {
+            showToast(dnsI18n.unexpectedError, 'danger');
+        });
+    });
+</script>
+
+{{else if eq .ViewMode "code"}}
+
+<form method="post" action="/domains/save-dns-zone/{{.Domain}}" class="op-stack">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{.T.Get "Zone file"}}</div>
+            <h1 class="op-title">{{.T.Get "Edit DNS File for"}} <span class="punycode">{{.Domain}}</span></h1>
+        </div>
+        <div class="op-actions">
+            <a class="op-btn op-btn-secondary" href="/domains/edit-dns-zone/{{.Domain}}?view=table">{{template "op_icon" "table"}} {{.T.Get "Table View"}}</a>
+            <a class="op-btn op-btn-secondary" href="/domains/export-dns-zone/{{.Domain}}" target="_blank">{{template "op_icon" "download"}} {{.T.Get "Download File"}}</a>
+            <button class="op-btn op-btn-danger" type="button" @click="reset = true">{{template "op_icon" "refresh"}} {{.T.Get "Reset Zone"}}</button>
+            <button type="button" id="save_zone_button" class="op-btn op-btn-primary">{{.T.Get "Save Changes"}}</button>
+        </div>
+    </div>
+    <a href="/domains/edit-dns-zone" class="op-backlink">{{template "op_icon" "arrowleft"}} {{.T.Get "All zones"}}</a>
+    <div class="op-alert is-warning" role="note">{{template "op_icon" "alert"}}<span><b>{{.T.Get "Attention:"}}</b> {{.T.Get "Editing DNS file is intended for advanced users only. This action can potentially lead to server misconfiguration or downtime if not done correctly."}} {{.T.Get "Please be cautious and make sure you understand the changes you are making."}}</span></div>
+    <textarea class="op-input op-code-area" id="zone_content" name="zone_content" spellcheck="false" aria-label="{{.T.Get "Zone file"}}">{{.ZoneContent}}</textarea>
+</form>
+
+<script>
+document.getElementById('save_zone_button').addEventListener('click', function() {
+    const zoneContent = document.getElementById('zone_content').value;
+    const domain = encodeURIComponent({{.Domain}});
+
+    const params = new URLSearchParams();
+    params.append('zone_content', zoneContent);
+
+    showToast({{toJSON (.T.Get "Saving zone file for domain")}} + ' ' + domain + ' ' + {{toJSON (.T.Get "Please wait for the process to finish.")}}, 'loading');
+
+    fetch(`/domains/save-dns-zone/${domain}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-Token': csrf_token,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+    })
+    .then(response => response.text())
+    .then(responseText => {
+        if (responseText.includes('saved')) {
+            showToast({{toJSON (.T.Get "Zone file saved successfully")}}, 'success');
+        } else {
+            showToast(responseText, 'danger');
+        }
+    })
+    .catch(() => {
+        showToast({{toJSON (.T.Get "An error occurred while saving the zone file.")}}, 'danger');
+    });
+});
+</script>
+
+{{end}}
+
+    <div class="op-scrim" x-show="reset" x-cloak @click="reset = false"></div>
+    <div class="op-sheet" role="dialog" aria-modal="true" aria-labelledby="reset-zone-title" x-show="reset" x-cloak @keydown.escape.window="reset = false">
+        <h2 id="reset-zone-title">{{.T.Get "Confirm DNS zone reset"}}</h2>
+        <p class="op-meta">{{.T.Get "Are you sure you want to reset the DNS zone for this domain?"}}</p>
+        <p class="op-meta">{{.T.Get "This acton is irreversible and will delete all existing DNS records, then restore the default zone records."}}</p>
+        <form action="/domains/restart-dns-zone/{{.Domain}}" method="post" class="op-actions" style="margin-top:20px">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <button class="op-btn op-btn-secondary" type="button" @click="reset = false">{{.T.Get "Cancel"}}</button>
+            <button class="op-btn op-btn-danger" type="submit" style="flex:1">{{template "op_icon" "refresh"}} {{.T.Get "Reset Zone"}}</button>
+        </form>
+    </div>
+
+{{else}}
+
+    <div class="op-page-head">
+        <div>
+            {{if .Zones}}<div class="op-eyebrow">{{len .Zones}} {{.T.Get "zones"}} · {{.ZoneRecords}} {{.T.Get "records"}}</div>{{end}}
+            <h1 class="op-title">{{.T.Get "DNS Zone Editor"}}</h1>
+            <p class="op-meta">{{.T.Get "Manage and edit Domain Name System (DNS) zone files, which contain critical information for mapping domain names to IP addresses and managing various DNS records, such as A, CNAME, MX, and TXT records."}}</p>
+        </div>
+    </div>
+{{if .Zones}}
+    <section class="op-card" aria-label="{{.T.Get "DNS zones"}}" x-data="{ q: '' }">
+        <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Search domains"}}" x-model="q" aria-label="{{.T.Get "Search domains"}}"></label></div>
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th>{{.T.Get "Domain"}}</th><th class="is-num">{{.T.Get "Records"}}</th><th class="op-col-wide op-sm-hide">{{.T.Get "Types"}}</th><th class="is-shrink op-sm-hide"><span class="sr-only">{{.T.Get "Edit"}}</span></th><th class="is-shrink"><span class="sr-only">{{.T.Get "More"}}</span></th></tr></thead>
+            <tbody>
+            {{range .Zones}}
+                <tr data-href="/domains/edit-dns-zone/{{.Domain}}" data-search="{{lower .Domain}}" x-show="!q || $el.dataset.search.includes(q.toLowerCase())">
+                    <td class="op-cell-title"><b><a class="punycode" href="/domains/edit-dns-zone/{{.Domain}}" style="color:inherit;text-decoration:none;overflow-wrap:anywhere">{{.Domain}}</a></b></td>
+                    <td data-label="{{$.T.Get "Records"}}" class="is-num"><span class="op-mono">{{.Records}}</span></td>
+                    <td data-label="{{$.T.Get "Types"}}" class="op-col-wide op-sm-hide"><span style="display:inline-flex;flex-wrap:wrap;gap:4px">{{range .Types}}<span class="op-type" style="--hue:var(--color-hue-{{template "dns_hue" .Type}})" title="{{.Count}} {{.Type}}">{{.Type}} {{.Count}}</span>{{end}}</span></td>
+                    <td class="is-shrink op-sm-hide"><a class="op-btn op-btn-secondary op-btn-sm" href="/domains/edit-dns-zone/{{.Domain}}">{{template "op_icon" "pencil"}} {{$.T.Get "Edit zone"}}</a></td>
+                    <td class="is-shrink op-cell-menu" style="position:relative" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                        <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "More for"}} {{.Domain}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                        <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                            <a href="/domains/edit-dns-zone/{{.Domain}}">{{template "op_icon" "pencil"}} {{$.T.Get "Edit records"}}</a>
+                            <a href="/domains/edit-dns-zone/{{.Domain}}?view=code">{{template "op_icon" "code"}} {{$.T.Get "Edit DNS File"}}</a>
+                            <a href="/domains/export-dns-zone/{{.Domain}}" target="_blank">{{template "op_icon" "download"}} {{$.T.Get "Export Zone"}}</a>
+                        </div>
+                    </td>
+                </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        <div class="op-tfoot"><span>{{len .Zones}} {{.T.Get "zones"}}</span>{{with .Nameservers}}<span class="op-hint">{{$.T.Get "Nameservers"}} {{range $i, $ns := .}}{{if $i}}, {{end}}<span class="op-mono">{{$ns}}</span>{{end}}</span>{{end}}</div>
+    </section>
+{{else if .Domains}}
+    {{template "op_domain_picker" (dict "T" .T "Domains" .Domains "RedirectBase" "/domains/edit-dns-zone/" "Label" (.T.Get "Pick a domain to edit its zone"))}}
+{{else}}
+    {{template "op_no_domain" .}}
+{{end}}
+
+{{end}}
+</div>
+<!-- END templates/domains/dns.html -->
+{{end}}
+
+{{define "dns_hue"}}{{if eq . "A"}}cyan{{else if eq . "AAAA"}}blue{{else if eq . "CNAME"}}green{{else if eq . "MX"}}orange{{else if eq . "TXT"}}purple{{else if eq . "CAA"}}red{{else if eq . "NS"}}indigo{{else}}yellow{{end}}{{end}}

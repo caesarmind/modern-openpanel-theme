@@ -1,0 +1,194 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/user/account.html -->
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            {{if or .HostingPlanName .MemberSinceLabel}}<div class="op-eyebrow">{{.HostingPlanName}}{{if and .HostingPlanName .MemberSinceLabel}} · {{end}}{{with .MemberSinceLabel}}{{$.T.Get "member since"}} {{.}}{{end}}</div>{{end}}
+            <h1 class="op-title">{{.T.Get "Login Details"}}</h1>
+            <p class="op-meta">{{.T.Get "Your email address and password for this panel."}}</p>
+        </div>
+    </div>
+
+<!-- js to focus fields -->
+<script>
+    document.addEventListener("alpine:init", () => {
+        Alpine.data("focusField", () => ({
+            init() {
+                this.focusBasedOnHash();
+                window.addEventListener("hashchange", () => this.focusBasedOnHash());
+            },
+            focusBasedOnHash() {
+                const hash = window.location.hash;
+                if (hash === "#username") {
+                    this.focusField("username");
+                } else if (hash === "#email") {
+                    this.focusField("email");
+                } else if (hash === "#password") {
+                    this.focusField("password");
+                }
+            },
+            focusField(fieldId) {
+                setTimeout(() => {
+                    const field = document.getElementById(fieldId);
+                    if (field) field.focus();
+                }, 100);
+            }
+        }));
+    });
+</script>
+<!-- END js to focus fields -->
+
+    <div class="op-cols-2">
+        <form class="op-card CrawlerStatusCard" id="toAddActive" method="POST" x-data="focusField()">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <div class="op-card-head"><h2>{{.T.Get "Email & Password"}}</h2></div>
+            <div class="op-form-grid">
+                <div class="op-field">
+                    <label for="username" class="op-label">{{.T.Get "Username"}}</label>
+                    {{if .PermitUsernameChangeByUser}}
+                    <input type="text" id="username" name="username" pattern="^[a-zA-Z0-9]{3,20}$" title="{{.T.Get "Username must be between 3 and 20 characters, and only contain letters and numbers (no spaces, hyphens, or underscores)."}}" class="op-input op-mono" value="{{.CurrentUsername}}">
+                    <span class="op-hint">{{.T.Get "3 to 20 letters and numbers."}}</span>
+                    {{else}}
+                    <input type="text" id="username" class="op-input op-mono" value="{{.CurrentUsername}}" readonly>
+                    <span class="op-hint">{{.T.Get "Set by your administrator."}}</span>
+                    {{end}}
+                </div>
+
+                <div class="op-field">
+                    <label for="email" class="op-label">{{.T.Get "Email address"}}</label>
+                    <input type="email" id="email" name="email" placeholder="{{.CurrentEmail}}" class="op-input" value="{{.CurrentEmail}}" autocomplete="email" required>
+                    <span class="op-hint">{{.T.Get "Used for password resets and notifications."}}</span>
+                </div>
+
+                <div class="op-field"
+                    x-data="passwordStrength({
+                        weak: '{{.T.Get "Weak password"}}',
+                        medium: '{{.T.Get "Medium strength password"}}',
+                        strong: '{{.T.Get "Strong password"}}',
+                        tooWeak: '{{.T.Get "Password does not meet the required strength."}}'
+                    }, {{.PasswordStrength}})"
+                    x-init="checkStrength()">
+                    <label for="password" class="op-label">{{.T.Get "New Password"}}</label>
+                    <div class="op-affix">
+                        <input type="password" id="password" name="password" placeholder="{{.T.Get "New Password"}}" maxlength="30" class="op-input" x-model="password" x-ref="input" @input="checkStrength()" autocomplete="new-password">
+                        <button type="button" id="show-hide-password" class="op-icon-btn" aria-label="{{.T.Get "Show password"}}" title="{{.T.Get "Show password"}}"><i class="bi bi-eye"></i></button>
+                        <button type="button" id="generate-password" class="op-icon-btn" aria-label="{{.T.Get "Generate password"}}" title="{{.T.Get "Generate password"}}"><i class="bi bi-shuffle"></i></button>
+                    </div>
+                    <div class="op-pw-meter" :data-score="!password ? 0 : strength === 'Strong' ? 4 : strength === 'Medium' ? 2 : 1"><span></span><span></span><span></span><span></span></div>
+                    <span class="op-hint" :class="{ 'is-danger': strength === 'Weak', 'is-warning': strength === 'Medium', 'is-success': strength === 'Strong' }" x-text="password ? strengthMessage : '{{.T.Get "Leave empty to keep your current password."}}'">{{.T.Get "Leave empty to keep your current password."}}</span>
+                </div>
+
+                <div class="op-field">
+                    <label for="confirm_password" class="op-label">{{.T.Get "Confirm New Password"}}</label>
+                    <div class="op-affix">
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="{{.T.Get "Confirm New Password"}}" maxlength="30" class="op-input" autocomplete="new-password">
+                        <span class="d-none" id="copy-password-link"><button type="button" id="copy-password" class="op-icon-btn" aria-label="{{.T.Get "Copy password"}}" title="{{.T.Get "Copy password"}}"><i class="bi bi-clipboard"></i></button></span>
+                    </div>
+                    <span class="op-hint" id="passwordHint">{{.T.Get "Type the new password again."}}</span>
+                    <span class="op-hint is-danger" id="passwordError" style="display:none;">{{.T.Get "Passwords do not match."}}</span>
+                </div>
+            </div>
+            <div class="op-form-foot">
+                <button type="reset" class="op-btn op-btn-secondary">{{.T.Get "Cancel"}}</button>
+                <button id="save-button" type="submit" class="op-btn op-btn-primary">{{.T.Get "Update"}}</button>
+            </div>
+        </form>
+
+        <div class="op-col">
+            {{if .UserAllowed.twofa}}
+            <section class="op-card">
+                {{if not .TwofaEnabled}}<div class="op-glow" style="right:-260px;top:-300px"></div>{{end}}
+                <div class="op-card-head"><h2>{{.T.Get "Two-factor authentication"}}</h2>{{if .TwofaEnabled}}<span class="op-status is-success">{{.T.Get "On"}}</span>{{else}}<span class="op-status is-warning">{{.T.Get "Off"}}</span>{{end}}</div>
+                <p class="op-meta" style="margin:0 0 12px">{{if .TwofaEnabled}}{{.T.Get "A code from your authenticator app is asked for after your password."}}{{else}}{{.T.Get "Add an authenticator app or a passkey so a stolen password isn't enough to get in."}}{{end}}</p>
+                <a class="op-btn {{if .TwofaEnabled}}op-btn-secondary{{else}}op-btn-primary{{end}}" href="/account/2fa">{{if .TwofaEnabled}}{{.T.Get "Manage 2FA"}}{{else}}{{.T.Get "Enable 2FA"}}{{end}}</a>
+            </section>
+            {{end}}
+            <section class="op-card">
+                <div class="op-card-head"><h2>{{.T.Get "Sessions"}}</h2>{{if .UserAllowed.sessions}}<a href="/account/sessions">{{.T.Get "Active sessions"}}</a>{{end}}</div>
+                <dl class="op-dl op-dl-end">
+                    <dt>{{.T.Get "This device"}}</dt><dd x-data="{ d: '' }" x-init="const u = navigator.userAgent; d = (/Edg\//.test(u) ? 'Edge' : /Firefox\//.test(u) ? 'Firefox' : /Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : '') + ((/Windows/.test(u) && ' on Windows') || (/Mac OS X/.test(u) && !/Mobile/.test(u) && ' on macOS') || (/Android/.test(u) && ' on Android') || (/iPhone|iPad/.test(u) && ' on iOS') || (/Linux/.test(u) && ' on Linux') || '')" x-text="d || '–'">–</dd>
+                    {{if .ThisIP}}<dt>{{.T.Get "IP address"}}</dt><dd class="op-mono">{{.ThisIP}}</dd>{{end}}
+                    <dt>{{.T.Get "Last login"}}</dt><dd>{{if .LastIP}}<span class="op-mono">{{.LastIP}}</span>{{if .LastLoginTime}} <span class="op-muted">· {{.LastLoginTime}}</span>{{end}}{{else}}–{{end}}</dd>
+                    {{if .UserAllowed.twofa}}<dt>{{.T.Get "Two-factor"}}</dt><dd>{{if .TwofaEnabled}}{{.T.Get "On"}}{{else}}{{.T.Get "Off"}}{{end}}</dd>{{end}}
+                    {{if and .UserAllowed.passkeys (ge .PasskeyCount 0)}}<dt>{{.T.Get "Passkeys"}}</dt><dd><a href="/account/passkeys">{{if .PasskeyCount}}{{.PasskeyCount}}{{else}}{{.T.Get "None"}}{{end}}</a></dd>{{end}}
+                </dl>
+            </section>
+        </div>
+    </div>
+</div>
+
+    <script>
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById("password");
+            const confirmPasswordInput = document.getElementById("confirm_password");
+            const showHideButton = document.getElementById("show-hide-password");
+            const eyeIcon = showHideButton.querySelector("i");
+
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                confirmPasswordInput.type = "text";
+                eyeIcon.classList.remove("bi-eye");
+                eyeIcon.classList.add("bi-eye-slash");
+            } else {
+                passwordInput.type = "password";
+                confirmPasswordInput.type = "password";
+                eyeIcon.classList.remove("bi-eye-slash");
+                eyeIcon.classList.add("bi-eye");
+            }
+        }
+
+        document.getElementById("show-hide-password").addEventListener("click", togglePasswordVisibility);
+
+        function generateRandomPassword() {
+            const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
+            let password = "";
+            for (let i = 0; i < 12; i++) {
+                const randomIndex = Math.floor(Math.random() * characters.length);
+                password += characters.charAt(randomIndex);
+            }
+            return password;
+        }
+
+        function copyPasswordToClipboard() {
+            copyToClipboard(document.getElementById("password").value);
+            const copyLink = document.getElementById("copy-password");
+            copyLink.innerHTML = '<i class="bi bi-check"></i>';
+            setTimeout(() => {
+                copyLink.innerHTML = '<i class="bi bi-clipboard"></i>';
+            }, 3000);
+        }
+
+        document.getElementById("generate-password").addEventListener("click", function() {
+            const newPassword = generateRandomPassword();
+            const showHideButton = document.getElementById("show-hide-password");
+            const eyeIcon = showHideButton.querySelector("i");
+
+            document.getElementById("password").type = "text";
+            document.getElementById("confirm_password").type = "text";
+            document.getElementById("password").value = newPassword;
+            document.getElementById("confirm_password").value = newPassword;
+            document.getElementById("password").dispatchEvent(new Event('input', { bubbles: true }));
+            eyeIcon.classList.remove("bi-eye");
+            eyeIcon.classList.add("bi-eye-slash");
+            document.getElementById("copy-password-link").classList.remove("d-none");
+        });
+
+        document.getElementById("copy-password").addEventListener("click", copyPasswordToClipboard);
+
+        document.querySelector("#toAddActive").addEventListener("submit", function(e) {
+            const password = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirm_password").value;
+            const mismatch = password !== confirmPassword;
+            if (mismatch) e.preventDefault();
+            document.getElementById("passwordError").style.display = mismatch ? "" : "none";
+            document.getElementById("passwordHint").style.display = mismatch ? "none" : "";
+            document.getElementById("confirm_password").classList.toggle("is-invalid", mismatch);
+        });
+    </script>
+
+<!-- END templates/user/account.html -->
+{{end}}

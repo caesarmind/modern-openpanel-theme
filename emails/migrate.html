@@ -1,0 +1,278 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/migrate.html -->
+{{if .Accounts}}
+<div class="op-content" x-data="opMigrate()" x-init="init()">
+
+    <!-- list of past runs -->
+    <template x-if="view === 'list'"><div class="op-col">
+        <div class="op-page-head">
+            <div>
+                <h1 class="op-title">{{.T.Get "Migrate Emails"}}</h1>
+                <p class="op-meta">{{.T.Get "Copy folders and messages from another IMAP server into one of your email accounts. Messages already copied are skipped, so a migration can safely be run again."}}</p>
+            </div>
+            <div class="op-actions"><button type="button" class="op-btn op-btn-primary" @click="newRun()">{{template "op_icon" "plus"}} {{.T.Get "New migration"}}</button></div>
+        </div>
+        <section class="op-card" id="migrateHistory">
+            <div class="op-card-head"><div><h2>{{.T.Get "Recent migrations"}}</h2><p class="op-meta">{{.T.Get "The last 10 runs are kept with their logs."}}</p></div></div>
+            <div class="op-table-wrap"><table class="op-table">
+                <thead><tr><th>{{.T.Get "Started"}}</th><th>{{.T.Get "Migration"}}</th><th>{{.T.Get "Status"}}</th><th class="is-shrink"><span class="op-sr">{{.T.Get "Actions"}}</span></th></tr></thead>
+                <tbody id="migrateHistoryRows"><template x-for="j in st.jobs" :key="j.id"><tr>
+                    <td class="op-cell-title"><span class="op-mono" style="font-size:12px;white-space:nowrap" x-text="when(j.started)"></span></td>
+                    <td data-label="{{.T.Get "Migration"}}"><span style="min-width:0"><b class="op-mono" style="font-size:13px;overflow-wrap:anywhere" x-text="j.source_user + '  ·  ' + j.source_host"></b><span class="op-sub" style="display:block;overflow-wrap:anywhere" x-text="'→ ' + j.destination"></span></span></td>
+                    <td data-label="{{.T.Get "Status"}}"><span><span class="op-status" :class="tone(j.status)" x-text="i18n[j.status] || j.status"></span><span class="op-hint" style="display:block;margin-top:2px;max-width:280px" x-show="j.status === 'failed' && j.message" x-text="reason(j.message)"></span><span class="op-hint is-warning" style="display:block;margin-top:2px;max-width:280px" x-show="j.too_big > 0 && j.status !== 'running'" x-text="tooBig(j)"></span></span></td>
+                    <td class="is-shrink"><button type="button" class="op-btn op-btn-ghost op-btn-sm" @click="openJob(j)">{{.T.Get "View log"}}</button></td>
+                </tr></template></tbody>
+            </table></div>
+        </section>
+    </div></template>
+
+    <!-- new migration wizard -->
+    <template x-if="view === 'wizard'"><div class="op-col">
+        <div class="op-page-head">
+            <div>
+                <div class="op-eyebrow">{{.T.Get "Migrate Emails"}}</div>
+                <h1 class="op-title">{{.T.Get "New migration"}}</h1>
+                <p class="op-meta">{{.T.Get "Copy folders and messages from another IMAP server into one of your email accounts."}}</p>
+            </div>
+            <div class="op-actions" x-show="st.jobs.length"><button type="button" class="op-btn op-btn-secondary" @click="view = 'list'">{{template "op_icon" "arrowleft"}} {{.T.Get "All migrations"}}</button></div>
+        </div>
+        <div class="op-mig-grid">
+            <section class="op-card" style="min-width:0">
+                <ol class="op-stepper"><template x-for="(t, i) in steps" :key="i"><li :class="step > i + 1 && 'is-done'" :aria-current="step === i + 1 ? 'step' : null" @click="go(i + 1)" style="cursor:pointer"><b x-text="{{toJSON (.T.Get "Step")}} + ' ' + (i + 1)"></b><span x-text="t"></span></li></template></ol>
+                <div style="margin-top:24px">
+
+                <div class="op-col" style="gap:18px" x-show="step === 1">
+                    <div><h2 class="op-mig-h">{{.T.Get "Source server"}}</h2><p class="op-meta" style="margin:4px 0 0">{{.T.Get "The server you are moving emails from."}}</p></div>
+                    <div><span class="op-label" style="display:block;margin-bottom:8px">{{.T.Get "Quick fill"}}</span><div class="op-chips"><template x-for="p in presets" :key="p[1]"><button type="button" class="op-chip" :class="f.source_host === p[1] && 'is-set'" @click="f.source_host = p[1]; f.source_security = 'ssl'; f.source_port = 993" x-text="p[0]"></button></template></div></div>
+                    <div class="op-mig-row3">
+                        <label class="op-field"><span class="op-label">{{.T.Get "IMAP server"}}</span><input class="op-input op-mono" id="source_host" x-model.trim="f.source_host" maxlength="253" placeholder="imap.example.com" autocomplete="off" spellcheck="false"></label>
+                        <label class="op-field"><span class="op-label">{{.T.Get "Security"}}</span><select class="op-select" id="source_security" x-model="f.source_security" @change="secChanged()"><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option><option value="none">{{.T.Get "None"}}</option></select></label>
+                        <label class="op-field"><span class="op-label">{{.T.Get "Port"}}</span><input class="op-input op-mono" id="source_port" x-model.number="f.source_port" inputmode="numeric"><span class="op-hint" style="color:var(--color-danger)" x-show="!portOk()" x-cloak>{{.T.Get "Use a port between 1 and 65535."}}</span></label>
+                    </div>
+                    <div class="op-alert is-warning" x-show="f.source_security === 'none'" x-cloak>{{template "op_icon" "alert"}}<span>{{.T.Get "Without SSL/TLS or STARTTLS the password and every message travel unencrypted."}}</span></div>
+                    <div class="op-mig-row2">
+                        <label class="op-field"><span class="op-label">{{.T.Get "Username"}}</span><input class="op-input op-mono" id="source_user" x-model.trim="f.source_user" maxlength="254" autocomplete="off" spellcheck="false" placeholder="you@example.com"></label>
+                        <label class="op-field"><span class="op-label">{{.T.Get "Password"}}</span><span style="display:flex;gap:8px"><input class="op-input op-mono" id="source_password" :type="showPass ? 'text' : 'password'" x-model="f.source_password" maxlength="1024" autocomplete="new-password"><button class="op-btn op-btn-secondary" type="button" @click="showPass = !showPass" x-text="showPass ? {{toJSON (.T.Get "Hide")}} : {{toJSON (.T.Get "Show")}}"></button></span><span class="op-hint">{{.T.Get "For Gmail, Outlook and other providers with two-factor login, use an app password."}}</span></label>
+                    </div>
+                </div>
+
+                <div class="op-col" style="gap:18px" x-show="step === 2" x-cloak>
+                    <div><h2 class="op-mig-h">{{.T.Get "Destination account"}}</h2><p class="op-meta" style="margin:4px 0 0">{{.T.Get "The email account on this server that receives the messages."}}</p></div>
+                    <div class="op-options" style="--cols:1">{{range .Accounts}}<label class="op-option" style="align-items:center"><input type="radio" name="destination" value="{{.}}" x-model="f.destination"><div style="min-width:0;flex:1"><b class="op-mono punycode" style="font-size:13px;overflow-wrap:anywhere">{{.}}</b></div><span class="op-ico-tile is-sm">{{template "op_icon" "mail"}}</span></label>{{end}}</div>
+                    <label class="op-field" style="max-width:420px"><span class="op-label">{{.T.Get "Account password"}}</span><input class="op-input op-mono" id="destination_password" type="password" x-model="f.destination_password" maxlength="1024" autocomplete="new-password"><span class="op-hint">{{.T.Get "Forgot it? You can set a new one under"}} <a href="/emails" style="color:var(--color-accent-text)">{{.T.Get "Email Accounts"}}</a>.</span></label>
+                    <label class="op-check-row" style="grid-template-columns:auto minmax(0,1fr);align-items:start;cursor:pointer"><input class="op-check" type="checkbox" id="exclude_junk" x-model="f.exclude_junk" style="margin-top:2px"><span><b>{{.T.Get "Skip Spam, Junk and Trash folders"}}</b><p>{{.T.Get "Leaves out Spam, Junk, Junk E-mail, Bulk Mail, Trash, Bin, Deleted Items and Deleted Messages, at any level."}}</p></span></label>
+                </div>
+
+                <div class="op-col" style="gap:18px" x-show="step === 3" x-cloak>
+                    <div><h2 class="op-mig-h">{{.T.Get "Test and start"}}</h2><p class="op-meta" style="margin:4px 0 0">{{.T.Get "The test logs in to both servers, nothing is copied."}}</p></div>
+                    <div class="op-mig-row2" style="gap:8px">
+                        <div class="op-mig-box"><span class="op-label">{{.T.Get "From"}}</span><b class="op-mono" x-text="f.source_user"></b><span class="op-mono op-hint" x-text="f.source_host + ':' + f.source_port"></span><span class="op-hint" x-text="secLabel()"></span></div>
+                        <div class="op-mig-box"><span class="op-label">{{.T.Get "To"}}</span><b class="op-mono" x-text="f.destination"></b><span class="op-hint" x-text="f.exclude_junk ? {{toJSON (.T.Get "Spam, Junk and Trash skipped")}} : {{toJSON (.T.Get "All folders")}}"></span></div>
+                    </div>
+                    <div class="op-actions" style="align-items:center"><button class="op-btn op-btn-secondary" type="button" id="migrateTest" @click="runTest()" :disabled="testing"><span x-text="testing ? i18n.testing : {{toJSON (.T.Get "Test connection")}}"></span></button><span class="op-hint" x-show="!test && !testing">{{.T.Get "Optional, it catches a wrong password before anything starts."}}</span></div>
+                    <template x-if="test"><div class="op-col" style="gap:8px" id="migrateTestResult">
+                        <div class="op-alert" :class="test.source ? 'is-success' : 'is-danger'"><span x-text="test.source ? i18n.sourceOk : i18n.sourceFail"></span></div>
+                        <div class="op-alert" :class="test.destination ? 'is-success' : 'is-danger'"><span x-text="test.destination ? i18n.destOk : i18n.destFail"></span></div>
+                        <pre class="op-mig-log" x-show="(!test.source || !test.destination) && test.output" x-text="test.output"></pre>
+                    </div></template>
+                    <div class="op-col" style="gap:8px">
+                        <span class="op-label">{{.T.Get "What happens next"}}</span>
+                        <div class="op-check-row" style="grid-template-columns:auto minmax(0,1fr)"><span style="color:var(--color-accent-text);display:flex">{{template "op_icon" "folder"}}</span><span><b>{{.T.Get "Folders are matched by role"}}</b><p>{{.T.Get "Sent, Drafts, Junk and Trash land in this account's own folders, for example Gmail's [Gmail]/Sent Mail goes to Sent."}}</p></span></div>
+                        <div class="op-check-row" style="grid-template-columns:auto minmax(0,1fr)"><span style="color:var(--color-accent-text);display:flex">{{template "op_icon" "refresh"}}</span><span><b>{{.T.Get "Safe to run again"}}</b><p>{{.T.Get "Messages already copied are skipped, so a second run only brings over what is new."}}</p></span></div>
+                        <div class="op-check-row" style="grid-template-columns:auto minmax(0,1fr)"><span style="color:var(--color-accent-text);display:flex">{{template "op_icon" "clock"}}</span><span><b>{{.T.Get "Runs in the background"}}</b><p>{{.T.Get "You can close this page. One migration runs at a time per account."}}</p></span></div>
+                    </div>
+                </div>
+
+                </div>
+                <div class="op-form-foot">
+                    <button class="op-btn op-btn-secondary" type="button" x-show="step > 1" @click="step--; test = null">{{.T.Get "Back"}}</button>
+                    <button class="op-btn op-btn-primary" type="button" x-show="step < 3" :disabled="!ok(step)" @click="step++">{{.T.Get "Continue"}}</button>
+                    <button class="op-btn op-btn-primary" type="button" id="migrateStart" x-show="step === 3" :disabled="starting || (test && (!test.source || !test.destination))" @click="start()"><span x-text="starting ? i18n.starting : {{toJSON (.T.Get "Start migration")}}"></span></button>
+                </div>
+            </section>
+            <aside class="op-card op-mig-side">
+                <span class="op-label" style="display:block;margin-bottom:12px">{{.T.Get "This migration"}}</span>
+                <div class="op-col" style="gap:12px">
+                    <div><span class="op-hint" style="display:block">{{.T.Get "Source"}}</span><span class="op-mono" x-text="f.source_host ? f.source_host + ':' + f.source_port : '–'"></span></div>
+                    <div><span class="op-hint" style="display:block">{{.T.Get "Username"}}</span><span class="op-mono" x-text="f.source_user || '–'"></span></div>
+                    <div><span class="op-hint" style="display:block">{{.T.Get "Destination"}}</span><span class="op-mono" x-text="f.destination || '–'"></span></div>
+                    <div><span class="op-hint" style="display:block">{{.T.Get "Folders"}}</span><span x-text="f.exclude_junk ? {{toJSON (.T.Get "All except Spam, Junk and Trash")}} : {{toJSON (.T.Get "All folders")}}"></span></div>
+                </div>
+                <p class="op-hint" style="margin:16px 0 0">{{.T.Get "Both passwords are kept only while the migration runs and are deleted when it ends."}}</p>
+            </aside>
+        </div>
+    </div></template>
+
+    <!-- one run: live while it runs, its log afterwards -->
+    <template x-if="view === 'run' && job"><div class="op-col">
+        <div class="op-page-head">
+            <div>
+                <div class="op-eyebrow">{{.T.Get "Migrate Emails"}}</div>
+                <h1 class="op-title" x-text="job.status === 'running' ? {{toJSON (.T.Get "Migration in progress")}} : ({ completed: {{toJSON (.T.Get "Migration completed")}}, failed: {{toJSON (.T.Get "Migration failed")}}, cancelled: {{toJSON (.T.Get "Migration cancelled")}} }[job.status] || job.status)"></h1>
+                <p class="op-meta op-mono" style="overflow-wrap:anywhere" x-text="job.source_user + '  ·  ' + job.source_host + '  →  ' + job.destination"></p>
+            </div>
+            <div class="op-actions"><button type="button" class="op-btn op-btn-secondary" @click="view = 'list'">{{template "op_icon" "arrowleft"}} {{.T.Get "All migrations"}}</button></div>
+        </div>
+        <section class="op-card" id="migrateRunning">
+            <div class="op-card-head">
+                <div style="min-width:0"><h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">{{.T.Get "Status"}} <span class="op-status" :class="tone(job.status)" x-text="i18n[job.status] || job.status"></span></h2><p class="op-meta" x-text="{{toJSON (.T.Get "Started")}} + ' ' + when(job.started)"></p></div>
+                <button type="button" class="op-btn op-btn-secondary" id="migrateCancel" x-show="job.status === 'running'" @click="cancel()">{{.T.Get "Cancel"}}</button>
+            </div>
+            <div class="op-mig-bar" x-show="job.status === 'running'"><span></span></div>
+            <div class="op-alert is-danger" x-show="job.status === 'failed'" x-cloak>{{template "op_icon" "alert"}}<span><b x-text="reason(job.message || job.start_error)"></b><br><span class="op-mono" style="font-size:12px" x-show="job.message" x-text="job.message"></span></span></div>
+            <div class="op-alert is-success" x-show="job.status === 'completed'" x-cloak>{{template "op_icon" "check"}}<span x-text="{{toJSON (.T.Get "All folders are in")}} + ' ' + job.destination + '. ' + {{toJSON (.T.Get "Run it again any time to bring over new messages, copied ones are skipped.")}}"></span></div>
+            <div class="op-alert is-warning" x-show="job.too_big > 0 && job.status !== 'running'" x-cloak>{{template "op_icon" "alert"}}<span x-text="tooBig(job)"></span></div>
+            <div class="op-alert" x-show="job.status === 'cancelled'" x-cloak>{{template "op_icon" "info"}}<span>{{.T.Get "Cancelled by user. Messages copied so far are kept, running it again picks up where it stopped."}}</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:20px 0 8px"><span class="op-label">{{.T.Get "Log"}}</span><button class="op-btn op-btn-ghost op-btn-sm" type="button" @click="copyLog()">{{template "op_icon" "copy"}} {{.T.Get "Copy"}}</button></div>
+            <pre x-ref="log" id="migrateLiveLog" class="op-mig-log" style="max-height:360px" x-text="log || '…'"></pre>
+            <div class="op-form-foot" x-show="job.status !== 'running'"><button type="button" class="op-btn op-btn-secondary" @click="view = 'list'">{{.T.Get "All migrations"}}</button><button type="button" class="op-btn op-btn-primary" @click="again(job)">{{template "op_icon" "refresh"}} {{.T.Get "Run again"}}</button></div>
+        </section>
+    </div></template>
+
+    <div class="op-toast" x-show="toast" x-cloak x-transition role="status" x-text="toast"></div>
+</div>
+
+<script>
+function opMigrate() {
+    const csrf = {{toJSON .CSRFToken}};
+    const blank = { source_host: '', source_security: 'ssl', source_port: 993, source_user: '', source_password: '', destination: '', destination_password: '', exclude_junk: true };
+    return {
+        st: Object.assign({ jobs: [] }, {{toJSON .Status}}),
+        view: 'wizard', step: 1, f: Object.assign({}, blank), showPass: false,
+        test: null, testing: false, starting: false, job: null, log: '', toast: '', poll: null,
+        steps: [{{toJSON (.T.Get "Source server")}}, {{toJSON (.T.Get "Destination account")}}, {{toJSON (.T.Get "Test and start")}}],
+        presets: [['Gmail', 'imap.gmail.com'], ['Outlook / Microsoft 365', 'outlook.office365.com'], ['Yahoo', 'imap.mail.yahoo.com'], ['iCloud', 'imap.mail.me.com']],
+        i18n: {
+            running: {{toJSON (.T.Get "Running")}},
+            completed: {{toJSON (.T.Get "Completed")}},
+            failed: {{toJSON (.T.Get "Failed")}},
+            cancelled: {{toJSON (.T.Get "Cancelled")}},
+            testing: {{toJSON (.T.Get "Testing...")}},
+            starting: {{toJSON (.T.Get "Starting...")}},
+            started: {{toJSON (.T.Get "Migration started.")}},
+            cancelConfirm: {{toJSON (.T.Get "Stop the running migration? Messages copied so far are kept.")}},
+            sourceOk: {{toJSON (.T.Get "Source server: login successful")}},
+            sourceFail: {{toJSON (.T.Get "Source server: login failed")}},
+            destOk: {{toJSON (.T.Get "Destination account: login successful")}},
+            destFail: {{toJSON (.T.Get "Destination account: login failed")}},
+            error: {{toJSON (.T.Get "Something went wrong, please try again.")}},
+            copied: {{toJSON (.T.Get "Copied.")}},
+            tooBig: {{toJSON (.T.Get "%d messages were bigger than this server's %s limit and were not copied.")}},
+        },
+        // imapsync exit codes the log ends with, anything else is shown as is
+        failReasons: {
+            EXIT_AUTHENTICATION_FAILURE_USER1: {{toJSON (.T.Get "Login to the source server failed, check the username and password.")}},
+            EXIT_AUTHENTICATION_FAILURE_USER2: {{toJSON (.T.Get "Login to the destination account failed, check its password.")}},
+            EXIT_CONNECTION_FAILURE_HOST1: {{toJSON (.T.Get "Could not connect to the source server, check the server, security and port.")}},
+            EXIT_CONNECTION_FAILURE_HOST2: {{toJSON (.T.Get "Could not connect to the destination server.")}},
+            EXIT_OVERQUOTA: {{toJSON (.T.Get "The destination account is full, raise its quota and run the migration again.")}},
+            EXIT_WITH_ERRORS: {{toJSON (.T.Get "Finished with errors, some messages were not copied. See the log.")}},
+            EXIT_WITH_ERRORS_MAX: {{toJSON (.T.Get "Stopped after too many errors. See the log.")}},
+            EXIT_ERR_APPEND: {{toJSON (.T.Get "The destination account refused some messages, they were not copied. See the log.")}},
+            EXIT_CONNECTION_FAILURE: {{toJSON (.T.Get "Could not connect to the source server, check the server, security and port.")}},
+            EXIT_TLS_FAILURE: {{toJSON (.T.Get "The SSL/TLS connection failed, try another Security option.")}},
+            EXIT_BY_SIGNAL: {{toJSON (.T.Get "Stopped before finishing.")}},
+        },
+        init() {
+            this.st.jobs = this.st.jobs || [];
+            if (this.st.running && this.st.jobs.length) { this.job = this.st.jobs[0]; this.log = this.st.log || ''; this.view = 'run'; this.schedule(); }
+            else if (this.st.jobs.length) this.view = 'list';
+        },
+        when(t) { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString(); },
+        tone(s) { return { running: 'is-warning', completed: 'is-success', failed: 'is-danger' }[s] || 'is-muted'; },
+        reason(m) { return this.failReasons[m] || m || ''; },
+        tooBig(j) { return this.i18n.tooBig.replace('%d', j.too_big).replace('%s', Math.round(j.max_size / 1048576) + ' MB'); },
+        secLabel() { return { ssl: 'SSL/TLS', starttls: 'STARTTLS', none: {{toJSON (.T.Get "No encryption")}} }[this.f.source_security]; },
+        secChanged() { const p = { ssl: 993, starttls: 143, none: 143 }; if ([993, 143].includes(Number(this.f.source_port))) this.f.source_port = p[this.f.source_security]; },
+        portOk() { const p = Number(this.f.source_port); return Number.isInteger(p) && p >= 1 && p <= 65535; },
+        ok(n) {
+            if (n >= 1 && !(this.f.source_host && this.portOk() && this.f.source_user && this.f.source_password)) return false;
+            if (n >= 2 && !(this.f.destination && this.f.destination_password)) return false;
+            return true;
+        },
+        go(n) { if (n === 1 || this.ok(n - 1)) { this.step = n; this.test = null; } },
+        newRun() { this.f = Object.assign({}, blank); this.step = 1; this.test = null; this.view = 'wizard'; },
+        again(j) { this.f = Object.assign({}, blank, { source_host: j.source_host, source_user: j.source_user, destination: j.destination }); this.step = 1; this.test = null; this.view = 'wizard'; },
+        form() {
+            const fd = new FormData();
+            fd.append('csrf_token', csrf);
+            ['source_host', 'source_security', 'source_port', 'source_user', 'source_password', 'destination', 'destination_password'].forEach(k => fd.append(k, this.f[k]));
+            if (this.f.exclude_junk) fd.append('exclude_junk', '1');
+            return fd;
+        },
+        post(url, body) {
+            return fetch(url, { method: 'POST', body: body }).then(r => r.json().catch(() => ({ error: this.i18n.error })).then(d => { if (!r.ok && !d.error) d.error = this.i18n.error; return d; }));
+        },
+        say(m) { this.toast = m; setTimeout(() => this.toast = '', 2500); },
+        runTest() {
+            this.testing = true; this.test = null;
+            this.post('/emails/migrate/test', this.form()).then(d => {
+                this.testing = false;
+                if (d.error) { showToast(d.error, 'error'); return; }
+                this.test = d;
+            }).catch(() => { this.testing = false; showToast(this.i18n.error, 'error'); });
+        },
+        start() {
+            this.starting = true;
+            this.post('/emails/migrate', this.form()).then(d => {
+                this.starting = false;
+                if (d.error) { showToast(d.error, 'error'); return; }
+                showToast(this.i18n.started, 'success');
+                this.f.source_password = ''; this.f.destination_password = ''; this.test = null;
+                this.log = ''; this.refresh(true);
+            }).catch(() => { this.starting = false; showToast(this.i18n.error, 'error'); });
+        },
+        refresh(follow) {
+            fetch('/emails/migrate/status', { headers: { 'Accept': 'application/json' } }).then(r => r.json()).then(st => {
+                st.jobs = st.jobs || [];
+                this.st = st;
+                if (st.running && st.jobs.length && (follow || (this.job && this.job.id === st.jobs[0].id))) {
+                    this.job = st.jobs[0]; this.view = 'run'; this.setLog(st.log || '');
+                } else if (this.job) {
+                    const j = st.jobs.find(x => x.id === this.job.id);
+                    if (j) { this.job = j; if (this.view === 'run') this.loadLog(j.id); }
+                }
+                this.schedule();
+            }).catch(() => { clearTimeout(this.poll); this.poll = setTimeout(() => this.refresh(), 10000); });
+        },
+        schedule() { clearTimeout(this.poll); if (this.st.running) this.poll = setTimeout(() => this.refresh(), 3000); },
+        setLog(text) {
+            const el = this.$refs.log, end = !el || el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+            this.log = text;
+            if (end) this.$nextTick(() => { if (this.$refs.log) this.$refs.log.scrollTop = this.$refs.log.scrollHeight; });
+        },
+        loadLog(id) { fetch('/emails/migrate/log/' + encodeURIComponent(id)).then(r => r.text()).then(t => this.setLog(t)); },
+        openJob(j) { this.job = j; this.log = ''; this.view = 'run'; if (j.status === 'running' && this.st.running) this.setLog(this.st.log || ''); else this.loadLog(j.id); },
+        cancel() {
+            if (!confirm(this.i18n.cancelConfirm)) return;
+            const body = new FormData();
+            body.append('csrf_token', csrf);
+            this.post('/emails/migrate/cancel', body).then(d => { if (d.error) showToast(d.error, 'error'); this.refresh(); }).catch(() => showToast(this.i18n.error, 'error'));
+        },
+        copyLog() { navigator.clipboard && navigator.clipboard.writeText(this.log); this.say(this.i18n.copied); },
+    };
+}
+</script>
+{{else}}
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Migrate Emails"}}</h1>
+            <p class="op-meta">{{.T.Get "Copy folders and messages from another IMAP server into one of your email accounts. Messages already copied are skipped, so a migration can safely be run again."}}</p>
+        </div>
+    </div>
+    <section class="op-card op-empty">
+        <span class="op-ico-tile">{{template "op_icon" "mail"}}</span>
+        <b>{{.T.Get "No email accounts yet"}}</b>
+        <span class="op-hint">{{.T.Get "Create the email account you want to migrate into first."}}</span>
+        <a href="/emails/new" class="op-btn op-btn-primary op-btn-sm">{{template "op_icon" "plus"}} {{.T.Get "New email account"}}</a>
+    </section>
+</div>
+{{end}}
+
+<!-- END templates/emails/migrate.html -->
+{{end}}

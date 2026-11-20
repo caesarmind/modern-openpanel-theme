@@ -1,0 +1,80 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/system/ip_blocker.html -->
+
+<form method="post" action="/security/ip-blocker" x-data="ipBlocker()" @submit.prevent="validateAndSubmit">
+
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-content">
+        <div class="op-page-head">
+            <div>
+                <h1 class="op-title">{{.T.Get "IP Blocker"}}</h1>
+                <p class="op-meta">{{.T.Get "This feature allows you to block a range of IP addresses to prevent them from accessing your websites."}}</p>
+            </div>
+            <div class="op-actions">
+                <button id="save-ips" type="submit" class="op-btn op-btn-primary">{{template "op_icon" "ban"}} {{.T.Get "Save Changes"}}</button>
+            </div>
+        </div>
+
+        <section class="op-card">
+            <div class="op-section">
+                <div>
+                    <h3>{{.T.Get "Blocked addresses"}}</h3>
+                    <p>{{.T.Get "Visitors from these addresses get a 403 on every domain in this account."}}</p>
+                    <p class="op-mono" style="font-size:12px" x-text="ips.split('\n').filter(l => l.trim()).length + ' ' + {{toJSON (.T.Get "entries")}}"></p>
+                </div>
+                <label class="op-field" for="blocked_ips">
+                    <span class="op-label">{{.T.Get "Enter IP addresses or CIDRs (one per line)"}}</span>
+                    <textarea id="blocked_ips" name="ips" rows="12" x-model="ips" @input="filterInput" class="op-input op-mono" style="height:auto;min-height:220px;padding:12px;line-height:20px;font-size:13px" spellcheck="false"
+                placeholder="192.168.1.1
+10.0.0.0/24
+8.8.8.8/32">{{join .IPs "\n"}}</textarea>
+                    <span class="op-hint is-invalid" x-show="errorMessage" x-text="errorMessage"></span>
+                    <span class="op-hint" x-show="!errorMessage">{{.T.Get "IPv4 and IPv6, with or without a CIDR range."}}</span>
+                </label>
+            </div>
+        </section>
+    </div>
+</form>
+
+<script>
+function ipBlocker() {
+    return {
+        ips: `{{join .IPs "\n"}}`,
+        errorMessage: '',
+        validateIP(ip) {
+            // Regex for IPv4, IPv6, or CIDR
+            const ipv4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+            const ipv4Cidr = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\/([0-9]|[1-2][0-9]|3[0-2])$/;
+            const ipv6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+            const ipv6Cidr = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\/([0-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])$/;
+
+            return ipv4.test(ip) || ipv4Cidr.test(ip) || ipv6.test(ip) || ipv6Cidr.test(ip);
+        },
+        filterInput() {
+            this.errorMessage = '';
+            const lines = this.ips.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line && !this.validateIP(line)) {
+                    this.errorMessage = '{{.T.Get "Invalid IP or CIDR on line {n}:"}}'.replace('{n}', i + 1) + ` "${line}"`;
+                    break;
+                }
+            }
+        },
+        validateAndSubmit(event) {
+            this.filterInput();
+            if (!this.errorMessage) {
+                event.target.submit();
+            }
+        }
+    }
+}
+</script>
+
+<!-- END templates/system/ip_blocker.html -->
+{{end}}

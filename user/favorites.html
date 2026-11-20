@@ -1,0 +1,105 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{/* a sortable column head for table-sort.js */}}
+{{define "fav_sort"}}<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>{{end}}
+
+{{define "content"}}
+<!-- START templates/user/favorites.html -->
+
+<div class="op-content" aria-label="{{.T.Get "Favorites"}}" x-data="{ searchQuery: '' }">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Favorites"}}</h1>
+            <p class="op-meta">{{.T.Get "Add a page with the star in the top bar of any page, click it again or remove it here to take it off."}}</p>
+        </div>
+    </div>
+
+{{if index .UserAllowed "favorites"}}
+    <section class="op-card" aria-label="{{.T.Get "Favorites Table"}}">
+        <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input x-model="searchQuery" class="op-input" placeholder="{{.T.Get "Search"}}" type="search" aria-label="{{.T.Get "Search favorites"}}"></label></div>
+
+        {{template "bulk_open" (dict "T" .T "Table" "#favorites-table" "Endpoint" "/account/favorites/bulk")}}
+{{if .Favorites}}
+        <div class="op-table-wrap">
+            <table id="favorites-table" class="op-table">
+                <thead>
+                    <tr>
+                        {{template "bulk_head_checkbox" .}}
+                        <th class="is-shrink">#</th>
+                        <th>{{template "fav_sort" (dict "Label" (.T.Get "Title") "Key" "title")}}</th>
+                        <th>{{template "fav_sort" (dict "Label" (.T.Get "Link") "Key" "link")}}</th>
+                        <th class="is-shrink"><span class="op-sr">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{$root := .}}
+                    {{range $i, $favorite := .Favorites}}
+                    {{$href := $favorite.Link}}{{if not (hasPrefix $favorite.Link "/")}}{{$href = printf "/%s" $favorite.Link}}{{end}}
+                    <tr data-row-check x-show="searchQuery === '' || {{toJSON (lower (printf "%s %s" $favorite.Name $favorite.Link))}}.includes(searchQuery.toLowerCase())">
+                        {{template "bulk_row_checkbox" (dict "T" $root.T "Key" $favorite.Link "Label" $favorite.Name)}}
+                        <td class="is-shrink"><span class="op-mono op-hint">{{add $i 1}}</span></td>
+                        <td class="op-cell-title" data-sort-col="title" data-sort-value="{{$favorite.Name}}"><div class="op-row-title"><span class="op-ico-tile is-sm" style="--hue:var(--color-hue-yellow)">{{template "op_icon" "star"}}</span><div><b class="punycode">{{$favorite.Name}}</b></div></div></td>
+                        <td data-label="{{$root.T.Get "Link"}}" data-sort-col="link" data-sort-value="{{$favorite.Link}}"><a href="{{$href}}" class="op-mono op-fav-link">{{$href}}</a></td>
+                        <td class="is-shrink op-cell-menu" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                            <button class="op-icon-btn" type="button" aria-label="{{$root.T.Get "Actions for"}} {{$favorite.Name}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                            <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                <a href="{{$href}}">{{template "op_icon" "out"}} {{$root.T.Get "Open"}}</a>
+                                <button type="button" class="is-danger" @click="open = false; deleteFavorite({{toJSON $favorite.Link}})">{{template "op_icon" "trash"}} {{$root.T.Get "Remove"}}</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+{{else}}
+        <div class="op-empty">
+            <span class="op-ico-tile">{{template "op_icon" "star"}}</span>
+            <b>{{.T.Get "No favorites yet."}}</b>
+            <span class="op-hint">{{.T.Get "Use the star in the top bar of any page to add it here."}}</span>
+        </div>
+{{end}}
+        {{template "bulk_bar" .}}
+        </div>
+    </section>
+
+<script>
+    function deleteFavorite(link) {
+            fetch('/json/favorites', {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrf_token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ link: link })
+            })
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    return response.json().then(data => {
+                        showToast(data.error || '{{.T.Get "Error deleting favorite"}}', 'error');
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{{.T.Get "Error deleting favorite"}}', 'error');
+            });
+    }
+</script>
+<script src="{{static "js/table-sort.js"}}"></script>
+
+{{else}}
+
+    <div class="op-alert is-warning">{{template "op_icon" "alert"}}
+        <span><b>{{.T.Get "Favorites are not enabled by the Administrator."}}</b> {{.T.Get "The Favorites feature is currently disabled by the administrator; please contact your administrator to enable it."}} <a href="https://openpanel.com/docs/panel/dashboard/#favorites" target="_blank" rel="noopener">{{.T.Get "Learn more"}}</a></span>
+    </div>
+
+{{end}}
+</div>
+
+<!-- END templates/user/favorites.html -->
+{{end}}

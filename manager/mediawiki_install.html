@@ -1,0 +1,19 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* mediawiki's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from mediawiki/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "MediaWiki wiki platform.")}},
+  adminPath: '/index.php?title=Special:UserLogin',
+  steps: [K.steps.where, K.step('site', { title: {{toJSON (.T.Get "Wiki and admin account")}} }), K.steps.db, K.steps.review],
+  summary: ['site_name', 'mediawiki_version', 'admin_username', 'db_name'],
+  fields: [
+    K.text('site_name', {{toJSON (.T.Get "Site name")}}, { value: 'MediaWiki', required: true }),
+    K.version('mediawiki_version', K.panelVersions('mediawiki')),
+    K.user(), K.email(), K.pass()
+  ].concat(K.db('mediawiki')),
+  run: [K.run.pre, K.run.php, K.run.dl('MediaWiki'), K.run.ex(), K.run.db, K.run.step({{toJSON (.T.Get "Running the MediaWiki CLI installer")}}, ['Running MediaWiki CLI installer']), K.run.save(['Deploying admin login helper', 'Registering cron job'])],
+  creds: K.creds()
+}{{end}}

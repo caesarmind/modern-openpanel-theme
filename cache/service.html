@@ -1,0 +1,319 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/cache/service.html -->
+<div class="op-content">
+
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{.Service}}{{if .Port}} · {{.T.Get "port"}} {{.Port}}{{else}} · {{.T.Get "HTTP cache"}}{{end}}</div>
+            <h1 class="op-title">{{.Title}}</h1>
+            <p class="op-meta">{{.Description}}</p>
+        </div>
+        <div class="op-actions">
+            {{if and .IsRunning (index .UserAllowed "docker")}}
+            <a href="/containers?s={{.Service}}" class="op-btn op-btn-secondary">{{template "op_icon" "pencil"}} {{.T.Get "Edit limits"}}</a>
+            {{end}}
+            {{if and .Port (ne .ContainerState "not_found")}}
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <input type="hidden" name="action" value="restart">
+                <button type="submit" class="op-btn op-btn-secondary">{{template "op_icon" "refresh"}} {{.T.Get "Restart"}}</button>
+            </form>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="op-cols-2">
+        <!-- status -->
+        <section class="op-card" aria-labelledby="status">
+            <div class="op-glow" style="right:-260px;top:-300px"></div>
+            <div class="op-card-head">
+                <h2 id="status">{{.T.Get "Status"}}</h2>
+                <span data-status-poll data-status-key="{{.StatusKey}}" data-status-map='{{.StatusMapJSON}}' data-fetch-url="{{.RequestPath}}">
+                    <span id="service-page-status" class="service-status-label op-status {{.StatusTone}}">{{.StatusLabel}}</span>
+                </span>
+            </div>
+            <p class="op-meta" style="margin:0 0 14px">
+                {{if eq .StatusKey "not_found"}}{{.T.Get "The service is turned off. Turn it on to start its container."}}
+                {{else if or (eq .StatusKey "running") (eq .StatusKey "healthy")}}{{.T.Get "The container is running in your account."}}
+                {{else if eq .StatusKey "unhealthy"}}{{.T.Get "The container runs, but its health check fails. Check the log."}}
+                {{else if or (eq .StatusKey "exited") (eq .StatusKey "dead")}}{{.T.Get "The container stopped. Restart it or check the log."}}
+                {{else}}{{.T.Get "The status refreshes on its own while the container changes state."}}{{end}}
+            </p>
+            <form method="post" class="op-pill-toggle">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <input type="hidden" name="action" value="{{if eq .ContainerState "not_found"}}enable{{else}}disable{{end}}">
+                <button type="submit" class="op-switch" role="switch" aria-checked="{{if eq .ContainerState "not_found"}}false{{else}}true{{end}}"
+                    aria-label="{{if eq .ContainerState "not_found"}}{{.T.Get "Click to Enable"}}{{else}}{{.T.Get "Click to Disable"}}{{end}}"></button>
+                <span>{{if eq .ContainerState "not_found"}}{{.T.Get "Disabled, click to enable"}}{{else}}{{.T.Get "Enabled, click to disable"}}{{end}}</span>
+            </form>
+        </section>
+
+        {{if .Port}}
+        <!-- connection -->
+        <section class="op-card" aria-labelledby="port">
+            <div class="op-card-head"><h2 id="port">{{.T.Get "Connection"}}</h2><span class="op-badge">{{.T.Get "TCP"}}</span></div>
+            <dl class="op-dl" style="grid-template-columns:auto minmax(0,1fr);gap:10px 16px">
+                <dt>{{.T.Get "Server:"}}</dt><dd id="service-page-name" class="op-mono" style="margin:0;text-align:right">{{.Service}}</dd>
+                <dt>{{.T.Get "Port:"}}</dt><dd id="service-page-port" class="op-mono" style="margin:0;text-align:right">{{.Port}}</dd>
+                <dt>{{.T.Get "Address"}}</dt><dd class="op-mono" style="margin:0;text-align:right">{{.ConnectAddress}}</dd>
+            </dl>
+            {{with .PingCommand}}
+            <div style="margin-top:12px" x-data="{ copied: false }">
+                <button class="op-cmd" type="button" title="{{$.T.Get "Copy"}}" @click="navigator.clipboard && navigator.clipboard.writeText($el.querySelector('code').textContent).then(() => { copied = true; setTimeout(() => copied = false, 1500) })">
+                    <span x-show="!copied">{{template "op_icon" "copy"}}</span><span x-show="copied" x-cloak>{{template "op_icon" "check"}}</span><code>{{.}}</code>
+                </button>
+            </div>
+            {{end}}
+        </section>
+        {{else}}
+        <!-- varnish stats -->
+        <section class="op-card" aria-labelledby="varnish-cache">
+            <div class="op-card-head"><h2 id="varnish-cache">{{.T.Get "Varnish Cache"}}</h2>{{if .IsRunning}}<span class="op-badge">{{.T.Get "Live"}}</span>{{end}}</div>
+            {{if .IsRunning}}
+            <dl class="op-dl" style="grid-template-columns:auto minmax(0,1fr);gap:10px 16px" x-data="varnishStats()" x-init="fetchStats()">
+                <template x-for="[label, value] in Object.entries(stats)" :key="label">
+                    <div style="display:contents"><dt x-text="statLabels[label] || label"></dt><dd class="op-mono" style="margin:0;text-align:right" x-text="value"></dd></div>
+                </template>
+            </dl>
+
+            <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('varnishStats', () => ({
+                    statLabels: { 'Hit Ratio': '{{.T.Get "Hit Ratio"}}', 'Hits': '{{.T.Get "Hits"}}', 'Misses': '{{.T.Get "Misses"}}', 'Pass': '{{.T.Get "Pass"}}', 'Requests': '{{.T.Get "Requests"}}', 'Backend Requests': '{{.T.Get "Backend Requests"}}', 'Backend Failures': '{{.T.Get "Backend Failures"}}', 'Efficiency Score': '{{.T.Get "Efficiency Score"}}' },
+                    stats: {
+                        'Hit Ratio': '--',
+                        'Hits': '--',
+                        'Misses': '--',
+                        'Pass': '--',
+                        'Requests': '--',
+                        'Backend Requests': '--',
+                        'Backend Failures': '--',
+                        'Efficiency Score': '--'
+                    },
+
+                    async fetchStats() {
+                        try {
+                            const res = await fetch(`/cache/varnish/stats`);
+                            const data = await res.json();
+
+                            if (!data || !data.cache) {
+                                Object.keys(this.stats).forEach(k => this.stats[k] = 'N/A');
+                                return;
+                            }
+
+                            const hitRatio = data.cache.hit_ratio ?? 0;
+
+                            this.stats = {
+                                'Hit Ratio': (hitRatio * 100).toFixed(2) + '%',
+                                'Hits': data.cache.hits ?? 0,
+                                'Misses': data.cache.misses ?? 0,
+                                'Pass': data.cache.pass ?? 0,
+
+                                'Requests': data.traffic?.requests_total ?? 0,
+
+                                'Backend Requests': data.backend?.requests ?? 0,
+                                'Backend Failures': data.backend?.failures ?? 0,
+
+                                'Efficiency Score': data.performance?.efficiency_score >= 80
+                                    ? '🟢 ' + data.performance.efficiency_score
+                                    : '🟠 ' + data.performance.efficiency_score
+                            };
+
+                        } catch (e) {
+                            Object.keys(this.stats).forEach(k => this.stats[k] = 'Error');
+                        }
+                    }
+                }));
+            });
+            </script>
+            {{else}}
+            <p class="op-meta" style="margin:0">{{.T.Get "Hit ratio, requests and backend stats show here once Varnish is running."}}</p>
+            {{end}}
+        </section>
+        {{end}}
+    </div>
+
+    {{if .IsRunning}}
+    <!-- container stats -->
+    <section id="service-page-stats" class="op-kpis" aria-label="{{.T.Get "Container"}}" x-data="containerStats()" x-init="fetchStats()">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{.T.Get "CPU Usage"}}</div><div class="op-kpi-value" x-text="val('CPUPerc')">--</div><div class="op-kpi-note">{{.T.Get "Container CPU"}}</div><div class="op-progress"><span :style="'width:' + pct('CPUPerc') + '%'" style="width:0"></span></div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "db"}} {{.T.Get "Memory Usage"}}</div><div class="op-kpi-value" x-text="part('MemUsage', 0)">--</div><div class="op-kpi-note" x-text="val('MemPerc') + ' · ' + i18n.limit + ' ' + part('MemUsage', 1)">&nbsp;</div><div class="op-progress"><span :style="'width:' + pct('MemPerc') + '%'" style="width:0"></span></div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "globe"}} {{.T.Get "Network I/O"}}</div><div class="op-kpi-value" x-text="part('NetIO', 0)">--</div><div class="op-kpi-note" x-text="i18n.received + ', ' + part('NetIO', 1) + ' ' + i18n.sent">&nbsp;</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "apps"}} {{.T.Get "PIDs"}}</div><div class="op-kpi-value" x-text="val('PIDs')">--</div><div class="op-kpi-note" x-text="i18n.block + ' ' + val('BlockIO')">&nbsp;</div></div>
+    </section>
+
+    <script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('containerStats', () => ({
+            serviceName: {{toJSON .Service}},
+            s: null,
+            failed: false,
+            i18n: { limit: '{{.T.Get "Limit"}}', block: '{{.T.Get "Block I/O"}}', received: '{{.T.Get "received"}}', sent: '{{.T.Get "sent"}}' },
+
+            async fetchStats() {
+                try {
+                    this.s = await window.fetchServiceData(this.serviceName);
+                    if (!this.s) this.failed = true;
+                } catch {
+                    this.failed = true;
+                }
+            },
+            val(key) {
+                if (this.s && this.s[key] !== undefined && this.s[key] !== '') return String(this.s[key]);
+                return this.failed ? 'N/A' : '--';
+            },
+            // "38MiB / 256MiB" -> one side
+            part(key, i) {
+                const v = this.val(key);
+                const bits = v.split(/\s+\/\s+/);
+                return bits.length > 1 ? bits[i].trim() : v;
+            },
+            pct(key) {
+                const n = parseFloat(this.val(key));
+                return isNaN(n) ? 0 : Math.max(0, Math.min(100, n));
+            },
+        }));
+    });
+    </script>
+    {{end}}
+
+    {{if not .Port}}
+    <!-- varnish domains -->
+    <section class="op-card" aria-labelledby="domains" x-data="{ searchQuery: '', domains: {{toJSON .VarnishDomainNames}} }">
+        <div class="op-card-head"><h2 id="domains">{{.T.Get "Domains"}}</h2></div>
+        <p class="op-meta" style="margin:-4px 0 12px">{{.T.Get "Enable/disable Varnish cache per domain."}}</p>
+        {{if .VarnishDomains}}
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search domains"}}" aria-label="{{.T.Get "Search domains"}}"></label>
+        </div>
+        <div class="op-table-wrap">
+            <table class="op-table">
+                <thead>
+                    <tr>
+                        <th scope="col">{{.T.Get "Domain Name"}}</th>
+                        <th scope="col" class="is-shrink">{{.T.Get "Status"}}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{$csrf := .CSRFToken}}
+                {{range .VarnishDomains}}
+                    <tr x-show="searchQuery === '' || {{toJSON .DomainURL}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
+                        <td><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-indigo)">{{template "op_icon" "globe"}}</span><div><b>{{.DomainURL}}</b></div></div></td>
+                        <td class="is-shrink" data-label="{{$.T.Get "Status"}}" x-data="{ enabled: {{if eq .Status "On"}}true{{else}}false{{end}} }">
+                            <form method="post" class="op-pill-toggle">
+                                <input type="hidden" name="csrf_token" value="{{$csrf}}"/>
+                                <input type="hidden" name="action" value="domain">
+                                <input type="hidden" name="domain_name" value="{{.DomainURL}}">
+
+                                <input type="hidden" name="varnish_action" :value="enabled ? 'Off' : 'On'">
+
+                                <button type="submit"
+                                    @click.prevent="enabled = !enabled; $event.target.form.submit()"
+                                    :aria-checked="enabled" role="switch" class="op-switch" aria-label="{{$.T.Get "Varnish cache for"}} {{.DomainURL}}">
+                                </button>
+                                <span x-text="enabled ? '{{$.T.Get "On"}}' : '{{$.T.Get "Off"}}'">{{if eq .Status "On"}}{{$.T.Get "On"}}{{else}}{{$.T.Get "Off"}}{{end}}</span>
+                            </form>
+                        </td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="op-empty" x-show="searchQuery && !domains.some(d => d.toLowerCase().includes(searchQuery.toLowerCase()))" x-cloak><b>{{.T.Get "Nothing matches"}}</b><span class="op-hint">{{.T.Get "Try another search."}}</span></div>
+        <div class="op-tfoot"><span>{{.T.Get "Domains:"}} {{len .VarnishDomains}}</span></div>
+        {{else}}
+        <div class="op-empty"><b>{{.T.Get "No domains yet."}}</b><a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Add a domain"}}</a></div>
+        {{end}}
+    </section>
+    {{end}}
+
+    {{if .IsRunning}}
+    <!-- logs -->
+    <section class="op-card" aria-labelledby="logs" x-data="logViewer()" x-init="checkLogHealth()">
+        <div class="op-card-head">
+            <h2 id="logs">{{.T.Get "Logs"}}</h2>
+            <button type="button" @click="fetchLogs" x-text="buttonText" :disabled="loading" id="service-log" class="op-btn op-btn-ghost op-btn-sm"></button>
+        </div>
+        <p class="op-meta" style="margin:0" x-show="!showLogs">{{.T.Get "View logs for the service."}}</p>
+        <div x-show="showLogs" x-cloak x-transition id="log-container">
+            <div class="op-editor" style="max-height:260px">
+                <div class="op-gutter"><template x-for="n in lineCount()" :key="n"><div x-text="n"></div></template></div>
+                <pre id="log-content" x-text="logContent"></pre>
+            </div>
+            <div class="op-editor-bar"><span x-text="lineCount() + ' ' + {{toJSON (.T.Get "lines")}}"></span><span class="op-mono">docker logs {{.Service}}</span></div>
+        </div>
+
+        <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('logViewer', () => ({
+                showLogs: false,
+                logContent: '',
+                buttonText: {{toJSON (.T.Get "View container log")}},
+                loading: false,
+                serviceName: {{toJSON .Service}},
+
+                lineCount() {
+                    return this.logContent ? this.logContent.replace(/\n+$/, '').split('\n').length : 0;
+                },
+
+                async checkLogHealth() {
+                    try {
+                        const response = await fetch(`/json/containers/log/${this.serviceName}`, {
+                            headers: { 'X-CSRF-Token': csrf_token },
+                        });
+                        if (!response.ok) return;
+                        const data = await response.text();
+                        this.logContent = data;
+                        // the log is already here for the health check, so it shows right away
+                        if (data) { this.showLogs = true; this.buttonText = {{toJSON (.T.Get "Refresh")}}; }
+                        if (typeof reportHealthIssues !== 'function' || !data) return;
+                        const errorLines = data.split('\n').filter(function (line) {
+                            return /\b(error|fatal|failed|denied|refused|exception|panic|critical)\b/i.test(line);
+                        });
+                        if (errorLines.length) {
+                            reportHealthIssues('service-log:' + this.serviceName, [{
+                                id: 'log-errors:' + this.serviceName,
+                                severity: 'warning',
+                                message: {{toJSON (.T.Get "Service")}} + ' ' + this.serviceName + ' ' + {{toJSON (.T.Get "log contains")}} + ' ' + errorLines.length + ' ' + {{toJSON (.T.Get "error line(s). Check the log.")}},
+                            }], 24);
+                        }
+                    } catch (error) {
+                        // background check, ignore failures
+                    }
+                },
+
+                async fetchLogs() {
+                    this.loading = true;
+                    this.buttonText = {{toJSON (.T.Get "Loading...")}};
+
+                    try {
+                        const response = await fetch(`/json/containers/log/${this.serviceName}`, {
+                            headers: { 'X-CSRF-Token': csrf_token },
+                        });
+
+                        if (!response.ok) throw new Error('Request failed');
+
+                        const data = await response.text();
+                        this.logContent = data || {{toJSON (.T.Get "No logs available.")}};
+                        this.buttonText = {{toJSON (.T.Get "Refresh")}};
+                    } catch (error) {
+                        this.logContent = {{toJSON (.T.Get "No logs.")}};
+                        this.buttonText = {{toJSON (.T.Get "Click to retry")}};
+                    } finally {
+                        this.showLogs = true;
+                        this.loading = false;
+                    }
+                },
+            }));
+        });
+        </script>
+    </section>
+    {{end}}
+
+</div>
+<!-- END templates/cache/service.html -->
+{{end}}

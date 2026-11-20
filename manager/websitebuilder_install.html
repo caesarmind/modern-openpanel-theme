@@ -1,0 +1,38 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/websitebuilder_install.html -->
+<div class="op-content">
+{{if .Domains}}
+{{template "op_iw_kit" .}}
+<script>
+(function () {
+  var K = window.opIWKit;
+  // run checkpoints mirror websites/websitebuilder_render.go, the done screen opens the builder
+  window.opIWConfig = {
+    slug: 'websitebuilder', name: {{toJSON (.T.Get "Website Builder")}}, title: {{toJSON (.T.Get "Website Builder")}}, cta: {{toJSON (.T.Get "Create website")}},
+    desc: {{toJSON (.T.Get "Build a new HTML website using a drag-and-drop builder.")}}, endpoint: '/website-builder/install', logo: {{toJSON (static "images/apps/websitebuilder.svg")}},
+    domains: {{toJSON .Domains}}, strength: {{.PasswordStrength}}, t: K.t,
+    note: {{toJSON (.T.Get "Starts with an empty index.html and style.css, then opens in the builder.")}},
+    success: ['Website creation completed'], managerLabel: {{toJSON (.T.Get "Open Website Builder")}},
+    manager: function (vm) { var d = vm.dom(); var sub = vm.subdir.replace(/\/+$/, ''); return '/website-builder/edit?domain=' + encodeURIComponent(d ? d.DomainURL : '') + (sub ? '/' + encodeURIComponent(sub) : ''); },
+    steps: [K.steps.where, K.steps.review],
+    fields: [],
+    run: [K.run.step({{toJSON (.T.Get "Creating files")}}, ['Creating files']), K.run.step({{toJSON (.T.Get "Setting file permissions")}}, ['Setting files permissions']), K.run.step({{toJSON (.T.Get "Setting file ownership")}}, ['Setting files owner']), K.run.step({{toJSON (.T.Get "Saving to Site Manager")}}, ['Saving website information'])],
+    creds: []
+  };
+})();
+</script>
+{{template "op_install_wizard" .}}
+{{else}}
+<div class="op-card op-empty op-block-card">
+    <p class="op-strong">{{.T.Get "No domains yet"}}</p>
+    <p class="op-hint">{{.T.Get "Add your first domain to get started"}}</p>
+    <a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}}{{.T.Get "New domain"}}</a>
+</div>
+{{end}}
+</div>
+<!-- END templates/manager/websitebuilder_install.html -->
+{{end}}

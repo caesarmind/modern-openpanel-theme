@@ -1,0 +1,16 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* tinyfilemanager's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from tinyfilemanager/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Single-file web-based file manager with login protection, no database required.")}},
+  adminPath: '/tinyfilemanager.php',
+  note: {{toJSON (.T.Get "No database: the login you set here is written into tinyfilemanager.php.")}},
+  steps: [K.steps.where, K.step('site', { label: {{toJSON (.T.Get "Login")}}, title: {{toJSON (.T.Get "Login")}}, desc: {{toJSON (.T.Get "The account that protects the file manager.")}} }), K.steps.review],
+  summary: ['admin_username'],
+  fields: [K.user(), K.pass()],
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Downloading TinyFileManager")}}, ['Downloading TinyFileManager', 'Hashing admin password', 'Writing admin credentials', 'Setting files permissions']), K.run.save()],
+  creds: [{ label: {{toJSON (.T.Get "Username")}}, field: 'admin_username', from: 'user' }, { label: {{toJSON (.T.Get "Password")}}, field: 'admin_password', from: 'pass', secret: true }]
+}{{end}}

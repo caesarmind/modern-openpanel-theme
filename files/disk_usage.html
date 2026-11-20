@@ -1,0 +1,112 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/disk_usage.html -->
+<section class="op-content" aria-label="{{.T.Get "Disk Usage Header"}}">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">/home/{{.CurrentUsername}}{{range .Breadcrumbs}}/{{.Name}}{{end}}</div>
+            <h1 class="op-title">{{.T.Get "Disk Usage"}}</h1>
+            <p class="op-meta">{{.T.Get "Find what takes up space or file count, then open it in the File Manager."}}</p>
+        </div>
+        <div class="op-actions">
+            <div class="op-segmented" role="group" aria-label="{{.T.Get "Measure"}}">
+                <a href="/disk-usage/" role="button" aria-pressed="true">{{.T.Get "Disk space"}}</a>
+                <a href="/inodes-explorer/" role="button" aria-pressed="false">{{.T.Get "Inodes"}}</a>
+            </div>
+        </div>
+    </div>
+
+    {{with .KPIs}}
+    <section class="op-kpis" aria-label="{{$.T.Get "Summary"}}">
+        {{with .Disk}}<div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "server"}} {{$.T.Get "Disk"}}</div><div class="op-kpi-value">{{.Value}} <small>{{.Unit}}</small></div><div class="op-kpi-note">{{if .FromListing}}{{$.T.Get "Home folder total"}}{{else if .Limit}}{{$.T.Get "of"}} {{.Limit}}{{else}}{{$.T.Get "No limit"}}{{end}}</div>{{if .Limit}}<div class="op-progress{{if ge .Pct 90}} is-danger{{else if ge .Pct 75}} is-warning{{end}}"><span style="width:{{.Pct}}%"></span></div>{{end}}</div>{{end}}
+        {{with .Inodes}}<div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "file"}} {{$.T.Get "Inodes"}}</div><div class="op-kpi-value">{{.Value}}</div><div class="op-kpi-note">{{if .Limit}}{{$.T.Get "of"}} {{.Limit}}{{else}}{{$.T.Get "No limit"}}{{end}}</div>{{if .Limit}}<div class="op-progress{{if ge .Pct 90}} is-danger{{else if ge .Pct 75}} is-warning{{end}}"><span style="width:{{.Pct}}%"></span></div>{{end}}</div>{{end}}
+        {{with .LargestFolder}}<div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "folder"}} {{$.T.Get "Largest folder"}}</div><div class="op-kpi-value" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="{{.Href}}" style="color:inherit;text-decoration:none" title="{{.Directory}}">{{.Directory}}</a></div><div class="op-kpi-note">{{$.KPIs.LargestSize}}</div></div>{{end}}
+        {{with .Trash}}<div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "trash"}} {{$.T.Get "Trash"}}</div><div class="op-kpi-value">{{.Value}} <small>{{.Unit}}</small></div>{{if $.KPIs.TrashBytes}}<div class="op-kpi-note is-warning">{{if $.KPIs.TrashHref}}<a href="{{$.KPIs.TrashHref}}" style="color:inherit">{{$.T.Get "Empty it to free space"}}</a>{{else}}{{$.T.Get "Empty it to free space"}}{{end}}</div>{{else}}<div class="op-kpi-note">{{$.T.Get "Trash is empty"}}</div>{{end}}</div>{{end}}
+    </section>
+    {{end}}
+
+    <div class="op-cols-2">
+    <section class="op-card op-du">
+        <div class="op-card-head">
+            <h2>{{.T.Get "Folders by size"}}</h2>
+            <button type="button" onclick="location.reload(true); return false;" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "refresh"}} {{.T.Get "Rescan"}}</button>
+        </div>
+        <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-du-crumbs">
+            {{if .ShowUpLink}}<a id="goUp" class="op-icon-btn" href="{{.UpLink}}" title="{{.T.Get "Up One Level"}}" aria-label="{{.T.Get "Up One Level"}}">{{template "op_icon" "cornerup"}}</a>{{end}}
+            <a class="op-tag op-mono" href="/disk-usage/">{{.CurrentUsername}}</a>
+            {{range .Breadcrumbs}}<span class="op-hint">/</span><a class="op-tag op-mono" href="{{.Path}}"{{if .Last}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}
+        </nav>
+        <ul class="op-du-list" id="folders_to_navigate">
+            {{range .Rows}}
+            <li data-size="{{.Count}}">
+                <div class="op-du-row">
+                    <a class="op-du-name" href="{{.Href}}"><span class="op-file-ico fm-folder">{{template "op_icon" "folder"}}</span><span>{{.Directory}}</span></a>
+                    <span class="op-mono op-du-size">{{.Count}}</span>
+                    {{if .FileManagerHref}}<a class="op-icon-btn op-du-open" href="{{.FileManagerHref}}" title="{{$.T.Get "File Manager"}}" aria-label="{{$.T.Get "File Manager"}}">{{template "op_icon" "out"}}</a>{{end}}
+                </div>
+                <span class="op-progress op-du-bar"><span style="width:0%"></span></span>
+            </li>
+            {{else}}
+            <li class="op-du-empty"><span class="op-hint">{{.T.Get "No folders here."}}</span></li>
+            {{end}}
+        </ul>
+    </section>
+
+    <section class="op-card" aria-labelledby="du-largest" x-data="largestFiles()">
+        <div class="op-card-head"><h2 id="du-largest">{{.T.Get "Largest files"}}</h2>{{if index .UserAllowed "filemanager"}}<a href="/files/">{{.T.Get "Open File Manager"}}</a>{{end}}</div>
+        <p class="op-hint" style="margin:0 0 8px">{{.T.Get "Files over 1 MB in this folder and below."}}</p>
+        <p class="op-hint" x-show="loading">{{.T.Get "Looking for large files…"}}</p>
+        <p class="op-hint" x-show="!loading && failed" x-cloak>{{.T.Get "Not available"}}</p>
+        <p class="op-hint" x-show="!loading && !failed && !files.length" x-cloak>{{.T.Get "No files over 1 MB here."}}</p>
+        <div class="op-bars" x-show="files.length" x-cloak>
+            <template x-for="f in files" :key="f.path">
+                <div class="op-bar-row">
+                    {{/* rtl so a long path is cut at the start and the file name stays visible */}}<span class="op-mono" style="font-size:12.5px;display:block;direction:rtl;text-align:left" :title="f.path"><a x-show="f.file_manager_href" :href="f.file_manager_href" style="color:inherit;text-decoration:none;unicode-bidi:plaintext" x-text="f.path"></a><span x-show="!f.file_manager_href" style="unicode-bidi:plaintext" x-text="f.path"></span></span>
+                    <b x-text="f.size"></b>
+                    <div class="op-progress"><span :style="{ width: f.pct + '%' }"></span></div>
+                </div>
+            </template>
+        </div>
+        <p class="op-hint" x-show="partial" x-cloak style="margin:8px 0 0">{{.T.Get "The search stopped after 10 seconds, so this list may be incomplete."}}</p>
+    </section>
+    </div>
+</section>
+
+<script>
+function largestFiles() {
+    return {
+        files: [], loading: true, failed: false, partial: false,
+        init() {
+            fetch(location.pathname + '?largest=1')
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(d => { this.files = d.files || []; this.partial = !!d.partial; })
+                .catch(() => { this.failed = true; })
+                .finally(() => { this.loading = false; });
+        },
+    };
+}
+</script>
+
+<script>
+// bars are sized against the biggest folder on the page
+(function () {
+    function parse(v) {
+        const m = String(v).trim().match(/^(\d+(?:\.\d+)?)\s*([BKMGT])?/i);
+        if (!m) return 0;
+        const n = parseFloat(m[1]);
+        return n * ({ B: 1, K: 1024, M: 1048576, G: 1073741824, T: 1099511627776 }[(m[2] || '').toUpperCase()] || 1);
+    }
+    const rows = [...document.querySelectorAll('#folders_to_navigate li[data-size]')];
+    const sizes = rows.map(r => parse(r.dataset.size));
+    const max = Math.max(1, ...sizes);
+    rows.forEach((r, i) => { const bar = r.querySelector('.op-du-bar span'); if (bar) bar.style.width = Math.max(1, Math.round(sizes[i] * 100 / max)) + '%'; });
+    // du prints 9.2G, show it as 9.2 GB
+    document.querySelectorAll('#folders_to_navigate .op-du-size').forEach(el => { el.textContent = el.textContent.trim().replace(/^([0-9.,]+)\s*([KMGTP])$/i, (m, n, u) => n + ' ' + u.toUpperCase() + 'B'); });
+})();
+</script>
+<!-- END templates/files/disk_usage.html -->
+{{end}}

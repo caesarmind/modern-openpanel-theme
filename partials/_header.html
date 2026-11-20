@@ -1,0 +1,237 @@
+{{define "header"}}<!-- START templates/partials/_header.html -->
+    <header id="main_header" class="op-topbar op-panel-topbar">
+
+
+                  <!-- Left Section -->
+                  <div class="op-topbar-left">
+                    <button id="sidebar_toggle_button" type="button" onclick="toggleSidebar()" class="op-icon-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                        <path d="M9 3v18"></path>
+                    </svg>
+                    <span class="op-sr">{{.T.Get "Toggle Sidebar"}}</span>
+                    </button>
+                    <span class="op-topbar-sep" aria-hidden="true"></span>
+                    {{if eq .MenuStyle "modern"}}
+                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs">
+                        {{if .NavTrail}}
+                        <ol role="list">
+                            {{$last := sub (len .NavTrail) 1}}
+                            {{range $i, $c := .NavTrail}}
+                            {{/* on phones only the current page fits */}}
+                            <li{{if lt $i $last}} class="op-crumb-parent"{{end}}>
+                                {{if $i}}<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>{{end}}
+                                {{if $c.Href}}
+                                <a href="{{$c.Href}}">{{$.T.Get $c.Label}}</a>
+                                {{else}}
+                                <span aria-current="page">{{$.T.Get $c.Label}}</span>
+                                {{end}}
+                            </li>
+                            {{end}}
+                        </ol>
+                        {{end}}
+                    </nav>
+                    {{else}}
+                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs">
+                        <ol role="list" x-data="navMenu('{{.RequestPath}}')">
+
+                        <ul>
+                            <template x-for="item in items" :key="item.label">
+                                <li x-show="item.show">
+                                    <a x-show="item.href !== '#'" :href="item.href" x-text="item.label"></a>
+                                    <span x-show="item.href === '#'" x-text="item.label"></span>
+                                </li>
+                            </template>
+                        </ul>
+
+                        <script>
+                            function navMenu(currentPath) {
+                                return {
+                                    // True when the visible section item's own link IS the
+                                    // current page (e.g. on /sites itself, not a sub-page
+                                    // like /website?domain=...) - the page's own .Title
+                                    // breadcrumb leaf is suppressed in that case so the bar
+                                    // doesn't show the same page twice ("Sites" then "Websites").
+                                    isSectionRoot() {
+                                        return this.items.some(i => i.show && i.href === currentPath);
+                                    },
+                                    items: [
+                                        {
+                                            label: "{{.T.Get "Dashboard"}}",
+                                            href: "/dashboard",
+                                            show: currentPath.startsWith('/dashboard/')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Files"}}",
+                                            href: "/files",
+                                            show: [
+                                                '/files',
+                                                '/file-manager/edit-file',
+                                                '/file-manager/view-file',
+                                                '/disk-usage',
+                                                '/inodes-explorer',
+                                                '/malware-scanner',
+                                                '/ftp',
+                                                '/fix-permissions',
+                                                '/file-manager/upload',
+                                                '/files.trash',
+                                            ].some(p => currentPath.startsWith(p)),
+                                        },
+                                        {
+                                            label: "{{.T.Get "Services"}}",
+                                            href: "/services",
+                                            show: currentPath.startsWith('/services/')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Caching"}}",
+                                            href: "#",
+                                            show: currentPath.startsWith('/cache')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Emails"}}",
+                                            href: "/emails",
+                                            show: currentPath.startsWith('/email')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Domains"}}",
+                                            href: "/domains",
+                                            show: currentPath.startsWith('/domain')
+                                        },
+                                        {
+                                            label: "{{.T.Get "MySQL"}}",
+                                            href: "/mysql",
+                                            show: currentPath.startsWith('/mysql')
+                                        },
+                                        {
+                                            label: "{{.T.Get "PostgreSQL"}}",
+                                            href: "/postgresql",
+                                            show: currentPath.startsWith('/postgresql')
+                                        },
+                                        {
+                                            label: "{{.T.Get "MongoDB"}}",
+                                            href: "/mongodb",
+                                            show: currentPath.startsWith('/mongodb')
+                                        },
+                                        {
+                                            label: "{{.T.Get "PHP"}}",
+                                            href: "/php/domains",
+                                            show: currentPath.startsWith('/php')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Containers"}}",
+                                            href: "/containers",
+                                            show: currentPath.startsWith('/containers')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Advanced"}}",
+                                            href: "#",
+                                            show: ['/server', '/cronjobs', '/process-manager', '/security/ip-blocker'].some(p => currentPath.startsWith(p))
+                                        },
+                                        {
+                                            label: "{{.T.Get "Account"}}",
+                                            href: "/account",
+                                            show: currentPath.startsWith('/account')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Backups"}}",
+                                            href: "/backups",
+                                            show: currentPath.startsWith('/backup')
+                                        },
+                                        {
+                                            label: "{{.T.Get "Sites"}}",
+                                            href: "/sites",
+                                            show: [
+                                                '/sites',
+                                                '/pm2',
+                                                '/nodejs',
+                                                '/python',
+                                                '/website-builder',
+                                                '/wordpress',
+                                                '/auto-installer',
+                                                '/website',
+                                            ].some(p => currentPath.startsWith(p)) || currentPath === '/git'
+                                        }
+                                    ]
+                                }
+                            }
+                        </script>
+{{if ne .RequestPath "/"}}
+                            {{if .Title}}
+                            <template x-if="!isSectionRoot() && items.some(i => i.show)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+                            </template>
+                            <template x-if="!isSectionRoot()">
+                            <li><a aria-current="page" href="{{.RequestPath}}">{{.Title}}</a></li>
+                            </template>
+                            {{end}}
+{{end}}
+                        </ol>
+                    </nav>
+                    {{end}}
+                  </div>
+                  <!-- END Left Section -->
+
+                  <!-- Right Section -->
+                  <div class="op-topbar-right">
+
+                    {{if and .UserAllowed.services (not (hasPrefix .RequestPath "/services"))}}
+                        {{template "service" .}}
+                    {{end}}
+
+                    {{if .UserAllowed.favorites}}
+                    <!-- Favorites: one click pins the page to the sidebar, another click takes it off -->
+                    <button type="button" class="op-icon-btn op-fav-btn" id="addFavoriteBtn" aria-pressed="false" title="{{.T.Get "Add to favorites"}}" aria-label="{{.T.Get "Add to favorites"}}">{{template "op_icon" "star"}}</button>
+                    <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const btn = document.getElementById('addFavoriteBtn');
+                        if (!btn) return;
+                        const here = window.location.pathname + window.location.search + window.location.hash;
+                        const isFav = () => (window.userFavorites || []).some(f => '/' + f.link === here);
+                        const paint = () => {
+                            const on = isFav();
+                            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                            btn.dataset.isFavorite = on;
+                            btn.title = on ? "{{.T.Get "Remove from favorites"}}" : "{{.T.Get "Add to favorites"}}";
+                            btn.setAttribute('aria-label', btn.title);
+                        };
+                        window.addEventListener('favorites-loaded', paint);
+                        paint();
+                        // right-click only removes, like the classic star
+                        btn.addEventListener('contextmenu', e => { if (isFav()) { e.preventDefault(); btn.click(); } });
+                        btn.addEventListener('click', () => {
+                            const on = isFav();
+                            const body = on ? { link: here } : { link: here, title: document.title.split(' - ')[0] };
+                            fetch('/json/favorites', {
+                                method: on ? 'DELETE' : 'PUT',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf_token },
+                                body: JSON.stringify(body)
+                            })
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d && d.error) { showToast(d.error, 'error'); return; }
+                                showToast(on ? "{{.T.Get "Successfully removed from favorites!"}}" : "{{.T.Get "Successfully added to favorites!"}}", 'success');
+                                loadFavorites();
+                            })
+                            .catch(() => showToast(on ? "{{.T.Get "Failed to remove favorite."}}" : "{{.T.Get "Failed to add favorite."}}", 'error'));
+                        });
+                    });
+                    </script>
+                    {{end}}
+
+                    {{if .UserAllowed.ai_assistant}}
+                        {{template "ai_assistant" .}}
+                    {{end}}
+
+                    {{template "search" .}}
+
+                    <!-- light/dark switch, same as the Theme row in the user menu -->
+                    <button type="button" class="op-icon-btn op-theme-btn" aria-label="{{.T.Get "Switch theme"}}" title="{{.T.Get "Switch theme"}}"
+                        onclick="var t = document.getElementById('theme-toggle'); if (t) { t.click(); } else { var d = document.documentElement.classList.toggle('dark'); localStorage.setItem('color-theme', d ? 'dark' : 'light'); }">
+                        <span class="op-theme-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/></svg></span><span class="op-theme-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></svg></span>
+                    </button>
+                  </div>
+                  <!-- END Right Section -->
+
+    </header>
+<!-- END templates/partials/_header.html -->
+{{end}}

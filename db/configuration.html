@@ -1,0 +1,51 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/db/configuration.html -->
+
+<script src="{{static "js/db-tuning.js"}}"></script>
+
+<div class="op-content" aria-label="{{.T.Get "Settings"}}" x-data="dbTuning('/{{.Engine.Slug}}/configuration/recommendations')" x-init="load()">
+<form method="post" x-ref="form" class="op-col">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get .Engine.ConfigTitle}}</h1>
+            <p class="op-meta">{{.T.Get .Engine.ConfigIntro}}{{if eq .Engine.Slug "mysql"}} {{.T.Get "For more information"}}, <a href="https://openpanel.com/docs/panel/mysql/configuration/" target="_blank" rel="noopener" style="color:var(--color-accent-text)">{{.T.Get "read the documentation"}}</a>.{{end}}</p>
+        </div>
+        <div class="op-actions"><button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save Changes"}}</button></div>
+    </div>
+
+    {{template "db_tuning_banner" (dict "T" .T "Title" "Optimize Database" "Intro" "Want to improve your database's performance? Click the optimize icon next to a setting to see a custom recommendation." "Checking" "Checking your database for possible optimizations...")}}
+
+    <section class="op-card" aria-label="{{.T.Get "Settings"}}">
+        <div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search"}}" aria-label="{{.T.Get "Search settings"}}"></label></div>
+        <div class="op-table-wrap">
+            <table id="{{.Engine.Slug}}-config-table" class="op-table">
+                <thead><tr><th scope="col">{{.T.Get "Setting"}}</th><th scope="col">{{.T.Get "Value"}}</th><th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Optimize"}}</span></th></tr></thead>
+                <tbody>
+                  {{$config := .CurrentConfig}}
+                  {{range .DefaultKeys}}
+                  {{$key := .}}
+                  {{$val := index $config $key}}
+                  <tr x-show="searchQuery === '' || {{toJSON $key}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON $val}}.toLowerCase().includes(searchQuery.toLowerCase())">
+                    <td class="op-cell-title"><div><b class="op-mono" style="font-size:13px">{{$key}}</b><span class="op-sub" x-show="byKey({{toJSON $key}})" x-cloak x-text="byKey({{toJSON $key}}) ? (byKey({{toJSON $key}}).label || {{toJSON $key}}) + ': ' + byKey({{toJSON $key}}).current + ' ' + {{toJSON ($.T.Get "now")}} + ', ' + byKey({{toJSON $key}}).recommended + ' ' + {{toJSON ($.T.Get "suggested")}} : ''"></span></div></td>
+                    <td data-label="{{$.T.Get "Value"}}"><input type="text" id="{{$key}}" name="{{$key}}" value="{{$val}}" placeholder="default" :class="applied[{{toJSON $key}}] ? 'is-applied' : ''" class="op-input op-mono" style="height:34px;max-width:260px" aria-label="{{$key}}"></td>
+                    <td class="is-shrink">{{template "db_tuning_button" (dict "Key" $key "T" $.T)}}</td>
+                  </tr>
+                  {{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="op-tfoot"><span>{{len .DefaultKeys}} {{.T.Get "settings"}}</span></div>
+    </section>
+</form>
+
+    {{template "db_tuning_dialog" .}}
+</div>
+
+<!-- END templates/db/configuration.html -->
+{{end}}

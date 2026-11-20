@@ -1,0 +1,210 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/confirm_import.html -->
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Import Emails"}}</h1>
+        <p class="op-meta"> {{.T.Get "Import email accounts from .xls or .csv files."}}</p>
+    </header>
+</div>
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+    <form class="mt-8" id="addDomainForm" method="POST" action="/emails/import/confirm">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+        <div class="op-form-grid">
+
+
+            <div class="op-field-wrap">
+            {{if .InvalidUsers}}
+<div class="op-alert is-danger op-mb"><div class="flex items-start"><span class="font-semibold">{{.T.Get "⚠️ The following addresses will be skipped:"}}</span></div><div class="overflow-y-auto mt-2">
+                    <ul class="text-sm">
+                        {{range .InvalidUsers}}
+                            <li>
+                                {{.Email}} —
+                                {{if not .DomainValid}} {{$.T.Get "domain does not exist"}}{{end}}
+                                {{if .EmailExists}} {{$.T.Get "address already exists"}}{{end}}
+                            </li>
+                        {{end}}
+                    </ul>
+    </div></div>
+            {{end}}
+            </div>
+
+
+            {{if .ValidUsers}}
+            <div class="op-field-wrap">
+
+                     <label for="domain" class="op-label op-label-row">{{.T.Get "The following users will be imported:"}}</label>
+                    <table class="op-table is-plain op-mt">
+                        <thead>
+                            <tr class="op-thead">
+                            <th class="op-td">{{.T.Get "Email"}}</th>
+                            <th class="op-td">{{.T.Get "Password"}}</th>
+                            <th class="op-td">{{.T.Get "Quota"}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .ValidUsers}}
+                            <tr>
+                                <td class="op-td">{{.Email}}</td>
+                                <td class="op-td">{{.Password}}</td>
+                                <td class="op-td">{{if .Quota}}{{.Quota}}{{else}}—{{end}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+
+            </div>
+            {{else}}
+            {{.T.Get "No Accounts to Import"}}
+            {{end}}
+
+
+        </div>
+
+        <div class="op-sep"><div class="op-divider"></div></div>
+
+<div class="op-actions op-actions-end">
+    <a href="/emails/import" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Upload"}}
+    </a>
+    {{if .ValidUsers}}
+    <button type="submit" id="installButton" class="op-btn op-btn-primary">{{.T.Get "Start Import"}}<svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+        </svg>
+    </button>
+    {{end}}
+</div>
+
+    </form>
+</div>
+<!-- END form -->
+
+
+<!-- .CrawlerStatusCard.active spin animation now lives globally in base.html -->
+
+<!-- progress text -->
+<div class="sm:mx-auto p-6 m-6">
+<pre id="statusMessage" class="op-pre hidden">
+</pre>
+<div>
+<!-- END progress text -->
+
+
+<!-- js for submit and validation -->
+<script>
+const addDomainForm = document.getElementById("addDomainForm");
+
+addDomainForm.addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    const installButton = event.target.querySelector("#installButton");
+
+    document.getElementById("toAddActive").classList.add("active");
+
+    const button = document.getElementById("installButton");
+    button.disabled = true;
+    button.innerText = {{toJSON (.T.Get "Importing...")}};
+
+    const statusMessageDiv = document.getElementById("statusMessage");
+    statusMessageDiv.classList.remove("hidden");
+    statusMessageDiv.innerText = "";
+
+    const formData = new FormData(addDomainForm);
+
+    let toastDisplayed = false;
+
+    const toastMessage = {{toJSON (.T.Get "Starting import. Please wait for the process to finish.")}};
+    showToast(toastMessage, 'loading');
+
+    fetch("/emails/import/confirm", {
+        method: "POST",
+        body: formData,
+    })
+    .then(response => {
+        if (!response.ok) {
+            const toastMessage = {{toJSON (.T.Get "Network response from backend was not ok. Please contact support.")}};
+            showToast(toastMessage, 'error');
+            toastDisplayed = true;
+            throw new Error("Network response was not ok.");
+        }
+        return response.body;
+    })
+    .then(stream => {
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        return new ReadableStream({
+            start(controller) {
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            controller.close();
+                            return;
+                        }
+                        const text = decoder.decode(value);
+
+                        if (
+                            !(
+                                text.toLowerCase().includes("working outside of request context") ||
+                                text.toLowerCase().includes("an active http request") ||
+                                text.toLowerCase().includes("consult the documentation")
+                            )
+                        ) {
+                            statusMessageDiv.innerText += text;
+                            statusMessageDiv.scrollTop = statusMessageDiv.scrollHeight;
+                        }
+
+                        if (text.toLowerCase().includes("import complete") && !toastDisplayed) {
+                            const toastMessage = {{toJSON (.T.Get "Import process completed.")}};
+                            showToast(toastMessage, 'success');
+                            toastDisplayed = true;
+                            document.getElementById("toAddActive").classList.remove("active");
+
+                            statusMessageDiv.style.display = "flex";
+                            button.disabled = false;
+                            button.innerText = {{toJSON (.T.Get "Start Import")}};
+                        } else if (text.toLowerCase().includes("error") && !toastDisplayed) {
+                            const toastMessage = {{toJSON (.T.Get "Error occurred during import.")}} + " " + {{toJSON (.T.Get "Please check the output below.")}};
+                            showToast(toastMessage, 'warning');
+                            toastDisplayed = true;
+                            document.getElementById("toAddActive").classList.remove("active");
+
+                            statusMessageDiv.style.display = "flex";
+                            button.disabled = false;
+                            button.innerText = {{toJSON (.T.Get "Retry Import")}};
+                        }
+
+                        read();
+                    }).catch(err => {
+                        console.error("Error reading stream", err);
+                    });
+                }
+                read();
+            }
+        });
+    })
+    .catch(error => {
+        console.error("Fetch error: ", error);
+        if (!toastDisplayed) {
+            const toastMessage = {{toJSON (.T.Get "A network error occurred. Please try again.")}};
+            showToast(toastMessage, 'error');
+            toastDisplayed = true;
+            document.getElementById("toAddActive").classList.remove("active");
+            statusMessageDiv.style.display = "flex";
+            button.disabled = false;
+            button.innerText = {{toJSON (.T.Get "Retry Import")}};
+        }
+    });
+});
+</script>
+<!-- END js for submit and validation -->
+
+
+<!-- END templates/emails/confirm_import.html -->
+{{end}}

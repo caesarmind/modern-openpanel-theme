@@ -1,0 +1,180 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/clamav/quarantine.html -->
+
+<section class="op-content" aria-label="{{.T.Get "Files Header"}}" x-data="{ searchQuery: '' }">
+<div class="op-page-head">
+    <div>
+        <div class="op-eyebrow">{{.T.Get "Malware Scanner"}}</div>
+        <h1 class="op-title">{{.T.Get "Quarantine"}}</h1>
+        <p class="op-meta">{{.T.Get "Files that were detected by ClamAV as malicious and placed in quarantine."}}</p>
+    </div>
+    <div class="op-actions">
+        <a href="/malware-scanner/logs" class="op-btn op-btn-secondary">{{template "op_icon" "history"}} {{.T.Get "Scan Logs"}}</a>
+        <a href="/malware-scanner" class="op-btn op-btn-primary">{{template "op_icon" "bug"}} {{.T.Get "Run Scan"}}</a>
+    </div>
+</div>
+
+
+{{if not .QuarantineFiles}}
+<!-- no files -->
+<div class="op-card op-empty">
+    <span class="op-ico-tile">{{template "op_icon" "shieldcheck"}}</span>
+    <b>{{.T.Get "No quarantined files"}}</b>
+    <p class="op-hint">{{.T.Get "No malicious files have been detected or the scan has not been initiated yet."}} <a href="/malware-scanner" style="color:var(--color-accent-text)">{{.T.Get "Click here to start a new scan"}} <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" aria-hidden="true" class="remixicon size-4 shrink-0"><path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path></svg></a></p>
+</div>
+<!-- END no files -->
+{{else}}
+
+<!-- files table -->
+<section class="op-card" aria-label="{{.T.Get "Quarantined Files"}}">
+    <div class="op-toolbar">
+        <span class="op-meta" style="flex:1 1 200px">{{.T.Get "Quarantined files:"}} {{len .QuarantineFiles}}</span>
+        <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Search"}}" x-model="searchQuery" aria-label="{{.T.Get "Search"}}"></label>
+    </div>
+    {{template "bulk_open" (dict "T" .T "Table" "#quarantine-table" "Endpoint" "/malware-scanner/quarantine/bulk")}}
+        <div class="op-table-wrap">
+            <table id="quarantine-table" class="op-table">
+                <thead>
+                    <tr>
+                        {{template "bulk_head_checkbox" .}}
+                        <th scope="col">{{template "sort_header" (dict "Label" (.T.Get "File") "Key" "file" "Type" "string")}}</th>
+                        <th scope="col">{{template "sort_header" (dict "Label" (.T.Get "Reason") "Key" "reason" "Type" "string")}}</th>
+                        <th scope="col">{{.T.Get "Quarantined"}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .QuarantineFiles}}
+                    <tr x-show="searchQuery === '' || {{toJSON .DisplayPath}}.toLowerCase().includes(searchQuery.toLowerCase())">
+                        {{template "bulk_row_checkbox" (dict "T" $.T "Key" .RelPath "Label" .DisplayPath)}}
+
+                        <td class="op-cell-title" data-sort-col="file" data-sort-value="{{.DisplayPath}}"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-danger)">{{template "op_icon" "bug"}}</span><div style="min-width:0"><b class="q-path op-mono" style="font-size:13px;font-weight:500;overflow-wrap:anywhere">{{.DisplayPath}}</b></div></div></td>
+
+                        <td data-label="{{$.T.Get "Reason"}}" data-sort-col="reason" data-sort-value="{{.Signature}}">
+                            {{if .Signature}}<span class="op-status is-danger">{{.Signature}}</span>{{else}}<span class="op-hint">{{$.T.Get "Unknown"}}</span>{{end}}
+                        </td>
+                        <td data-label="{{$.T.Get "Quarantined"}}"><span class="op-mono" style="font-size:12px">{{if .QuarantinedAt}}{{.QuarantinedAt}}{{else}}&ndash;{{end}}</span></td>
+
+                        <td class="is-shrink">
+                            <div class="op-q-actions" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false" style="position:relative">
+                                <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions for"}} {{.DisplayPath}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                                <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                                    <button type="button" @click="open = false" onclick="quarantineConfirm(this, 'restore', () => restoreQuarantinedFile({{toJSON .RelPath}}))">{{template "op_icon" "history"}} {{$.T.Get "Restore"}}</button>
+                                    <button type="button" @click="open = false" onclick="quarantineConfirm(this, 'safe', () => markQuarantinedFileSafe({{toJSON .RelPath}}, {{toJSON .FileName}}))">{{template "op_icon" "shieldcheck"}} {{$.T.Get "Mark as safe"}}</button>
+                                    <hr>
+                                    <button type="button" class="is-danger" @click="open = false" onclick="quarantineConfirm(this, 'delete', () => deleteQuarantinedFile({{toJSON .RelPath}}))">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    {{template "bulk_bar" .}}
+    </div>
+</section>
+<!-- END files table -->
+
+{{end}}
+
+</section>
+
+<script src="{{static "js/table-sort.js"}}"></script>
+<script>
+function reloadAfter(ms) {
+    setTimeout(() => location.reload(), ms);
+}
+
+// inline confirmation in the row, like the File Manager: delete crosses the path out, mark safe turns it green
+let closeQuarantineConfirm = null;
+const quarantineModes = {
+    restore: { color: '#2563eb', icon: 'bi-arrow-counterclockwise', label: '{{.T.Get "Restore"}}', btn: 'op-btn-primary' },
+    safe: { color: '#16a34a', icon: 'bi-shield-check', label: '{{.T.Get "Mark as safe"}}', btn: 'op-btn-primary', style: 'background:#16a34a;' },
+    delete: { color: '#dc2626', icon: 'bi-trash', label: '{{.T.Get "Delete permanently"}}', btn: 'op-btn-danger', strike: true },
+};
+
+function quarantineConfirm(btn, action, run) {
+    if (closeQuarantineConfirm) closeQuarantineConfirm();
+    const mode = quarantineModes[action];
+    const row = btn.closest('tr');
+    const actions = btn.closest('.op-q-actions');
+    const path = row.querySelector('.q-path');
+    const original = path.innerHTML;
+
+    path.style.color = mode.color;
+    if (mode.strike) path.style.textDecoration = 'line-through';
+    if (action === 'restore') path.insertAdjacentHTML('afterbegin', '<i class="bi bi-arrow-counterclockwise mr-1"></i>');
+
+    const bar = document.createElement('span');
+    bar.className = 'inline-flex items-center gap-2';
+    bar.innerHTML =
+        `<button type="button" data-act="ok" class="op-btn op-btn-sm ${mode.btn}" style="${mode.style || ''}"><i class="bi ${mode.icon}"></i> ${mode.label}</button>` +
+        `<button type="button" data-act="cancel" class="gap-1 op-btn op-btn-sm op-btn-secondary"><i class="bi bi-x-lg"></i> {{.T.Get "Cancel"}}</button>`;
+    // the menu closes itself, only the trigger needs hiding
+    const buttons = Array.from(actions.children).filter(c => !c.classList.contains('op-menu'));
+    buttons.forEach(b => b.style.display = 'none');
+    actions.appendChild(bar);
+
+    function close() {
+        bar.remove();
+        buttons.forEach(b => b.style.display = '');
+        path.innerHTML = original;
+        path.style.color = '';
+        path.style.textDecoration = '';
+        document.removeEventListener('click', onOutside, true);
+        document.removeEventListener('keydown', onKey);
+        closeQuarantineConfirm = null;
+    }
+    function onOutside(e) { if (!bar.contains(e.target)) close(); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+
+    bar.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    bar.querySelector('[data-act="ok"]').addEventListener('click', () => {
+        bar.querySelectorAll('button').forEach(b => b.disabled = true);
+        document.removeEventListener('click', onOutside, true);
+        run();
+    });
+    setTimeout(() => document.addEventListener('click', onOutside, true), 0);
+    document.addEventListener('keydown', onKey);
+    bar.querySelector('[data-act="ok"]').focus();
+    closeQuarantineConfirm = close;
+}
+
+function quarantineRequest(url, method, okMsg, failMsg) {
+    fetch(url, { method, headers: { 'X-CSRF-Token': csrf_token } })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { showToast(okMsg, 'success'); reloadAfter(800); }
+        else { showToast(data.error || failMsg, 'error'); if (closeQuarantineConfirm) closeQuarantineConfirm(); }
+    })
+    .catch(e => { showToast(e.message, 'error'); if (closeQuarantineConfirm) closeQuarantineConfirm(); });
+}
+
+function restoreQuarantinedFile(relPath) {
+    quarantineRequest(`/malware-scanner/quarantine/restore?file=${encodeURIComponent(relPath)}`,
+        'POST', '{{.T.Get "File restored."}}', '{{.T.Get "Restore failed"}}');
+}
+
+function deleteQuarantinedFile(relPath) {
+    quarantineRequest(`/malware-scanner/quarantine/delete?file=${encodeURIComponent(relPath)}`,
+        'POST', '{{.T.Get "File deleted."}}', '{{.T.Get "Delete failed"}}');
+}
+
+function markQuarantinedFileSafe(relPath, fileName) {
+    quarantineRequest(`/malware-scanner/quarantine/mark-safe?file=${encodeURIComponent(relPath)}`,
+        'POST', '{{.T.Get "Marked as safe and restored."}}', '{{.T.Get "Failed"}}');
+}
+</script>
+
+<!-- END templates/files/clamav/quarantine.html -->
+{{end}}
+
+{{define "sort_header"}}
+<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="{{.Type}}" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>
+{{end}}

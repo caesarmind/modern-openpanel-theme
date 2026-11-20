@@ -1,0 +1,309 @@
+{{define "wp_caching"}}
+<!-- START templates/manager/wp/_caching.html -->
+<script>
+function wpCaching() {
+    const domain = {{toJSON .CurrentDomain}};
+    const t = {
+        failed: {{toJSON (.T.Get "Request failed.")}},
+        justNow: {{toJSON (.T.Get "just now")}},
+        minAgo: {{toJSON (.T.Get "min ago")}},
+        hAgo: {{toJSON (.T.Get "h ago")}},
+        dAgo: {{toJSON (.T.Get "d ago")}},
+        measuring: {{toJSON (.T.Get "Measuring response time, this takes a few seconds..")}},
+        purged: {{toJSON (.T.Get "Purging caches..")}},
+    };
+    return {
+        loaded: false,
+        loading: false,
+        clock: null,
+        s: {
+            varnish: { allowed: true, service_running: false, enabled: false, ttl: 3600, hit_ratio: 0, objects: 0 },
+            redis: { allowed: true, service_running: false, enabled: false, hit_ratio: 0, used_memory: 0, memory_limit: 0, site_keys: 0 },
+            opcache: { available: true, global_enabled: true, enabled: false, hit_rate: 0, used_memory: 0, total_memory: 0, cached_scripts: 0, php_version: '', error: '' },
+        },
+        m: null,
+        busy: { varnish: false, ttl: false, redis: false, opcache: false, purge: false, measure: false },
+        ttl: 3600,
+        now: Date.now(),
+
+        load() {
+            if (this.loading) return;
+            this.startClock();
+            this.loading = true;
+            fetch('/website/cache?domain=' + encodeURIComponent(domain), { headers: { 'X-CSRF-Token': csrf_token } })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.error) { showToast(d.error, 'error'); return; }
+                    this.apply(d);
+                    this.loaded = true;
+                })
+                .catch(e => showToast(String(e), 'error'))
+                .finally(() => { this.loading = false; });
+        },
+
+        startClock() {
+            if (this.clock) return;
+            this.clock = setInterval(() => { this.now = Date.now(); }, 30000);
+        },
+
+        apply(d) {
+            this.s = d;
+            this.ttl = d.varnish.ttl;
+            if (d.measurement) this.m = d.measurement;
+        },
+
+        post(action, params, key) {
+            this.busy[key] = true;
+            const body = new URLSearchParams(Object.assign({ domain: domain, csrf_token: csrf_token }, params));
+            return fetch('/website/cache/' + action, { method: 'POST', headers: { 'X-CSRF-Token': csrf_token }, body: body })
+                .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+                .then(({ ok, d }) => {
+                    if (!ok || d.error) { showToast(d.error || t.failed, 'error'); return null; }
+                    if (d.status) this.apply(d.status);
+                    if (d.message) showToast(d.message, 'success');
+                    return d;
+                })
+                .catch(e => { showToast(String(e), 'error'); return null; })
+                .finally(() => { this.busy[key] = false; });
+        },
+
+        toggleVarnish() {
+            this.post('varnish', { state: this.s.varnish.enabled ? 'off' : 'on' }, 'varnish');
+        },
+        setTTL() { this.post('varnish-ttl', { ttl: this.ttl }, 'ttl'); },
+        toggleRedis() { this.post('redis', { state: this.s.redis.enabled ? 'off' : 'on' }, 'redis'); },
+        toggleOpcache() { this.post('opcache', { state: this.s.opcache.enabled ? 'off' : 'on' }, 'opcache'); },
+        purge() { this.post('purge', {}, 'purge').then(d => { if (d) this.load(); }); },
+        measure() {
+            showToast(t.measuring, 'info');
+            this.post('measure', {}, 'measure').then(d => { if (d && d.measurement) this.m = d.measurement; });
+        },
+
+        pct(v) { return Math.round((v || 0) * 100) + '%'; },
+        num(v) { return Math.round(v || 0).toLocaleString(); },
+        get varnishHas() { return this.loaded && this.s.varnish.service_running && (this.s.varnish.hits + this.s.varnish.misses) > 0; },
+        get redisHas() { return this.loaded && this.s.redis.service_running && (this.s.redis.hits + this.s.redis.misses) > 0; },
+        get spark() {
+            const h = (this.m && this.m.history) || [];
+            if (!h.length) return { cached: '', direct: '', points: [] };
+            const max = Math.max(...h.map(p => p.direct_ms), 1);
+            const step = h.length > 1 ? 100 / (h.length - 1) : 0;
+            const x = i => h.length > 1 ? i * step : 50;
+            const y = v => 31 - (v / max) * 28;
+            const line = key => h.map((p, i) => x(i).toFixed(1) + ',' + y(p[key]).toFixed(1)).join(' ');
+            return {
+                cached: line('cached_ms'),
+                direct: line('direct_ms'),
+                points: h.map((p, i) => ({ x: x(i), w: h.length > 1 ? step : 100, label: new Date(p.measured_at * 1000).toLocaleString() + ': ' + this.ms(p.cached_ms) + ' / ' + this.ms(p.direct_ms) + ' ms' })),
+            };
+        },
+        mb(bytes) { return ((bytes || 0) / 1048576).toFixed(1) + ' MB'; },
+        ratio(used, total) { return total > 0 ? Math.min(100, used / total * 100) : 0; },
+        ms(v) { return v >= 100 ? Math.round(v) : (Math.round(v * 10) / 10); },
+        get speedup() { return this.m && this.m.cached_ms > 0 ? this.m.direct_ms / this.m.cached_ms : 0; },
+        get cachedBar() { return this.m && this.m.direct_ms > 0 ? Math.max(2, Math.min(100, this.m.cached_ms / this.m.direct_ms * 100)) : 0; },
+        get lastMeasured() {
+            if (!this.m) return '-';
+            const sec = Math.max(0, Math.floor(this.now / 1000 - this.m.measured_at));
+            if (sec < 60) return t.justNow;
+            if (sec < 3600) return Math.floor(sec / 60) + ' ' + t.minAgo;
+            if (sec < 86400) return Math.floor(sec / 3600) + ' ' + t.hAgo;
+            return Math.floor(sec / 86400) + ' ' + t.dAgo;
+        },
+    };
+}
+</script>
+
+<div x-data="wpCaching()" x-effect="if (activeTab === 'caching' && !loaded) load()">
+
+    <div class="op-wp-body">
+
+        <!-- cache levels -->
+        <section class="op-card">
+            <div class="op-card-head">
+                <h2>{{.T.Get "Cache levels"}}</h2>
+                <button type="button" @click="purge()" :disabled="!loaded || busy.purge" class="op-btn op-btn-secondary op-btn-sm">
+                    <span class="op-wp-btn-ico" :class="busy.purge && 'animate-spin'">{{template "op_icon" "refresh"}}</span>
+                    {{.T.Get "Purge all"}}
+                </button>
+            </div>
+
+            <div class="op-checks">
+                <!-- 1. varnish -->
+                <div class="op-check-row">
+                    <span class="op-wp-state" :class="s.varnish.enabled && s.varnish.service_running ? 'is-success' : (s.varnish.enabled ? 'is-warning' : 'is-off')">
+                        <span x-show="s.varnish.enabled && s.varnish.service_running">{{template "op_icon" "check"}}</span>
+                        <span x-show="!(s.varnish.enabled && s.varnish.service_running)">{{template "op_icon" "alert"}}</span>
+                    </span>
+                    <div>
+                        <b>{{.T.Get "Page cache"}} <span class="op-muted">·</span> Varnish</b>
+                        <p>{{.T.Get "Varnish serves ready-made pages without touching PHP. Admin area, logged-in users, cart and checkout always stay dynamic."}}</p>
+                        <p x-show="loaded && !s.varnish.allowed" class="is-warning">{{.T.Get "Varnish is not included in your plan."}}</p>
+                        <div x-show="s.varnish.allowed" class="op-wp-cache-meta">
+                            <label class="op-wp-ttl">{{.T.Get "Lifetime"}}
+                                <select x-model.number="ttl" @change="setTTL()" :disabled="!loaded || busy.ttl" class="op-select">
+                                    <option value="60">{{.T.Get "1 minute"}}</option>
+                                    <option value="300">{{.T.Get "5 minutes"}}</option>
+                                    <option value="900">{{.T.Get "15 minutes"}}</option>
+                                    <option value="1800">{{.T.Get "30 minutes"}}</option>
+                                    <option value="3600">{{.T.Get "1 hour"}}</option>
+                                    <option value="21600">{{.T.Get "6 hours"}}</option>
+                                    <option value="86400">{{.T.Get "1 day"}}</option>
+                                </select>
+                            </label>
+                            <span class="op-wp-cache-stat">
+                                <span class="op-hint" x-text="!loaded ? '...' : !s.varnish.service_running ? {{toJSON (.T.Get "Varnish is not running")}} : varnishHas ? pct(s.varnish.hit_ratio) + ' ' + {{toJSON (.T.Get "from cache")}} + ' · ' + num(s.varnish.hits + s.varnish.misses) + ' ' + {{toJSON (.T.Get "requests")}} : {{toJSON (.T.Get "No recent visits")}}"
+                                      title="{{.T.Get "Recent page requests to this site."}}"></span>
+                                <span class="op-bar is-thin" x-show="varnishHas"><span class="op-bar-fill is-success" :style="'width:' + (varnishHas ? s.varnish.hit_ratio * 100 : 0) + '%'"></span></span>
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="s.varnish.enabled.toString()" aria-label="{{.T.Get "Page cache on"}}"
+                            @click="toggleVarnish()" :disabled="!loaded || busy.varnish || !s.varnish.allowed"
+                            class="op-switch"></button>
+                </div>
+
+                <!-- 2. redis -->
+                <div class="op-check-row">
+                    <span class="op-wp-state" :class="s.redis.enabled && s.redis.service_running ? 'is-success' : (s.redis.enabled ? 'is-warning' : 'is-off')">
+                        <span x-show="s.redis.enabled && s.redis.service_running">{{template "op_icon" "check"}}</span>
+                        <span x-show="!(s.redis.enabled && s.redis.service_running)">{{template "op_icon" "alert"}}</span>
+                    </span>
+                    <div>
+                        <b>{{.T.Get "Object cache"}} <span class="op-muted">·</span> Redis</b>
+                        <p>{{.T.Get "Repeated database queries are answered from your private Redis instead of MySQL. Turning it on installs and configures the free Redis Object Cache plugin."}}</p>
+                        <p x-show="loaded && !s.redis.allowed" class="is-warning">{{.T.Get "Redis is not included in your plan."}}</p>
+                        <p x-show="loaded && s.redis.allowed && s.redis.enabled && !s.redis.service_running" class="is-warning">{{.T.Get "Redis service is stopped, the site falls back to the database."}}</p>
+                        <div x-show="s.redis.allowed" class="op-wp-cache-meta">
+                            <span class="op-wp-cache-stat">
+                                <span class="op-hint" x-text="!loaded ? '...' : !s.redis.service_running ? {{toJSON (.T.Get "Redis is not running")}} : (redisHas ? pct(s.redis.hit_ratio) + ' · ' : '') + mb(s.redis.site_bytes) + ' ' + {{toJSON (.T.Get "for this site")}}"
+                                      :title="num(s.redis.site_keys) + ' ' + {{toJSON (.T.Get "keys for this site. Redis memory for all your sites:")}} + ' ' + mb(s.redis.used_memory) + (s.redis.memory_limit ? ' / ' + mb(s.redis.memory_limit) : '')"></span>
+                                <span class="op-bar is-thin" x-show="redisHas"><span class="op-bar-fill is-success" :style="'width:' + (redisHas ? s.redis.hit_ratio * 100 : 0) + '%'"></span></span>
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="s.redis.enabled.toString()" aria-label="{{.T.Get "Object cache on"}}"
+                            @click="toggleRedis()" :disabled="!loaded || busy.redis || !s.redis.allowed"
+                            class="op-switch"></button>
+                </div>
+
+                <!-- 3. opcache -->
+                <div class="op-check-row">
+                    <span class="op-wp-state" :class="s.opcache.enabled && s.opcache.global_enabled ? 'is-success' : (s.opcache.enabled ? 'is-warning' : 'is-off')">
+                        <span x-show="s.opcache.enabled && s.opcache.global_enabled">{{template "op_icon" "check"}}</span>
+                        <span x-show="!(s.opcache.enabled && s.opcache.global_enabled)">{{template "op_icon" "alert"}}</span>
+                    </span>
+                    <div>
+                        <b>OPcache <span class="op-muted">·</span> <span x-text="{{toJSON (.T.Get "precompiled PHP")}} + (s.opcache.php_version ? ' ' + s.opcache.php_version : '')"></span></b>
+                        <p>{{.T.Get "WordPress and plugin code stays in memory already compiled, so PHP doesn't recompile it on every visit."}}</p>
+                        <p x-show="s.opcache.error" class="is-warning" x-text="s.opcache.error"></p>
+                        <p x-show="loaded && s.opcache.available && !s.opcache.global_enabled" class="is-warning">{{.T.Get "OPcache is turned off in the PHP settings for this PHP version."}}{{if .UserAllowed.php_ini}} <a href="/php" class="op-link">{{.T.Get "PHP settings"}}</a>{{end}}</p>
+                        <div x-show="s.opcache.available" class="op-wp-cache-meta">
+                            <span class="op-wp-cache-stat">
+                                <span class="op-hint" x-text="!loaded ? '...' : pct(s.opcache.hit_rate) + ' ' + {{toJSON (.T.Get "hit rate")}} + ' · ' + {{toJSON (.T.Get "memory")}} + ' ' + mb(s.opcache.used_memory) + ' ' + {{toJSON (.T.Get "of")}} + ' ' + mb(s.opcache.total_memory)"
+                                      :title="s.opcache.cached_scripts + ' ' + {{toJSON (.T.Get "scripts cached. Numbers cover all your sites on this PHP version.")}}"></span>
+                                <span class="op-bar is-thin" x-show="loaded && s.opcache.enabled && s.opcache.global_enabled" :title="{{toJSON (.T.Get "Memory used")}}"><span class="op-bar-fill" :style="'width:' + ratio(s.opcache.used_memory, s.opcache.total_memory) + '%'"></span></span>
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="s.opcache.enabled.toString()" aria-label="{{.T.Get "OPcache on"}}"
+                            @click="toggleOpcache()" :disabled="!loaded || busy.opcache || !s.opcache.available || !s.opcache.global_enabled"
+                            class="op-switch"></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- response time -->
+        <section class="op-card" aria-label="{{.T.Get "Home page speed"}}">
+            <div class="op-card-head">
+                <h2>{{.T.Get "Home page response time"}}</h2>
+                <button type="button" x-show="m" x-cloak @click="measure()" :disabled="busy.measure" class="op-btn op-btn-secondary op-btn-sm">
+                    <span class="op-wp-btn-ico" :class="busy.measure && 'animate-spin'">{{template "op_icon" "bolt"}}</span>
+                    <span x-text="busy.measure ? {{toJSON (.T.Get "Measuring..")}} : {{toJSON (.T.Get "Measure again")}}"></span>
+                </button>
+            </div>
+
+            <div class="op-empty op-wp-speed-empty" x-show="!m">
+                <span class="op-ico-tile">{{template "op_icon" "gauge"}}</span>
+                <b>{{.T.Get "Not measured yet"}}</b>
+                <span class="op-hint">{{.T.Get "Run a test to compare your site with and without any caching."}}</span>
+                <button type="button" @click="measure()" :disabled="busy.measure" class="op-btn op-btn-primary op-btn-sm">
+                    <span class="op-wp-btn-ico" :class="busy.measure && 'animate-spin'">{{template "op_icon" "bolt"}}</span>
+                    <span x-text="busy.measure ? {{toJSON (.T.Get "Measuring..")}} : {{toJSON (.T.Get "Measure now")}}"></span>
+                </button>
+            </div>
+
+            <div class="op-wp-speed" x-show="m" x-cloak>
+                <div class="op-wp-speed-main">
+                    <div class="op-wp-speed-num" aria-live="polite">
+                        <b :class="m ? '' : 'op-faint'" x-text="m ? ms(m.cached_ms) : '--'"></b>
+                        <span>ms</span>
+                        <span x-show="speedup >= 1.5" class="op-badge is-success" x-text="(speedup >= 10 ? Math.round(speedup) : speedup.toFixed(1)) + '× ' + {{toJSON (.T.Get "faster")}}"></span>
+                    </div>
+
+                    <div class="op-wp-speed-bars">
+                        <div>
+                            <div class="op-wp-speed-label">
+                                <span x-text="m && !m.via_varnish ? {{toJSON (.T.Get "Current setup (OPcache + Redis)")}} : {{toJSON (.T.Get "With cache")}}"></span>
+                                <span class="op-mono" x-text="m ? ms(m.cached_ms) + ' ms' : '-- ms'"></span>
+                            </div>
+                            <div class="op-bar"><div class="op-bar-fill is-success" :style="'width:' + cachedBar + '%'"></div></div>
+                        </div>
+                        <div>
+                            <div class="op-wp-speed-label">
+                                <span title="{{.T.Get "Rendered in a separate PHP process with OPcache off and Redis disabled, visitors are not affected."}}">{{.T.Get "No cache at all"}}</span>
+                                <span class="op-mono" x-text="m ? ms(m.direct_ms) + ' ms' : '-- ms'"></span>
+                            </div>
+                            <div class="op-bar"><div class="op-bar-fill" :style="'width:' + (m ? 100 : 0) + '%'"></div></div>
+                        </div>
+                    </div>
+
+                    <div class="op-hint">
+                        <p x-show="m && !m.via_varnish">{{.T.Get "Page cache is off for this site, the first bar is your site through the webserver with OPcache and Redis. Turn on the page cache to serve ready-made HTML."}}</p>
+                        <p x-show="m && (m.cached_code !== 200 || m.direct_code !== 200)" class="is-warning" x-text="{{toJSON (.T.Get "Home page answered with HTTP")}} + ' ' + (m ? (m.cached_code !== 200 ? m.cached_code : m.direct_code) : '') + ', ' + {{toJSON (.T.Get "numbers may not reflect a normal page load.")}}"></p>
+                    </div>
+                </div>
+
+                <div class="op-wp-speed-tiles">
+                    <div class="op-wp-speed-tile" x-show="varnishHas" :title="loaded && s.varnish.service_running ? {{toJSON (.T.Get "Recent page requests to this site. All your sites:")}} + ' ' + pct(s.varnish.account_hit_ratio) : ''">
+                        <span>{{.T.Get "Pages from cache"}}</span>
+                        <strong x-text="varnishHas ? pct(s.varnish.hit_ratio) : '-'"></strong>
+                        <span class="op-bar is-thin"><span class="op-bar-fill is-success" :style="'width:' + (varnishHas ? s.varnish.hit_ratio * 100 : 0) + '%'"></span></span>
+                        <small x-text="varnishHas ? num(s.varnish.hits) + ' ' + {{toJSON (.T.Get "hits")}} + ' · ' + num(s.varnish.misses) + ' ' + {{toJSON (.T.Get "misses")}} : (loaded && s.varnish.service_running ? {{toJSON (.T.Get "No recent visits")}} : '-')"></small>
+                    </div>
+                    <div class="op-wp-speed-tile" x-show="redisHas" :title="loaded && s.redis.service_running ? {{toJSON (.T.Get "Redis memory for all your sites:")}} + ' ' + mb(s.redis.used_memory) + (s.redis.memory_limit ? ' / ' + mb(s.redis.memory_limit) : '') : ''">
+                        <span>{{.T.Get "Queries from Redis"}}</span>
+                        <strong x-text="redisHas ? pct(s.redis.hit_ratio) : '-'"></strong>
+                        <span class="op-bar is-thin"><span class="op-bar-fill is-success" :style="'width:' + (redisHas ? s.redis.hit_ratio * 100 : 0) + '%'"></span></span>
+                        <small x-text="redisHas ? num(s.redis.hits) + ' ' + {{toJSON (.T.Get "hits")}} + ' · ' + num(s.redis.misses) + ' ' + {{toJSON (.T.Get "misses")}} + (s.redis.site_metrics ? ' (1h)' : ' (' + {{toJSON (.T.Get "all sites")}} + ')') : (loaded && s.redis.service_running ? {{toJSON (.T.Get "Not used by this site")}} : '-')"></small>
+                    </div>
+                    <div class="op-wp-speed-tile">
+                        <span>{{.T.Get "Last measurement"}}</span>
+                        <strong class="is-sm" x-text="lastMeasured" :title="m ? new Date(m.measured_at * 1000).toLocaleString() : ''"></strong>
+                        <small x-text="m && m.via_varnish && m.direct_ms > m.cached_ms ? {{toJSON (.T.Get "saves")}} + ' ' + ms(m.direct_ms - m.cached_ms) + ' ms ' + {{toJSON (.T.Get "per visit")}} : '-'"></small>
+                        <div class="op-wp-spark">
+                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label="{{.T.Get "Response time of the last measurements"}}">
+                                <line x1="0" y1="31" x2="100" y2="31" stroke="currentColor" class="op-wp-spark-base" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+                                <polyline :points="spark.direct" fill="none" stroke="currentColor" class="op-muted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+                                <polyline :points="spark.cached" fill="none" stroke="currentColor" class="is-success" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+                            </svg>
+                            <!-- hover areas live outside the svg, alpine can't loop a template inside svg -->
+                            <div class="op-wp-spark-hit">
+                                <template x-for="(pt, i) in spark.points" :key="i">
+                                    <span :title="pt.label"></span>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="op-wp-spark-key">
+                            <span><i class="is-success"></i>{{.T.Get "cache"}}</span>
+                            <span><i></i>{{.T.Get "no cache"}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</div>
+<!-- END templates/manager/wp/_caching.html -->
+{{end}}

@@ -1,0 +1,115 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/psql/users.html -->
+<div class="op-content">
+{{$running := eq .ContainerState "running"}}
+<div class="op-page-head">
+    <div>
+        <div class="op-eyebrow">PostgreSQL</div>
+        <h1 class="op-title">{{.T.Get "Users"}}</h1>
+        <p class="op-meta">{{.T.Get "Total users:"}} <b class="op-mono" id="total_records_count">{{len .Users}}</b></p>
+    </div>
+    <div class="op-actions">
+        {{if $running}}
+        <a href="/postgresql/assign" class="op-btn op-btn-secondary">{{template "op_icon" "db"}} {{.T.Get "Assign User to Database"}}</a>
+        <a href="/postgresql/remove" class="op-btn op-btn-secondary">{{.T.Get "Remove User from Database"}}</a>
+        <a href="/postgresql/user" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Create User"}}</a>
+        {{else}}
+        <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-secondary">{{template "op_icon" "db"}} {{.T.Get "Assign User to Database"}}</span>
+        <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-secondary">{{.T.Get "Remove User from Database"}}</span>
+        <span title="{{.T.Get "Unavailable while the service is not running."}}" aria-disabled="true" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Create User"}}</span>
+        {{end}}
+    </div>
+</div>
+
+<section class="op-card" aria-label="{{.T.Get "Users Table"}}" x-data="{ searchQuery: '', dbs: {} }" x-init="fetch('/postgresql/info').then(r => r.ok ? r.json() : null).then(d => { const m = {}; ((d && d.assigned_databases) || []).forEach(a => String(a.users || '').split(',').map(u => u.trim()).filter(Boolean).forEach(u => (m[u] = m[u] || []).push(a.database))); dbs = m; }).catch(() => {})">
+    <div class="op-toolbar">
+        <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search"}}" aria-label="{{.T.Get "Search users"}}"></label>
+        <label class="op-pill-toggle"><button class="op-switch" type="button" role="switch" id="showAllCheckbox" aria-checked="{{if .ShowAll}}true{{else}}false{{end}}" aria-label="{{.T.Get "Show system users"}}"></button> {{.T.Get "Show system users"}}</label>
+    </div>
+    <script>
+        document.getElementById('showAllCheckbox').addEventListener('click', () => {
+            const q = new URLSearchParams(window.location.search);
+            if (q.has('show_all')) q.delete('show_all'); else q.set('show_all', 'true');
+            window.location.search = q.toString();
+        });
+    </script>
+
+{{template "bulk_open" (dict "T" .T "Table" "#users-table" "Endpoint" "/postgresql/users/bulk")}}
+    <div class="op-table-wrap">
+        <table id="users-table" class="op-table">
+            <thead>
+                <tr>
+{{template "bulk_head_checkbox" .}}
+                    <th scope="col">{{template "sort_header" (dict "Label" (.T.Get "Username") "Key" "username" "Type" "string")}}</th>
+                    <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+    {{if and $running (eq .HealthStatus "healthy")}}
+        {{if .Users}}
+            {{range .Users}}
+            {{$row := .}}{{$user := .Name}}{{$system := .IsSystem}}
+            <tr x-show="searchQuery === '' || {{toJSON $user}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
+{{$skip := ""}}{{if $system}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" $user "Label" $user "Skip" $skip)}}
+                <td class="op-cell-title" data-sort-col="username"><div class="op-row-title"><span class="op-file-ico" style="--hue:{{if $system}}var(--color-faint){{else}}var(--color-hue-cyan){{end}}">{{template "op_icon" "user"}}</span><div><b class="op-mono" style="font-size:13px">{{$user}}</b>{{if $system}}<span class="op-sub">{{$.T.Get "System User"}}</span>{{else}}<span class="op-sub" x-show="dbs[{{toJSON $user}}]" x-cloak x-text="dbs[{{toJSON $user}}] ? {{toJSON ($.T.Get "Assigned to")}} + ' ' + dbs[{{toJSON $user}}].join(', ') : ''"></span>{{end}}</div></div></td>
+                <td class="is-shrink op-cell-menu" style="position:relative">
+                    {{if $system}}<span class="op-hint">{{$.T.Get "System User"}}</span>{{else}}
+                    <form method="POST" action="/delete_postgres_user" hidden>
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="db_user" value="{{$user}}">
+                    </form>
+                    <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                        <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions"}} {{$user}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                        <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                            <a href="/postgresql/password/{{$user}}">{{template "op_icon" "key"}} {{$.T.Get "Change Password"}}</a>
+                            <a href="/postgresql/assign">{{template "op_icon" "db"}} {{$.T.Get "Assign to database"}}</a>
+                            <hr>
+                            <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Delete this user?")}} + ' ' + {{toJSON $user}})) $root.closest('td').querySelector('form').submit()">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</button>
+                        </div>
+                    </div>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        {{else}}
+            <tr><td colspan="3"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "user"}}</span><b>{{.T.Get "No users yet."}}</b><a href="/postgresql/user" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Create your first user"}}</a></div></td></tr>
+        {{end}}
+    {{else}}
+            <tr><td colspan="3"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "info"}}</span><b>{{$.T.Get .StatusDetail}}</b><span id="refresh-message" class="op-hint"></span></div></td></tr>
+    {{end}}
+            </tbody>
+        </table>
+    </div>
+    <div class="op-tfoot"><span>{{.T.Get "Total users:"}} {{len .Users}}</span></div>
+{{template "bulk_bar" .}}
+</div>
+</section>
+{{if ne .HealthStatus "healthy"}}
+<script>
+    let countdown = 5;
+    const messageEl = document.getElementById('refresh-message');
+    const interval = setInterval(() => {
+        if (countdown > 0) {
+            messageEl.textContent = `{{.T.Get "The page will refresh in"}} ${countdown} {{.T.Get "seconds"}}`;
+            countdown--;
+        } else {
+            clearInterval(interval);
+            window.location.reload();
+        }
+    }, 1000);
+</script>
+{{end}}
+
+<script src="{{static "js/table-sort.js"}}"></script>
+</div>
+
+<!-- END templates/psql/users.html -->
+{{end}}
+
+{{define "sort_header"}}
+<button type="button" class="op-th-sort" data-sort-key="{{.Key}}" data-sort-type="{{.Type}}" onclick="opSortToggle(event, this, sortTableColumn)">{{.Label}}<i aria-hidden="true"></i></button>
+{{end}}

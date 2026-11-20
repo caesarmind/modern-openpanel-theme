@@ -1,0 +1,69 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/wp/install.html -->
+<div class="op-content">
+{{if .Domains}}
+{{template "op_iw_kit" .}}
+<script>
+(function () {
+  var K = window.opIWKit;
+  function lower8() { return Math.random().toString(36).slice(2, 10); }
+  function wpVersions() {
+    return fetch('https://api.wordpress.org/core/stable-check/1.0/').then(function (r) { return r.json(); }).then(function (data) {
+      return Object.keys(data).filter(function (v) { return data[v] !== 'insecure'; })
+        .sort(function (a, b) { var x = a.split('.').map(Number), y = b.split('.').map(Number); for (var i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); } return 0; })
+        .slice(0, 10);
+    });
+  }
+  // fields, checks and run checkpoints mirror wordpress/install.go
+  window.opIWConfig = {
+    slug: 'wordpress', name: 'WordPress', title: {{toJSON (.T.Get "Install WordPress")}}, cta: {{toJSON (.T.Get "Install WordPress")}},
+    desc: {{toJSON (.T.Get "Install WordPress CMS in a few clicks.")}}, endpoint: '/wordpress/install', logo: {{toJSON (static "images/apps/wordpress.svg")}},
+    domains: {{toJSON .Domains}}, mysqlPrefix: {{toJSON .MySQLPrefix}}, strength: {{.PasswordStrength}}, t: K.t,
+    success: ['WordPress installation completed'], manager: '/wordpress', managerLabel: {{toJSON (.T.Get "Open WP Manager")}}, adminPath: '/wp-admin/',
+    steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+    summary: ['website_name', 'wordpress_version', 'admin_username', 'db_name'],
+    fields: [
+      K.text('website_name', {{toJSON (.T.Get "Website name")}}, { required: true, placeholder: {{toJSON (.T.Get "My Blog")}} }),
+      K.text('site_description', {{toJSON (.T.Get "Tagline")}}, { placeholder: {{toJSON (.T.Get "Just another WordPress site")}} }),
+      K.version('wordpress_version', wpVersions, false),
+      K.email(), K.user({ value: undefined, gen: 'alnum8' }), K.pass(),
+      { name: 'db_name', step: 'db', label: {{toJSON (.T.Get "Database name")}}, prefix: true, gen: lower8, required: true, validate: 'dbname', mono: true, half: true },
+      { name: 'db_prefix', step: 'db', label: {{toJSON (.T.Get "Table prefix")}}, gen: 'prefix', required: true, validate: 'dbprefix', mono: true, half: true },
+      { name: 'db_user', step: 'db', label: {{toJSON (.T.Get "Database user")}}, prefix: true, gen: lower8, required: true, validate: 'dbname', mono: true, half: true },
+      { name: 'db_password', step: 'db', label: {{toJSON (.T.Get "Database password")}}, type: 'password', gen: 'alnum12', required: true, validate: 'dbpass', half: true },
+      { name: 'sets_note', step: 'db', type: 'note', label: {{toJSON (.T.Get "Plugin and theme sets your hosting provider set up are installed right after WordPress, nothing to pick here.")}} }
+    ],
+    run: [
+      K.run.step({{toJSON (.T.Get "Starting PHP container")}}, ['Starting PHP container']),
+      K.run.step({{toJSON (.T.Get "Downloading WordPress archive")}}, ['Downloading', 'Using existing archive']),
+      K.run.step({{toJSON (.T.Get "Extracting files to document root")}}, ['Extracting files']),
+      K.run.step({{toJSON (.T.Get "Creating .htaccess and wp-config.php")}}, ['Creating .htaccess', 'Writing database logins', 'Added mu-plugin', 'Set FS_METHOD', 'Error specifying FS_METHOD']),
+      K.run.step({{toJSON (.T.Get "Generating security keys and salts")}}, ['Shuffling WordPress Salts']),
+      K.run.step({{toJSON (.T.Get "Setting file permissions and ownership")}}, ['Setting files permissions and owner', 'Fixing wp-content permissions', 'Fixing file permissions']),
+      K.run.step({{toJSON (.T.Get "Testing WP-CLI")}}, ['WP-CLI is functional', 'WP-CLI not available']),
+      K.run.step({{toJSON (.T.Get "Creating database and MySQL user")}}, ['Testing database connection', 'Checking', 'container is healthy', 'Creating database']),
+      K.run.step({{toJSON (.T.Get "Importing tables into the database")}}, ['Importing WordPress tables']),
+      K.run.step({{toJSON (.T.Get "Configuring permalinks and site settings")}}, ['Setting pretty permalinks', 'Setting site tagline']),
+      K.run.step({{toJSON (.T.Get "Enabling auto-login from Site Manager")}}, ['Enabling auto-login']),
+      K.run.step({{toJSON (.T.Get "Installing plugin and theme sets")}}, ['Checking for server-wide', 'Installing plugin', 'Installing theme', 'installed successfully', 'Failed to install']),
+      K.run.step({{toJSON (.T.Get "Saving to Site Manager")}}, ['Saving website information', 'Reloading'])
+    ],
+    creds: K.creds('admin_username', [{ label: {{toJSON (.T.Get "Table prefix")}}, field: 'db_prefix' }])
+  };
+})();
+</script>
+{{template "op_install_wizard" .}}
+{{else}}
+<div class="op-card op-empty op-block-card">
+    <p class="op-strong">{{.T.Get "No domains yet"}}</p>
+    <p class="op-hint">{{.T.Get "Add your first domain to get started"}}</p>
+    <a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}}{{.T.Get "New domain"}}</a>
+</div>
+{{end}}
+</div>
+<!-- END templates/manager/wp/install.html -->
+{{end}}

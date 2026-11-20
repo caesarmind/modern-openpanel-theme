@@ -1,0 +1,893 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "bk_icon"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-full w-full">{{if eq . "full"}}<path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"/><path d="M10 12l4 0"/>{{else if eq . "html"}}<path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"/>{{else if eq . "databases"}}<path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/>{{else if eq . "mail"}}<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z"/><path d="M3 7l9 6l9 -6"/>{{else if eq . "vhosts"}}<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/>{{else if eq . "crons"}}<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 7v5l3 3"/>{{else if eq . "queue"}}<path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/>{{else if eq . "logs"}}<path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/>{{else if eq . "home"}}<path d="M4 4m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M14 4m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M14 14m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/>{{end}}</svg>{{end}}
+
+{{define "bk_job_what"}}<span class="op-strong">
+    <span x-show="j.target === 'all'">{{.T.Get "Everything"}}</span>
+    <span x-show="j.target === 'files'">{{.T.Get "Files only (no databases)"}}</span>
+    <span x-show="j.target === 'html'">{{.T.Get "Website files"}}</span>
+    <span x-show="j.target === 'mail'">{{.T.Get "Emails"}}</span>
+    <span x-show="j.target === 'vhosts'">{{.T.Get "Domains"}}</span>
+    <span x-show="j.target === 'dns'">{{.T.Get "DNS zones"}}</span>
+    <span x-show="j.target === 'crons'">{{.T.Get "Cron jobs"}}</span>
+    <span x-show="j.target === 'database'">{{.T.Get "Database"}}</span>
+    <span x-show="j.target === 'paths'">{{.T.Get "Selected files"}}</span>
+    <span x-show="j.target === 'mailboxes'">{{.T.Get "Selected mailboxes"}}</span>
+    <span x-show="j.target === 'domains'">{{.T.Get "Selected domains"}}</span>
+    <span x-show="j.target === 'dns_zones'">{{.T.Get "Selected DNS zones"}}</span>
+</span>
+<p x-show="j.database || (j.items || []).length" class="max-w-xl truncate text-xs op-muted" x-text="j.database || (j.items || []).map(i => itemLabel(i, j.target)).join(', ')"></p>{{end}}
+
+{{define "content"}}
+<!-- START templates/files/backup_restore.html -->
+
+<div class="op-content" x-data="{
+    backups: {{.PageJSON}},
+    tab: (['full','html','databases','mail','vhosts','crons','queue','logs'].includes(new URLSearchParams(window.location.search).get('tab')) ? new URLSearchParams(window.location.search).get('tab') : ''),
+    search: '',
+    selectedFile: null,
+    selected: {},
+    choice: {},
+    summaryOpen: false,
+    summaryItems: [],
+    running: false,
+    finished: false,
+    downloadOpen: false,
+    picker: { open: false, file: '', path: '', dirs: [], files: [], loading: false, error: '', picked: {} },
+    downloading: false,
+    downloadResult: null,
+    reindexing: {{if .Reindexing}}true{{else}}false{{end}},
+    barStyle: {},
+    jobs: { queue: [], logs: [] },
+    jobsTimer: null,
+    pollInterval: null,
+    init() {
+        if (this.reindexing) this.startPolling();
+        this.loadJobs();
+    },
+    // keeps refreshing while something is queued or running
+    async loadJobs() {
+        clearTimeout(this.jobsTimer);
+        try {
+            const resp = await fetch('/backups/jobs');
+            if (resp.ok) this.jobs = await resp.json();
+        } catch (e) {}
+        if (this.jobs.queue.length) this.jobsTimer = setTimeout(() => opVisible(() => this.loadJobs()), 3000);
+    },
+    fmtDuration(from, to) {
+        if (!from) return '–';
+        const secs = Math.max(0, Math.round(((to ? new Date(to) : new Date()) - new Date(from)) / 1000));
+        const m = Math.floor(secs / 60);
+        return m ? m + 'm ' + String(secs % 60).padStart(2, '0') + 's' : secs + 's';
+    },
+    // fixed to the bottom like the bulk actions bar, but only as wide as main so it doesn't cover the sidebar
+    placeBar() {
+        const main = this.$root.closest('main') || document.querySelector('main');
+        if (!main) return;
+        const place = () => {
+            const rect = main.getBoundingClientRect();
+            this.barStyle = { left: rect.left + 'px', right: Math.max(0, window.innerWidth - rect.right) + 'px' };
+        };
+        place();
+        if (!this._barObserver && window.ResizeObserver) {
+            this._barObserver = new ResizeObserver(place);
+            this._barObserver.observe(main);
+        }
+    },
+    hasSelection() {
+        return this.isItemTab(this.tab) ? this.selectedCount() > 0 : !!this.selectedFile;
+    },
+    startPolling() {
+        this.pollInterval = opPoll(() => {
+            // the old list or an error object both come back while or after indexing, only the reindexing flag says it's done
+            fetch('/backups/list?output=json&status=1')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.reindexing) {
+                        opStop(this.pollInterval);
+                        window.location.reload();
+                    }
+                }).catch(() => {});
+        }, 3000);
+    },
+    setTab(t) {
+        this.tab = t;
+        this.search = '';
+        this.selectedFile = null;
+        this.selected = {};
+        if (this.isJobTab(t)) this.loadJobs();
+        const url = new URL(window.location);
+        if (t) url.searchParams.set('tab', t); else url.searchParams.delete('tab');
+        history.replaceState(null, '', url);
+    },
+    listKind(tab) {
+        return { html: 'files' }[tab] || '';
+    },
+    canPick() {
+        const b = this.backups.find(x => x.file === this.selectedFile);
+        return !!(b && this.listKind(this.tab) && (b.lists || []).includes(this.listKind(this.tab)));
+    },
+    openPicker() {
+        this.picker = { open: true, file: this.selectedFile, path: '', dirs: [], files: [], loading: false, error: '', picked: {} };
+        this.loadDir('');
+    },
+    async pickerFetch(url) {
+        this.picker.loading = true;
+        this.picker.error = '';
+        try {
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || resp.statusText);
+            return data;
+        } catch (e) {
+            this.picker.error = e.message;
+            return null;
+        } finally {
+            this.picker.loading = false;
+        }
+    },
+    async loadDir(path) {
+        const data = await this.pickerFetch('/backups/files?backup=' + encodeURIComponent(this.picker.file) + '&path=' + encodeURIComponent(path));
+        if (!data) return;
+        this.picker.path = data.path || '';
+        this.picker.dirs = data.dirs || [];
+        this.picker.files = data.files || [];
+    },
+    crumbs() {
+        const parts = this.picker.path ? this.picker.path.split('/') : [];
+        return parts.map((name, i) => ({ name: name, path: parts.slice(0, i + 1).join('/') }));
+    },
+    parentPath() {
+        return this.picker.path.split('/').slice(0, -1).join('/');
+    },
+    childPath(name) {
+        return this.picker.path ? this.picker.path + '/' + name : name;
+    },
+    pickedKeys() {
+        return Object.keys(this.picker.picked).filter(k => this.picker.picked[k]);
+    },
+    restorePicked() {
+        const b = this.backups.find(x => x.file === this.picker.file);
+        this.summaryItems = [{ target: 'paths', database: '', picks: this.pickedKeys(), file: b.file, created: b.created, status: 'pending', message: '' }];
+        this.picker.open = false;
+        this.finished = false;
+        this.summaryOpen = true;
+    },
+    async downloadOne(rel) {
+        const formData = new FormData();
+        formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+        formData.append('backup_file', this.picker.file);
+        formData.append('path', rel);
+        try {
+            const resp = await fetch('/backups/download-file', { method: 'POST', body: formData });
+            if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
+            const url = URL.createObjectURL(await resp.blob());
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = rel.split('/').pop();
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            this.picker.error = e.message;
+        }
+    },
+    fmtUnix(sec) {
+        return sec ? this.fmtDate(new Date(sec * 1000).toISOString()) : '';
+    },
+    fmtSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+        return bytes.toFixed(1) + ' ' + units[i];
+    },
+    fmtDate(iso) {
+        if (!iso) return '';
+        return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    },
+    backupsFor(type) {
+        return type === 'full' ? this.backups : this.backups.filter(b => (b.types || []).includes(type));
+    },
+    visibleBackups() {
+        const q = this.search.toLowerCase();
+        return this.backupsFor(this.tab).filter(b => !q || this.fmtDate(b.created).toLowerCase().includes(q));
+    },
+    isJobTab(t) {
+        return t === 'queue' || t === 'logs';
+    },
+    isItemTab(t) {
+        return ['databases', 'mail', 'vhosts'].includes(t);
+    },
+    // every database, mailbox, domain or zone found in the backups, listed once with the backups that have it, newest first
+    itemsFor(kind) {
+        const field = { databases: 'databases', mail: 'mailboxes', vhosts: 'domains', dns: 'zones' }[kind];
+        const byKey = {};
+        for (const b of this.backups) {
+            for (const it of (b[field] || [])) {
+                const engine = kind === 'databases' ? (it.engine || 'mysql') : '';
+                const key = kind + ':' + engine + ':' + it.name;
+                if (!byKey[key]) byKey[key] = { key: key, name: it.name, engine: engine, on_server: kind === 'databases' || !!it.on_server, suspended: !!it.suspended, backups: [] };
+                // a domain restore brings its dns zone along when that backup has it
+                const zone = kind === 'vhosts' && (b.zones || []).some(z => z.name === it.name);
+                byKey[key].backups.push({ file: b.file, created: b.created, size_text: it.size_text || (it.size ? this.fmtSize(it.size) : ''), count: it.count || 0, zone: zone });
+            }
+        }
+        return Object.values(byKey).sort((a, b) => a.name.localeCompare(b.name));
+    },
+    // mailboxes are stored as domain/user, people know them as user@domain
+    itemLabel(name, kind) {
+        if (kind !== 'mail' && kind !== 'mailboxes') return name;
+        const [domain, user] = name.split('/');
+        return user ? user + '@' + domain : name;
+    },
+    visibleItems() {
+        const q = this.search.toLowerCase();
+        return this.itemsFor(this.tab).filter(d => !q || this.itemLabel(d.name, this.tab).toLowerCase().includes(q));
+    },
+    // mailboxes and zones need their domain on the account, a missing domain gets added back by the Domains restore
+    pickable(row) {
+        if (row.suspended) return false;
+        return row.on_server || this.tab === 'vhosts';
+    },
+    chosenBackup(row) {
+        return row.backups.find(b => b.file === this.choice[row.key]) || row.backups[0];
+    },
+    allSelected() {
+        const rows = this.visibleItems().filter(r => this.pickable(r));
+        return rows.length > 0 && rows.every(r => this.selected[r.key]);
+    },
+    someSelected() {
+        return this.selectedCount() > 0 && !this.allSelected();
+    },
+    toggleAll(on) {
+        for (const r of this.visibleItems().filter(r => this.pickable(r))) this.selected[r.key] = on;
+    },
+    selectedCount() {
+        return Object.values(this.selected).filter(Boolean).length;
+    },
+    // picked rows grouped by the backup chosen for each, one restore or download per backup
+    selectionGroups() {
+        const groups = {};
+        for (const row of this.itemsFor(this.tab).filter(r => this.selected[r.key] && this.pickable(r))) {
+            const b = this.chosenBackup(row);
+            if (!groups[b.file]) groups[b.file] = { file: b.file, created: b.created, rows: [] };
+            groups[b.file].rows.push(row);
+        }
+        return Object.values(groups);
+    },
+    // a single database comes back as its .sql, anything else as a .tar.gz of just the picked items
+    async downloadSelected() {
+        const kind = { databases: 'databases', mail: 'mailboxes', vhosts: 'domains' }[this.tab];
+        this.downloading = true;
+        try {
+            for (const g of this.selectionGroups()) {
+                const formData = new FormData();
+                formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+                formData.append('backup_file', g.file);
+                formData.append('kind', kind);
+                for (const row of g.rows) formData.append('items', kind === 'databases' ? row.engine + '/' + row.name : row.name);
+                const resp = await fetch('/backups/download-items', { method: 'POST', body: formData });
+                if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
+                const name = ((resp.headers.get('Content-Disposition') || '').split('filename=')[1] || 'backup.tar.gz').replace(/\x22/g, '');
+                const url = URL.createObjectURL(await resp.blob());
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        } catch (e) {
+            showToast(e.message, 'error');
+        } finally {
+            this.downloading = false;
+        }
+    },
+    canRestore() {
+        return this.isItemTab(this.tab) ? this.selectedCount() > 0 : !!this.selectedFile;
+    },
+    openSummary() {
+        if (this.tab === 'databases') {
+            this.summaryItems = this.itemsFor('databases').filter(d => this.selected[d.key]).map(d => {
+                const b = this.chosenBackup(d);
+                return { target: 'database', database: d.name, engine: d.engine, file: b.file, created: b.created, status: 'pending', message: '' };
+            });
+        } else if (this.isItemTab(this.tab)) {
+            // one restore per backup, with every item picked from it
+            const target = { mail: 'mailboxes', vhosts: 'domains' }[this.tab];
+            this.summaryItems = this.selectionGroups().map(g => ({ target: target, database: '', picks: g.rows.map(r => r.name), file: g.file, created: g.created, status: 'pending', message: '' }));
+        } else {
+            const b = this.backups.find(x => x.file === this.selectedFile);
+            this.summaryItems = [{ target: this.tab === 'full' ? 'all' : this.tab, database: '', file: b.file, created: b.created, status: 'pending', message: '' }];
+        }
+        this.finished = false;
+        this.summaryOpen = true;
+    },
+    // adds every summary item to the account's restore queue, then shows the queue on the overview
+    async runRestore() {
+        this.running = true;
+        let failed = '';
+        for (const item of this.summaryItems) {
+            try {
+                const formData = new FormData();
+                formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+                formData.append('backup_file', item.file);
+                formData.append('restore_target', item.target);
+                if (item.database) formData.append('database', item.database);
+                if (item.engine) formData.append('engine', item.engine);
+                for (const pick of (item.picks || [])) formData.append('items', pick);
+                const resp = await fetch('/backups/queue', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (!data.queued) failed = data.error || resp.statusText;
+            } catch (e) {
+                failed = e.toString();
+            }
+        }
+        this.running = false;
+        this.summaryOpen = false;
+        this.selected = {};
+        this.selectedFile = null;
+        if (failed) {
+            showToast(failed, 'error');
+        } else {
+            showToast(this.$refs.queuedMsg.textContent, 'success');
+        }
+        this.setTab('');
+        this.loadJobs();
+    },
+    closeSummary() {
+        if (this.running) return;
+        this.summaryOpen = false;
+        if (this.finished) {
+            this.selected = {};
+            this.selectedFile = null;
+        }
+    },
+    async submitDownload() {
+        this.downloading = true;
+        this.downloadResult = null;
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+            formData.append('backup_file', this.selectedFile);
+            const resp = await fetch('/backups/download', { method: 'POST', body: formData });
+            if (resp.ok) {
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = this.selectedFile;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.downloadResult = { success: true };
+            } else {
+                this.downloadResult = await resp.json();
+            }
+        } catch (e) {
+            this.downloadResult = { error: e.toString() };
+        } finally {
+            this.downloading = false;
+        }
+    }
+}">
+
+    <span x-ref="queuedMsg" class="hidden">{{.T.Get "Added to the queue."}}</span>
+    <!-- Hidden CSRF token for JS fetch calls -->
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <!-- Header -->
+    <div class="op-page-head">
+        <header>
+            <div class="flex flex-col gap-2 text-center sm:flex-row sm:items-center sm:justify-between sm:text-start">
+                <div>
+                    <div class="op-wp-title">
+                        <h1 class="op-title">{{.T.Get "Restore & Download"}}</h1>
+                        <template x-if="reindexing">
+                            <span class="gap-1.5 op-badge is-warning">
+                                <svg class="animate-spin size-3" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                </svg>
+                                {{.T.Get "Indexing..."}}
+                            </span>
+                        </template>
+                    </div>
+                    <p class="op-meta">{{.T.Get "Restore or download backups from destination."}}</p>
+                </div>
+                <div class="flex flex-none items-center justify-center gap-2 px-2 sm:justify-end sm:px-0">
+                    <form method="post" action="">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                        <button
+                            :disabled="reindexing"
+                            class="op-btn op-btn-primary"
+                            type="submit">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="size-4 shrink-0">
+                                <path d="M5.463 4.433A9.961 9.961 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.136-.67 4.116-1.81 5.74L17 12h3A8 8 0 0 0 6.46 6.228l-.997-1.795zm13.074 15.134A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.136.67-4.116 1.81-5.74L7 12H4a8 8 0 0 0 13.54 5.772l.997 1.795z"/>
+                            </svg>
+                            {{.T.Get "Reindex Destination"}}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {{if .ReindexError}}
+            <div class="mt-3 flex gap-2 px-3 py-2">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="size-4 shrink-0 mt-0.5 is-danger">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <p class="text-xs is-danger">{{.ReindexError}}</p>
+            </div>
+            {{end}}
+        </header>
+    </div>
+
+    {{if .Backups}}
+    <!-- type tabs -->
+    <div class="op-subtabs" role="tablist" aria-label="{{.T.Get "Backup types"}}">
+        <button type="button" role="tab" @click="setTab('')" :aria-selected="(tab === '').toString()" :aria-pressed="(tab === '').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "home"}}</span>{{.T.Get "Overview"}}</button>
+        <button type="button" role="tab" @click="setTab('full')" :aria-selected="(tab === 'full').toString()" :aria-pressed="(tab === 'full').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "full"}}</span>{{.T.Get "Everything"}} <span class="op-count" x-text="backupsFor('full').length"></span></button>
+        <button type="button" role="tab" @click="setTab('html')" :aria-selected="(tab === 'html').toString()" :aria-pressed="(tab === 'html').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "html"}}</span>{{.T.Get "Website Files"}} <span class="op-count" x-text="backupsFor('html').length"></span></button>
+        <button type="button" role="tab" @click="setTab('databases')" :aria-selected="(tab === 'databases').toString()" :aria-pressed="(tab === 'databases').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "databases"}}</span>{{.T.Get "Databases"}} <span class="op-count" x-text="itemsFor('databases').length"></span></button>
+        <button type="button" role="tab" @click="setTab('mail')" :aria-selected="(tab === 'mail').toString()" :aria-pressed="(tab === 'mail').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "mail"}}</span>{{.T.Get "Emails"}} <span class="op-count" x-text="itemsFor('mail').length"></span></button>
+        <button type="button" role="tab" @click="setTab('vhosts')" :aria-selected="(tab === 'vhosts').toString()" :aria-pressed="(tab === 'vhosts').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "vhosts"}}</span>{{.T.Get "Domains"}} <span class="op-count" x-text="itemsFor('vhosts').length"></span></button>
+        <button type="button" role="tab" @click="setTab('crons')" :aria-selected="(tab === 'crons').toString()" :aria-pressed="(tab === 'crons').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "crons"}}</span>{{.T.Get "Cron Jobs"}} <span class="op-count" x-text="backupsFor('crons').length"></span></button>
+        <button type="button" role="tab" @click="setTab('queue')" :aria-selected="(tab === 'queue').toString()" :aria-pressed="(tab === 'queue').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "queue"}}</span>{{.T.Get "Queue"}} <span class="op-count" x-text="jobs.queue.length"></span></button>
+        <button type="button" role="tab" @click="setTab('logs')" :aria-selected="(tab === 'logs').toString()" :aria-pressed="(tab === 'logs').toString()" class="op-bk-tab"><span class="op-bk-tab-ico">{{template "bk_icon" "logs"}}</span>{{.T.Get "Logs"}}</button>
+    </div>
+
+    <!-- overview: stats and a card per type, a table only shows once a type is picked -->
+    <div x-show="!tab" class="op-col">
+        <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+            <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"/><path d="M10 12l4 0"/></svg>{{.T.Get "Total Backups"}}</div><div class="op-kpi-value" x-text="backups.length"></div><div class="op-kpi-note">{{.T.Get "on the destination"}}</div></div>
+            <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 7v5l3 3"/></svg>{{.T.Get "Latest Backup"}}</div><div class="op-kpi-value" style="font-size:20px" x-text="fmtDate(backups[0]?.created) || '–'"></div><div class="op-kpi-note op-mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="backups[0]?.file || ''"></div></div>
+            <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M4 13m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M17 17l0 .01"/><path d="M4 15l2.5 -8.5a2 2 0 0 1 1.9 -1.5h7.2a2 2 0 0 1 1.9 1.5l2.5 8.5"/></svg>{{.T.Get "Total Size"}}</div><div class="op-kpi-value" x-text="fmtSize(backups.reduce((sum, b) => sum + (b.size || 0), 0))"></div><div class="op-kpi-note">{{.T.Get "all archives together"}}</div></div>
+            <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg>{{.T.Get "Last Restore"}}
+                    <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'done'">· {{.T.Get "Done"}}</span>
+                    <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'failed'" class="is-danger">· {{.T.Get "Failed"}}</span></div><div class="op-kpi-value" style="font-size:20px">
+                    <span x-show="jobs.queue.length" class="inline-flex items-center gap-1.5"><i class="bi bi-arrow-repeat animate-spin"></i><span x-text="jobs.queue.length"></span> {{.T.Get "in queue"}}</span>
+                    <span x-show="!jobs.queue.length" x-text="jobs.logs[0] ? fmtDate(jobs.logs[0].finished) : '–'"></span>
+                </div><div class="op-kpi-note" x-show="!jobs.queue.length &amp;&amp; !jobs.logs[0]">{{.T.Get "No restores yet."}}</div></div>
+        </section>
+
+        <section class="op-card"><div class="op-card-head"><div><h2>{{.T.Get "What do you want to restore?"}}</h2><p class="op-meta">{{.T.Get "Pick a type to see its backups."}}</p></div></div>
+        <div class="op-options" style="--cols:3">
+                <button type="button" class="op-option" @click="setTab('full')"><span class="op-ico-tile">{{template "op_icon" "archive"}}</span><div><b>{{.T.Get "Everything"}}</b><span><span x-text="backupsFor('full').length"></span> {{.T.Get "backups"}}</span></div></button>
+                <button type="button" class="op-option" @click="setTab('html')"><span class="op-ico-tile">{{template "op_icon" "folder"}}</span><div><b>{{.T.Get "Website Files"}}</b><span><span x-text="backupsFor('html').length"></span> {{.T.Get "backups"}}</span></div></button>
+                <button type="button" class="op-option" @click="setTab('databases')"><span class="op-ico-tile">{{template "op_icon" "db"}}</span><div><b>{{.T.Get "Databases"}}</b><span><span x-text="itemsFor('databases').length"></span> {{.T.Get "databases"}}</span></div></button>
+                <button type="button" class="op-option" @click="setTab('mail')"><span class="op-ico-tile">{{template "op_icon" "mail"}}</span><div><b>{{.T.Get "Emails"}}</b><span><span x-text="itemsFor('mail').length"></span> {{.T.Get "email accounts"}}</span></div></button>
+                <button type="button" class="op-option" @click="setTab('vhosts')"><span class="op-ico-tile">{{template "op_icon" "globe"}}</span><div><b>{{.T.Get "Domains"}}</b><span><span x-text="itemsFor('vhosts').length"></span> {{.T.Get "domains"}}</span></div></button>
+                <button type="button" class="op-option" @click="setTab('crons')"><span class="op-ico-tile">{{template "op_icon" "clock"}}</span><div><b>{{.T.Get "Cron Jobs"}}</b><span><span x-text="backupsFor('crons').length"></span> {{.T.Get "backups"}}</span></div></button>
+        </div>
+        </section>
+        <section class="op-card"><div class="op-card-head"><div><h2>{{.T.Get "Restore activity"}}</h2><p class="op-meta">{{.T.Get "Restores run one at a time, the rest wait in the queue."}}</p></div></div>
+        <div class="op-options" style="--cols:3">
+            <button type="button" class="op-option" @click="setTab('queue')"><span class="op-ico-tile">{{template "op_icon" "menu"}}</span><div><b>{{.T.Get "Queue"}}</b><span><span x-text="jobs.queue.length"></span> {{.T.Get "in queue"}}</span></div></button>
+            <button type="button" class="op-option" @click="setTab('logs')"><span class="op-ico-tile">{{template "op_icon" "history"}}</span><div><b>{{.T.Get "Logs"}}</b><span><span x-text="jobs.logs.length"></span> {{.T.Get "restores"}}</span></div></button>
+        </div>
+        </section>
+    </div>
+
+    <!-- restore queue -->
+    <div x-show="tab === 'queue'" x-cloak class="op-card">
+        <!-- queue: one restore runs at a time, the rest wait their turn -->
+        <h2 class="flex items-center gap-2 op-h">
+            {{.T.Get "Queue"}}
+            <span x-show="jobs.queue.length" class="op-badge" x-text="jobs.queue.length"></span>
+        </h2>
+        <p class="mb-3 text-sm op-muted">{{.T.Get "Restores run one at a time, the rest wait here."}}</p>
+        <div class="overflow-x-auto">
+            <table class="op-table is-plain">
+                <thead class="op-thead">
+                    <tr>
+                        <th class="op-th">{{.T.Get "What"}}</th>
+                        <th class="op-th">{{.T.Get "From backup"}}</th>
+                        <th class="op-th">{{.T.Get "Added"}}</th>
+                        <th class="op-th">{{.T.Get "Status"}}</th>
+                    </tr>
+                </thead>
+                <tbody class="op-tbody">
+                    <template x-for="j in jobs.queue" :key="j.id">
+                        <tr>
+                            <td class="p-4 text-sm">{{template "bk_job_what" .}}</td>
+                            <td class="op-td" x-text="fmtDate(j.created) || '–'"></td>
+                            <td class="op-td" x-text="fmtDate(j.queued)"></td>
+                            <td class="op-td">
+                                <span x-show="j.status === 'running'" class="inline-flex items-center gap-1.5 op-strong"><i class="bi bi-arrow-repeat animate-spin"></i>{{.T.Get "Restoring..."}} <span class="op-muted" x-text="fmtDuration(j.started, null)"></span></span>
+                                <span x-show="j.status === 'queued'">{{.T.Get "Waiting"}}</span>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="!jobs.queue.length">
+                        <td colspan="4" class="text-center op-td">{{.T.Get "Nothing is being restored right now."}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- restore log -->
+    <div x-show="tab === 'logs'" x-cloak class="op-card">
+        <!-- logs: what was restored and how it went -->
+        <h2 class="op-h">{{.T.Get "Logs"}}</h2>
+        <p class="mb-3 text-sm op-muted">{{.T.Get "Your latest restores, newest first."}}</p>
+        <div class="overflow-x-auto">
+            <table class="op-table is-plain">
+                <thead class="op-thead">
+                    <tr>
+                        <th class="op-th">{{.T.Get "What"}}</th>
+                        <th class="op-th">{{.T.Get "From backup"}}</th>
+                        <th class="op-th">{{.T.Get "Restored"}}</th>
+                        <th class="op-th">{{.T.Get "Took"}}</th>
+                        <th class="op-th">{{.T.Get "Status"}}</th>
+                    </tr>
+                </thead>
+                <tbody class="op-tbody">
+                    <template x-for="j in jobs.logs" :key="j.id">
+                        <tr>
+                            <td class="p-4 text-sm">{{template "bk_job_what" .}}</td>
+                            <td class="op-td" x-text="fmtDate(j.created) || '–'"></td>
+                            <td class="op-td" x-text="fmtDate(j.finished)"></td>
+                            <td class="op-td" x-text="fmtDuration(j.started, j.finished)"></td>
+                            <td class="op-td">
+                                <span x-show="j.status === 'done'" class="op-badge is-success">{{.T.Get "Done"}}</span>
+                                <span x-show="j.status === 'failed'" class="op-badge is-danger">{{.T.Get "Failed"}}</span>
+                                <p x-show="j.message" class="mt-1 max-w-xl text-xs" :class="j.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'" x-text="j.message"></p>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="!jobs.logs.length">
+                        <td colspan="5" class="text-center op-td">{{.T.Get "No restores yet."}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- one type picked -->
+    <div x-show="tab && !isJobTab(tab)" x-cloak class="op-card">
+        <p class="text-sm op-muted" style="margin:0">
+            <span x-show="tab === 'full'">{{.T.Get "Select a backup to restore everything in it: files, databases, emails, domains with their DNS zones and cron jobs."}}</span>
+            <span x-show="tab === 'html'" x-cloak>{{.T.Get "Select a backup to restore all its website files, or pick single files and folders with Choose files."}}</span>
+            <span x-show="tab === 'databases'" x-cloak>{{.T.Get "Select one or more databases. The newest backup is used unless you choose another one."}}</span>
+            <span x-show="tab === 'mail'" x-cloak>{{.T.Get "Select one or more email accounts. The newest backup is used unless you choose another one."}}</span>
+            <span x-show="tab === 'vhosts'" x-cloak>{{.T.Get "Select one or more domains to restore their configuration, PHP version and DNS zone. Domains you deleted are added back to your account first, suspended domains can't be restored."}}</span>
+            <span x-show="tab === 'crons'" x-cloak>{{.T.Get "Select a backup to restore only the cron jobs from it."}}</span>
+        </p>
+
+        <!-- toolbar, like the other list pages -->
+        <div class="op-toolbar" style="margin-top:12px">
+            <div class="relative w-full sm:w-64">
+                <input x-model="search" type="search" placeholder="{{.T.Get "Search"}}"
+                    class="op-input"/>
+                <div class="op-search-ico">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="size-[1.125rem] shrink-0"><path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- backups (full, website files, cron jobs) -->
+        <div x-show="!isItemTab(tab)" class="overflow-x-auto">
+            <table class="op-table is-plain">
+                <thead class="op-thead">
+                    <tr>
+                        <th scope="col" class="w-10 op-th"></th>
+                        <th class="op-th">{{.T.Get "Created"}}</th>
+                        <th x-show="tab === 'full'" class="op-th">{{.T.Get "Contents"}}</th>
+                        <th class="op-th is-num">{{.T.Get "Size"}}</th>
+                    </tr>
+                </thead>
+                <tbody class="op-tbody">
+                    <template x-for="b in visibleBackups()" :key="b.file">
+                        <tr @click="selectedFile = (selectedFile === b.file ? null : b.file)"
+                            :class="selectedFile === b.file ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-900'"
+                            class="cursor-pointer">
+                            <td class="w-10 py-4 pl-4 sm:pl-6 pr-2 align-middle">
+                                <input type="checkbox" class="op-native-check" :checked="selectedFile === b.file" @click.stop="selectedFile = $event.target.checked ? b.file : null" :aria-label="fmtDate(b.created)"/>
+                            </td>
+                            <td class="whitespace-nowrap p-4 text-sm">
+                                <span class="op-strong" x-text="fmtDate(b.created) || '—'"></span>
+                                <span x-show="b === backupsFor(tab)[0]" class="ml-1 op-badge is-accent">{{.T.Get "Latest"}}</span>
+                                <p x-show="b.error" class="mt-0.5 text-xs is-danger" x-text="b.error"></p>
+                            </td>
+                            <td x-show="tab === 'full'" class="op-td">
+                                <div class="flex flex-wrap items-center gap-x-4 gap-1">
+                                    <span x-show="b.types.includes('html')" class="inline-flex items-center gap-1.5"><span class="size-3.5 shrink-0 op-muted">{{template "bk_icon" "html"}}</span>{{.T.Get "Website files"}}</span>
+                                    <span x-show="b.databases.length" class="inline-flex items-center gap-1.5"><span class="size-3.5 shrink-0 op-muted">{{template "bk_icon" "databases"}}</span>{{.T.Get "Databases"}}<span x-show="b.databases.length" class="tabular-nums op-muted" x-text="b.databases.length"></span></span>
+                                    <span x-show="b.types.includes('mail')" class="inline-flex items-center gap-1.5"><span class="size-3.5 shrink-0 op-muted">{{template "bk_icon" "mail"}}</span>{{.T.Get "Emails"}}<span x-show="b.mailboxes.length" class="tabular-nums op-muted" x-text="b.mailboxes.length"></span></span>
+                                    <span x-show="b.types.includes('vhosts')" class="inline-flex items-center gap-1.5"><span class="size-3.5 shrink-0 op-muted">{{template "bk_icon" "vhosts"}}</span>{{.T.Get "Domains"}}<span x-show="b.domains.length" class="tabular-nums op-muted" x-text="b.domains.length"></span></span>
+                                    <span x-show="b.types.includes('crons')" class="inline-flex items-center gap-1.5"><span class="size-3.5 shrink-0 op-muted">{{template "bk_icon" "crons"}}</span>{{.T.Get "Cron jobs"}}</span>
+                                </div>
+                            </td>
+                            <td class="whitespace-nowrap op-td is-num" x-text="b.size_text || '—'"></td>
+                        </tr>
+                    </template>
+                    <tr x-show="visibleBackups().length === 0">
+                        <td colspan="4" class="text-center op-td">{{.T.Get "No backups found."}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- databases, email accounts and domains, each listed once -->
+        <div x-show="isItemTab(tab)" x-cloak class="overflow-x-auto">
+            <table class="op-table is-plain">
+                <thead class="op-thead">
+                    <tr>
+                        <th scope="col" class="w-10 op-th">
+                            <input type="checkbox" class="op-native-check" :checked="allSelected()" :indeterminate="someSelected()" @change="toggleAll($event.target.checked)" aria-label="{{.T.Get "Select all"}}"/>
+                        </th>
+                        <th class="op-th">
+                            <span x-show="tab === 'databases'">{{.T.Get "Database Name"}}</span>
+                            <span x-show="tab === 'mail'">{{.T.Get "Email Account"}}</span>
+                            <span x-show="tab === 'vhosts'">{{.T.Get "Domain"}}</span>
+                        </th>
+                        <th class="op-th">{{.T.Get "Created"}}</th>
+                        <th class="op-th is-num">{{.T.Get "Size"}}</th>
+                    </tr>
+                </thead>
+                <tbody class="op-tbody">
+                    <template x-for="d in visibleItems()" :key="d.key">
+                        <tr @click="if (pickable(d)) selected[d.key] = !selected[d.key]"
+                            :class="selected[d.key] ? 'bg-gray-100 dark:bg-gray-800' : (pickable(d) ? 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer' : 'opacity-50')">
+                            <td class="w-10 py-4 pl-4 sm:pl-6 pr-2 align-middle">
+                                <input type="checkbox" class="op-native-check" :checked="selected[d.key]" :disabled="!pickable(d)" @click.stop="selected[d.key] = $event.target.checked" :aria-label="itemLabel(d.name, tab)"/>
+                            </td>
+                            <td class="p-4 text-sm">
+                                <span class="op-strong" x-text="itemLabel(d.name, tab)"></span>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <span x-show="d.engine === 'mysql'" class="op-badge is-accent">MySQL</span>
+                                    <span x-show="d.engine === 'postgres'" class="op-badge is-accent">PostgreSQL</span>
+                                    <span x-show="tab === 'vhosts'" class="op-badge">+ {{.T.Get "VirtualHost"}}</span>
+                                    <span x-show="tab === 'vhosts'" class="op-badge">+ {{.T.Get "PHP version"}}</span>
+                                    <span x-show="tab === 'vhosts' && chosenBackup(d).zone" class="op-badge">+ {{.T.Get "DNS zone"}}</span>
+                                    <span x-show="tab === 'vhosts' && d.suspended" :title="$el.dataset.hint" data-hint="{{.T.Get "Unsuspend the domain to restore its VirtualHost."}}" class="op-badge is-danger">{{.T.Get "Suspended"}}</span>
+                                    <span x-show="tab === 'vhosts' && !d.on_server" class="op-badge is-warning">{{.T.Get "Will be added"}}</span>
+                                    <span x-show="tab === 'mail' && !d.on_server" class="op-hint">{{.T.Get "Restore the domain first"}}</span>
+                                </div>
+                            </td>
+                            <td class="p-4 text-sm" @click.stop>
+                                <span class="op-strong" x-text="fmtDate(chosenBackup(d).created) || '—'"></span>
+                                <span class="op-hint">· <span x-text="d.backups.length"></span> {{.T.Get "backups found"}}</span>
+                                <select x-show="d.backups.length > 1"
+                                    :value="chosenBackup(d).file"
+                                    @change="choice[d.key] = $event.target.value; if (pickable(d)) selected[d.key] = true"
+                                    class="mt-1 block w-full appearance-none truncate px-2 py-1 text-xs sm:w-64 op-surface">
+                                    <template x-for="b in d.backups" :key="b.file">
+                                        <option :value="b.file" :selected="b.file === chosenBackup(d).file" x-text="(fmtDate(b.created) || '—') + (b.size_text ? ' (' + b.size_text + ')' : '')"></option>
+                                    </template>
+                                </select>
+                            </td>
+                            <td class="whitespace-nowrap op-td is-num">
+                                <span x-text="chosenBackup(d).size_text || '—'"></span>
+                                <p x-show="tab === 'mail'" class="op-hint"><span x-text="chosenBackup(d).count"></span> {{.T.Get "messages"}}</p>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="visibleItems().length === 0">
+                        <td colspan="4" class="text-center op-td">
+                            <span x-show="tab === 'databases'">{{.T.Get "No databases found in the backups."}}</span>
+                            <span x-show="tab !== 'databases'">{{.T.Get "Nothing found in the backups. Backups made before this version don't list emails and domains, restore those from the Everything tab."}}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- actions, the same bottom bar the bulk actions use on other pages -->
+        {{template "bulk_btn_style"}}
+        <div x-show="hasSelection()" class="h-24" aria-hidden="true"></div>
+        <div x-show="hasSelection()" x-cloak x-transition :style="barStyle" x-init="placeBar()"
+            class="fixed bottom-0 z-40 flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 op-surface">
+            <div class="op-strong">
+                <span x-show="isItemTab(tab)"><span x-text="selectedCount()"></span> {{.T.Get "selected"}}</span>
+                <span x-show="!isItemTab(tab)" x-text="fmtDate(backups.find(b => b.file === selectedFile)?.created)"></span>
+                <button type="button" class="ms-2 text-xs op-accent-text" @click="selected = {}; selectedFile = null">{{.T.Get "Clear"}}</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" x-show="listKind(tab) && selectedFile" @click="openPicker()" :disabled="!canPick()"
+                    :title="canPick() ? '' : $el.dataset.hint" data-hint="{{.T.Get "This backup was made before single items could be restored."}}" aria-label="{{.T.Get "Choose files"}}"
+                    class="bulk-btn relative op-btn op-btn-sm op-btn-secondary"><i class="bi bi-list-check" aria-hidden="true"></i><span class="bulk-btn-label">{{.T.Get "Choose files"}}</span></button>
+                <button type="button" @click="if (isItemTab(tab)) downloadSelected(); else { downloadResult = null; downloadOpen = true; }" :disabled="downloading" aria-label="{{.T.Get "Download"}}"
+                    class="bulk-btn relative op-btn op-btn-sm op-btn-secondary"><i class="bi" :class="downloading ? 'bi-arrow-repeat animate-spin' : 'bi-download'" aria-hidden="true"></i><span class="bulk-btn-label">{{.T.Get "Download"}}</span></button>
+                <button type="button" @click="openSummary()" :disabled="!canRestore()" aria-label="{{.T.Get "Restore"}}"
+                    class="bulk-btn relative op-btn op-btn-sm op-btn-primary">{{template "op_icon" "refresh"}}<span class="bulk-btn-label">{{.T.Get "Restore"}}</span></button>
+            </div>
+        </div>
+    </div>
+
+    {{else}}
+    <div class="p-4 sm:p-6 lg:p-8">
+        <div class="p-4 py-6 text-center">
+            <template x-if="reindexing">
+                <span class="op-meta">{{.T.Get "Indexing destination, please wait..."}}</span>
+            </template>
+            <template x-if="!reindexing">
+                <div>
+                    <span class="op-strong">{{.T.Get "No backups indexed yet"}}</span>
+                    <p class="mt-1 text-sm op-muted">{{.T.Get "Click \"Reindex Destination\" to fetch available backups."}}</p>
+                </div>
+            </template>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- File picker: folder browser for website files, same listing as the /files folder picker -->
+    <div x-show="picker.open" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @keydown.escape.window="picker.open = false" @click.self="picker.open = false">
+        <div class="flex w-full max-w-xl flex-col op-surface">
+            <div class="flex items-center justify-between px-5 py-4">
+                <div class="min-w-0">
+                    <h3 class="op-h">
+                        {{.T.Get "Choose files"}}
+                    </h3>
+                    <p class="truncate text-xs op-muted" x-text="fmtDate(backups.find(b => b.file === picker.file)?.created)"></p>
+                </div>
+                <button type="button" @click="picker.open = false" class="p-1 transition-colors op-muted">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="size-4"><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-3 px-5 py-4">
+                <!-- breadcrumbs, like the /files folder picker -->
+                <div class="flex flex-wrap items-center gap-1 text-sm">
+                    <button type="button" @click="loadDir('')" class="cursor-pointer op-muted"><i class="bi bi-house"></i></button>
+                    <template x-for="c in crumbs()" :key="c.path">
+                        <span class="flex items-center gap-1">
+                            <span class="op-muted">/</span>
+                            <button type="button" @click="loadDir(c.path)" class="cursor-pointer truncate op-muted" x-text="c.name"></button>
+                        </span>
+                    </template>
+                </div>
+
+                <p x-show="picker.error" class="px-3 py-2 text-xs is-danger" x-text="picker.error"></p>
+
+                <ul class="h-72 overflow-y-auto text-sm">
+                    <li x-show="picker.loading" class="px-3 py-2 op-muted">{{.T.Get "Loading..."}}</li>
+
+                    <!-- website files -->
+                    <template x-if="!picker.loading">
+                        <div>
+                            <li x-show="picker.path">
+                                <button type="button" @click="loadDir(parentPath())" class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"><i class="bi bi-arrow-up"></i> ..</button>
+                            </li>
+                            <template x-for="d in picker.dirs" :key="'d' + d.name">
+                                <li class="flex items-center gap-2 px-3 py-2">
+                                    <input type="checkbox" :checked="picker.picked[childPath(d.name)]" @change="picker.picked[childPath(d.name)] = $event.target.checked" class="op-native-check"/>
+                                    <button type="button" @click="loadDir(childPath(d.name))" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
+                                        <i class="bi bi-folder-fill is-warning"></i>
+                                        <span class="min-w-0 truncate op-strong" x-text="d.name"></span>
+                                        <span class="ml-auto whitespace-nowrap text-xs op-muted" x-text="d.files + ' · ' + fmtSize(d.size)"></span>
+                                        <i class="bi bi-chevron-right op-muted"></i>
+                                    </button>
+                                </li>
+                            </template>
+                            <template x-for="f in picker.files" :key="'f' + f.name">
+                                <li class="flex items-center gap-2 px-3 py-2">
+                                    <input type="checkbox" :checked="picker.picked[childPath(f.name)]" @change="picker.picked[childPath(f.name)] = $event.target.checked" class="op-native-check"/>
+                                    <i class="bi bi-file-earmark op-muted"></i>
+                                    <span class="min-w-0 flex-1 truncate op-strong" x-text="f.name"></span>
+                                    <span class="whitespace-nowrap text-xs op-muted" x-text="fmtSize(f.size) + ' · ' + fmtUnix(f.mtime)"></span>
+                                    <button type="button" @click="downloadOne(childPath(f.name))" title="{{.T.Get "Download"}}" class="cursor-pointer op-muted"><i class="bi bi-download"></i></button>
+                                </li>
+                            </template>
+                            <li x-show="!picker.dirs.length && !picker.files.length" class="px-3 py-2 op-muted">{{.T.Get "This folder is empty."}}</li>
+                        </div>
+                    </template>
+
+                </ul>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 px-5 py-3">
+                <span class="op-hint"><span x-text="pickedKeys().length"></span> {{.T.Get "selected"}}</span>
+                <div class="flex gap-2">
+                    <button type="button" @click="picker.open = false"
+                        class="op-btn op-btn-secondary">{{.T.Get "Cancel"}}</button>
+                    <button type="button" @click="restorePicked()" :disabled="!pickedKeys().length"
+                        class="op-btn op-btn-primary">{{.T.Get "Restore selected"}}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore summary modal -->
+    <div x-show="summaryOpen" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @keydown.escape.window="closeSummary()" @click.self="closeSummary()">
+        <div class="w-full max-w-xl op-surface">
+            <div class="flex items-center justify-between px-5 py-4">
+                <h3 class="op-h">{{.T.Get "Restore Summary"}}</h3>
+                <button type="button" @click="closeSummary()" :disabled="running" class="p-1 transition-colors op-muted">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="size-4"><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-4 px-5 py-4">
+                <div x-show="!finished && !running" class="flex gap-2 px-3 py-2">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="mt-0.5 size-4 shrink-0 is-warning"><path d="M12.866 3l9.526 16.5a1 1 0 0 1-.866 1.5H2.474a1 1 0 0 1-.866-1.5L11.134 3a1 1 0 0 1 1.732 0zM11 16v2h2v-2h-2zm0-7v5h2V9h-2z"/></svg>
+                    <p class="text-xs is-warning">{{.T.Get "Restoring will overwrite existing data. This action cannot be undone."}} {{.T.Get "The items are added to the queue and restored one at a time."}}</p>
+                </div>
+
+                <div>
+                    <p class="mb-2 text-xs font-medium op-muted">{{.T.Get "Items to restore"}}</p>
+                    <ul class="">
+                        <template x-for="item in summaryItems" :key="item.target + item.database + item.file + (item.picks || []).join()">
+                            <li class="flex items-start justify-between gap-3 px-3 py-2.5">
+                                <div class="min-w-0">
+                                    <p class="op-strong">
+                                        <span x-show="item.target === 'all'">{{.T.Get "Everything"}}</span>
+                                        <span x-show="item.target === 'html'">{{.T.Get "Website files"}}</span>
+                                        <span x-show="item.target === 'mail'">{{.T.Get "Emails"}}</span>
+                                        <span x-show="item.target === 'vhosts'">{{.T.Get "Domains"}}</span>
+                                        <span x-show="item.target === 'crons'">{{.T.Get "Cron jobs"}}</span>
+                                        <span x-show="item.target === 'database'" x-text="item.database"></span>
+                                        <span x-show="item.target === 'dns'">{{.T.Get "DNS zones"}}</span>
+                                        <span x-show="item.target === 'paths'">{{.T.Get "Selected files"}}</span>
+                                        <span x-show="item.target === 'mailboxes'">{{.T.Get "Selected mailboxes"}}</span>
+                                        <span x-show="item.target === 'domains'">{{.T.Get "Selected domains"}}</span>
+                                        <span x-show="item.target === 'dns_zones'">{{.T.Get "Selected DNS zones"}}</span>
+                                    </p>
+                                    <p x-show="item.picks?.length" class="text-xs break-words op-muted" x-text="(item.picks || []).map(p => itemLabel(p, item.target)).join(', ')"></p>
+                                    <p class="truncate text-xs op-muted" x-text="fmtDate(item.created)"></p>
+                                    <p x-show="item.message" class="mt-0.5 text-xs" :class="item.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'" x-text="item.message"></p>
+                                </div>
+                                <div class="shrink-0">
+                                    <svg x-show="item.status === 'running'" class="size-4 animate-spin op-accent-text" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                    <svg x-show="item.status === 'done'" viewBox="0 0 24 24" fill="currentColor" class="size-4 is-success"><path d="M10 15.172l9.192-9.193 1.415 1.414L10 18l-6.364-6.364 1.414-1.414z"/></svg>
+                                    <svg x-show="item.status === 'error'" viewBox="0 0 24 24" fill="currentColor" class="size-4 is-danger"><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></svg>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 px-5 py-3">
+                <button type="button" @click="closeSummary()" :disabled="running"
+                    class="op-btn op-btn-secondary">
+                    <span x-show="!finished">{{.T.Get "Cancel"}}</span>
+                    <span x-show="finished">{{.T.Get "Close"}}</span>
+                </button>
+                <button type="button" x-show="!finished" @click="runRestore()" :disabled="running"
+                    class="op-btn op-btn-primary">
+                    <svg x-show="running" class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    <span x-show="!running">{{.T.Get "Restore Selected Items"}}</span>
+                    <span x-show="running">{{.T.Get "Restoring..."}}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download modal -->
+    <div x-show="downloadOpen" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @keydown.escape.window="if (!downloading) downloadOpen = false" @click.self="if (!downloading) downloadOpen = false">
+        <div class="w-full max-w-xl op-surface">
+            <div class="px-5 py-4">
+                <h3 class="op-h">{{.T.Get "Download Backup"}}</h3>
+                <p class="mt-0.5 text-xs op-muted" x-text="fmtDate(backups.find(b => b.file === selectedFile)?.created)"></p>
+            </div>
+            <div class="space-y-2 px-5 py-4">
+                <p x-show="!downloadResult" class="text-sm op-muted">{{.T.Get "The backup archive will be fetched from the destination and downloaded to your browser."}} {{.T.Get "Large files may take a moment to transfer."}}</p>
+                <p x-show="downloadResult?.success" class="text-sm is-success">{{.T.Get "Download started."}}</p>
+                <div x-show="downloadResult?.error">
+                    <p class="text-sm font-medium is-danger">{{.T.Get "Download failed."}}</p>
+                    <p class="mt-0.5 text-xs is-danger" x-text="downloadResult?.error"></p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 px-5 py-3">
+                <button type="button" @click="downloadOpen = false" :disabled="downloading"
+                    class="op-btn op-btn-secondary">{{.T.Get "Close"}}</button>
+                <button type="button" x-show="!downloadResult?.success" @click="submitDownload()" :disabled="downloading"
+                    class="op-btn op-btn-primary">
+                    <svg x-show="downloading" class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    <span x-show="!downloading">{{.T.Get "Download"}}</span>
+                    <span x-show="downloading">{{.T.Get "Downloading..."}}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- END templates/files/backup_restore.html -->
+{{end}}

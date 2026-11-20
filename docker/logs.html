@@ -1,0 +1,162 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/docker/logs.html -->
+
+<div class="op-page-head op-cms-head">
+    <div>
+        <div class="op-eyebrow" id="log-eyebrow"></div>
+        <h1 class="op-title">{{.T.Get "Logs"}}</h1>
+        <p class="op-meta">{{.T.Get "View Docker container logs."}}</p>
+    </div>
+    <div class="op-actions">
+        <button type="button" class="op-btn op-btn-secondary" onclick="copyLog()">{{template "op_icon" "copy"}} {{.T.Get "Copy"}}</button>
+        <button type="button" class="op-btn op-btn-secondary" title="{{.T.Get "Open log in new tab"}}" onclick="openLogInNewTab()">{{template "op_icon" "forward"}} {{.T.Get "Open raw"}}</button>
+    </div>
+</div>
+
+<div class="op-content">
+<section class="op-card" x-data="{ rawMode: false, wrap: true, q: '' }" x-effect="window.__logFilter = q; window.__logWrap = wrap; renderLog(window.__loadedLog, rawMode)">
+    <div class="op-toolbar">
+        {{/* opened from a service's Logs tab, the service is already picked */}}
+        <label class="op-field" style="flex:0 1 220px{{if .ServiceTool}};display:none{{end}}"><span class="op-label">{{.T.Get "Container"}}</span>
+            <select id="log-select" class="op-select">
+                <option disabled selected value>{{.T.Get "-- Select container --"}}</option>
+                {{range .Services}}<option value="{{.}}">{{.}}</option>{{end}}
+            </select>
+        </label>
+        <label class="op-field" style="flex:0 1 120px"><span class="op-label">{{.T.Get "Lines"}}</span>
+            <select id="lines-select" class="op-select">
+                <option value="20">20</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option selected value="1000">1000</option>
+                <option value="2000">2000</option>
+                <option value="999999">{{.T.Get "All"}}</option>
+            </select>
+        </label>
+    </div>
+    <div class="op-toolbar">
+        <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="q" placeholder="{{.T.Get "Filter lines"}}" aria-label="{{.T.Get "Filter lines"}}"></label>
+        <span style="flex:1"></span>
+        <button type="button" class="op-filter" :aria-pressed="rawMode.toString()" @click="rawMode = !rawMode; window.__logRawMode = rawMode">{{.T.Get "Raw view"}}</button>
+        <button type="button" class="op-filter" :aria-pressed="wrap.toString()" @click="wrap = !wrap">{{.T.Get "Wrap"}}</button>
+    </div>
+    <div class="op-terminal" role="log" aria-label="{{.T.Get "Container log"}}">
+        <div class="op-terminal-bar"><i></i><i></i><i></i><span id="log-title">{{.T.Get "Select a container to view its logs here."}}</span></div>
+        <div id="log-content" style="max-height:65vh;overflow:auto"></div>
+    </div>
+</section>
+</div>
+
+<script>
+const logsI18n = {
+    emptyLog: {{toJSON (.T.Get "The log file is empty.")}},
+    fetchError: {{toJSON (.T.Get "Error fetching log data.")}},
+    title: {{toJSON (.T.Get "Logs")}},
+    lines: {{toJSON (.T.Get "lines")}},
+    copied: {{toJSON (.T.Get "Logs copied to clipboard.")}},
+    copyFailed: {{toJSON (.T.Get "Failed to copy logs.")}}
+};
+
+function logURL() {
+    const logName = document.getElementById('log-select').value;
+    const linesValue = document.getElementById('lines-select').value;
+    let url = `/containers/logs/${encodeURIComponent(logName)}`;
+    if (linesValue !== 'ALL') {
+        url += `?lines=${linesValue}`;
+    }
+    return url;
+}
+
+// SHOW LOG FILE CONTENT
+function fetchLog() {
+    const logName = document.getElementById('log-select').value;
+    if (!logName) return;
+    fetch(logURL())
+        .then(response => response.text())
+        .then(text => {
+            const n = text.trim() ? text.trim().split('\n').length : 0;
+            document.getElementById('log-title').textContent = logName + ' · ' + n + ' ' + logsI18n.lines;
+            document.getElementById('log-eyebrow').textContent = logName;
+            window.__loadedLog = text.trim();
+            renderLog(window.__loadedLog, window.__logRawMode);
+        })
+        .catch(error => {
+            console.error('Error fetching log:', error);
+            document.getElementById('log-content').textContent = logsI18n.fetchError;
+        });
+}
+
+// formatted view colours error and warning lines, raw view shows the log as-is
+function renderLog(text, rawMode) {
+    const box = document.getElementById('log-content');
+    if (!box) return;
+    box.innerHTML = '';
+    const pre = document.createElement('pre');
+    pre.style.whiteSpace = window.__logWrap === false ? 'pre' : 'pre-wrap';
+    pre.style.wordBreak = window.__logWrap === false ? 'normal' : 'break-word';
+    const q = (window.__logFilter || '').toLowerCase();
+    const lines = (text || '').split('\n').filter(l => !q || l.toLowerCase().includes(q));
+    if (text === undefined) {
+        pre.textContent = '';
+    } else if (!text) {
+        pre.textContent = logsI18n.emptyLog;
+    } else if (rawMode) {
+        pre.textContent = lines.join('\n');
+    } else {
+        lines.forEach(line => {
+            const span = document.createElement('span');
+            span.style.display = 'block';
+            span.textContent = line;
+            if (/\b(error|fatal|panic|crit(ical)?|emerg(ency)?|alert|exception)\b/i.test(line)) {
+                span.style.color = '#ff6b6b';
+            } else if (/\bwarn(ing)?\b/i.test(line)) {
+                span.className = 'y';
+            }
+            pre.appendChild(span);
+        });
+    }
+    box.appendChild(pre);
+    box.scrollTop = box.scrollHeight;
+}
+
+function copyLog() {
+    if (!window.__loadedLog) return;
+    copyToClipboard(window.__loadedLog)
+        .then(() => showToast(logsI18n.copied, "success"))
+        .catch(err => {
+            console.error("Clipboard copy failed:", err);
+            showToast(logsI18n.copyFailed, "warning");
+        });
+}
+
+function openLogInNewTab() {
+    if (!document.getElementById('log-select').value) return;
+    window.open(logURL(), "_blank");
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const containerParam = urlParams.get('container');
+    const linesParam = urlParams.get('lines');
+
+    if (containerParam) {
+        document.getElementById('log-select').value = containerParam;
+        if (linesParam) {
+            document.getElementById('lines-select').value = linesParam;
+        }
+        fetchLog();
+    }
+
+    document.getElementById('log-select').addEventListener('change', fetchLog);
+    document.getElementById('lines-select').addEventListener('change', fetchLog);
+});
+</script>
+
+
+<!-- END templates/docker/logs.html -->
+{{end}}

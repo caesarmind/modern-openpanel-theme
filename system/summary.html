@@ -1,0 +1,185 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/system/summary.html -->
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">{{.T.Get "Daily Summary"}}{{if .Found}} · {{.T.Get "made"}} {{.Summary.GeneratedAt.Format "2 Jan 15:04 MST"}}{{end}}</div>
+            <h1 class="op-title">{{if .Found}}{{.Summary.From.Format "Monday, 2 January 2006"}}{{else}}{{.T.Get "Daily Summary"}}{{end}}</h1>
+            <p class="op-meta">{{if and .Found .Summary.Headline}}{{.Summary.Headline}}{{else}}{{.T.Get "What happened on your account and websites each day, with what needs fixing first."}}{{end}}</p>
+        </div>
+        {{if .Dates}}
+        <div class="op-actions"><div class="ds-day" role="group" aria-label="{{.T.Get "Day"}}">
+            {{if .Prev}}<a class="op-btn op-btn-secondary" href="/summary?date={{.Prev}}" aria-label="{{.T.Get "Previous day"}}" title="{{.T.Get "Previous day"}}">{{template "op_icon" "chevleft"}}</a>{{else}}<button class="op-btn op-btn-secondary" type="button" disabled aria-label="{{.T.Get "Previous day"}}">{{template "op_icon" "chevleft"}}</button>{{end}}
+            <select class="op-select" aria-label="{{.T.Get "Date"}}" onchange="window.location.href = '/summary?date=' + encodeURIComponent(this.value)">
+                {{if not .Found}}<option value="" selected disabled>{{.T.Get "Pick a day"}}</option>{{end}}
+                {{range .Dates}}<option value="{{.}}"{{if eq . $.Date}} selected{{end}}>{{$.DayLabel .}}</option>{{end}}
+            </select>
+            {{if .Next}}<a class="op-btn op-btn-secondary" href="/summary?date={{.Next}}" aria-label="{{.T.Get "Next day"}}" title="{{.T.Get "Next day"}}">{{template "op_icon" "chevright"}}</a>{{else}}<button class="op-btn op-btn-secondary" type="button" disabled aria-label="{{.T.Get "Next day"}}">{{template "op_icon" "chevright"}}</button>{{end}}
+        </div></div>
+        {{end}}
+    </div>
+
+    {{if not .Found}}
+    <section class="op-card">
+        <div class="op-empty"><b>{{if .Dates}}{{.T.Get "There is no summary for this day."}}{{else}}{{.T.Get "Your first summary will be ready tomorrow morning."}}{{end}}</b><span class="op-hint">{{.T.Get "A summary is made each morning for the day before and kept for 90 days."}}</span></div>
+    </section>
+    {{else}}
+    {{$s := .Summary}}
+    {{with .Tiles}}
+    <section class="op-kpis ds-kpis" aria-label="{{$.T.Get "The day in numbers"}}">
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "pulse"}} {{$.T.Get "Requests"}}</div>
+            <div class="op-kpi-value"><span>{{$s.Num $s.TotalRequests}}</span>{{template "ds_delta" (dict "T" $.T "Tile" .Requests)}}</div>
+            <div class="op-kpi-note">{{if .Requests.HasPrev}}{{.Requests.PrevNum}} {{$.T.Get "the day before"}}{{else}}{{$.T.Get "No summary for the day before"}}{{end}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "users"}} {{$.T.Get "Unique IPs"}}</div>
+            <div class="op-kpi-value"><span>{{$s.Num $s.TotalVisitors}}</span>{{template "ds_delta" (dict "T" $.T "Tile" .Visitors)}}</div>
+            <div class="op-kpi-note">{{$.T.Get "across"}} {{len $s.Websites}} {{if eq (len $s.Websites) 1}}{{$.T.Get "website"}}{{else}}{{$.T.Get "websites"}}{{end}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "upload"}} {{$.T.Get "Bandwidth"}}</div>
+            <div class="op-kpi-value"><span>{{$s.SentNum}} <small>{{$s.SentUnit}}</small></span>{{template "ds_delta" (dict "T" $.T "Tile" .Bandwidth)}}</div>
+            <div class="op-kpi-note">{{$.T.Get "sent to visitors"}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "warn"}} {{$.T.Get "Error pages"}}</div>
+            <div class="op-kpi-value{{if $s.TotalErrors}} is-danger{{end}}"><span>{{$s.Num $s.TotalErrors}}</span>{{template "ds_delta" (dict "T" $.T "Tile" .Errors)}}</div>
+            <div class="op-kpi-note">{{$s.Num $s.TotalNotFound}} {{$.T.Get "not found (404)"}}</div>
+        </div>
+        <div class="op-kpi">
+            <div class="op-kpi-label">{{template "op_icon" "shield"}} {{$.T.Get "Firewall blocks"}}</div>
+            <div class="op-kpi-value"><span>{{$s.Num $s.TotalBlocked}}</span>{{template "ds_delta" (dict "T" $.T "Tile" .Blocked)}}</div>
+            <div class="op-kpi-note">{{$s.Num $s.TotalRateLimited}} {{$.T.Get "rate limited"}}</div>
+        </div>
+    </section>
+    {{end}}
+
+    {{if or $s.Attention $s.Look}}
+    <section class="op-card" aria-label="{{.T.Get "What to look at"}}">
+        {{if $s.Attention}}<div>
+            <p class="ds-tag"><span class="ds-dot is-danger"></span>{{.T.Get "Needs your attention"}} · {{len $s.Attention}}</p>
+            <ul class="ds-find">{{range $s.Attention}}{{template "ds_item" (dict "Item" . "Tone" "is-danger")}}{{end}}</ul>
+        </div>{{end}}
+        {{if $s.Look}}<div{{if $s.Attention}} class="ds-look"{{end}}>
+            <p class="ds-tag"><span class="ds-dot is-warning"></span>{{.T.Get "Worth a look"}} · {{len $s.Look}}</p>
+            <ul class="ds-find">{{range $s.Look}}{{template "ds_item" (dict "Item" . "Tone" "is-warning")}}{{end}}</ul>
+        </div>{{end}}
+    </section>
+    {{end}}
+
+    <div class="op-cols-2">
+        <section class="op-card" aria-labelledby="ds-good">
+            <div class="op-card-head"><h2 id="ds-good">{{if or $s.Attention $s.Look}}{{.T.Get "What went well"}}{{else}}{{.T.Get "Nothing needs your attention on this day"}}{{end}}</h2></div>
+            {{if $s.Good}}<ul class="ds-good">{{range $s.Good}}<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5l10 -10"/></svg><span>{{.}}</span></li>{{end}}</ul>
+            {{else}}<p class="op-hint">{{.T.Get "No good news recorded for this day."}}</p>{{end}}
+        </section>
+        <section class="op-card" aria-labelledby="ds-usage">
+            <div class="op-card-head"><h2 id="ds-usage">{{.T.Get "Resource usage"}}</h2>{{if .UserAllowed.usage}}<a href="/server/usage/history">{{.T.Get "Usage history"}}</a>{{end}}</div>
+            <div class="ds-usage">
+                {{range $s.Usage}}<div class="ds-usage-row"><span>{{$.T.Get .Title}}</span><span class="op-mono op-hint">{{.Used}} {{$.T.Get "of"}} {{.Total}} · {{.Percent}}%</span><div class="op-progress{{if eq .Level "full"}} is-danger{{else if eq .Level "warning"}} is-warning{{end}}"><span style="width:{{if lt .Width 1}}1{{else}}{{.Width}}{{end}}%"></span></div></div>{{end}}
+                {{range $s.Facts}}<p class="op-hint">{{.}}</p>{{end}}
+                {{if not (or $s.Usage $s.Facts)}}<p class="op-hint">{{.T.Get "No usage was recorded for this day."}}</p>{{end}}
+            </div>
+        </section>
+    </div>
+
+    <section class="op-card" aria-labelledby="ds-sites">
+        <div class="op-card-head"><h2 id="ds-sites">{{.T.Get "Websites"}} <span class="op-hint">· {{len $s.Websites}}</span></h2>{{if .UserAllowed.goaccess}}<a href="/domains/stats">{{.T.Get "Visitor statistics"}}</a>{{end}}</div>
+        {{if $s.Websites}}
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr>
+                <th aria-sort="none"><button class="op-th-sort" type="button" data-sort-key="name" data-sort-type="string" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Website"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="descending" class="is-num"><button class="op-th-sort" type="button" data-sort-key="requests" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Requests"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="none" class="is-num"><button class="op-th-sort" type="button" data-sort-key="ips" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Unique IPs"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="none" class="is-num"><button class="op-th-sort" type="button" data-sort-key="bytes" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Bandwidth"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="none" class="is-num"><button class="op-th-sort" type="button" data-sort-key="notfound" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "404s"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="none" class="is-num"><button class="op-th-sort" type="button" data-sort-key="errors" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Errors"}}<i aria-hidden="true"></i></button></th>
+                <th aria-sort="none" class="is-num"><button class="op-th-sort" type="button" data-sort-key="blocked" data-sort-type="number" onclick="opSortToggle(event, this, sortTableColumn)">{{.T.Get "Blocked"}}<i aria-hidden="true"></i></button></th>
+            </tr></thead>
+            <tbody>
+                {{range $s.Websites}}{{$w := .}}
+                <tr>
+                    <td class="op-cell-title" data-sort-col="name" data-sort-value="{{.Name}}"><div class="op-row-title"><div><b class="punycode">{{.Name}}</b>{{if or .TopPage .Change}}<span class="op-sub">{{with .TopPage}}{{$.T.Get "Top page"}} {{.}}{{end}}{{if .TopPage}} · {{$s.Num .TopPageViews}} {{if eq .TopPageViews 1}}{{$.T.Get "view"}}{{else}}{{$.T.Get "views"}}{{end}}{{end}}{{with .Change}}{{if $w.TopPage}} · {{end}}{{.}} {{$.T.Get "vs the day before"}}{{end}}</span>{{end}}</div></div></td>
+                    <td data-label="{{$.T.Get "Requests"}}" class="is-num" data-sort-col="requests" data-sort-value="{{.Requests}}"><span class="ds-req"><span class="op-progress"><span style="width:{{.Bar}}%"></span></span><span class="op-mono">{{$s.Num .Requests}}</span></span></td>
+                    <td data-label="{{$.T.Get "Unique IPs"}}" class="is-num" data-sort-col="ips" data-sort-value="{{.UniqueIPs}}"><span class="op-mono{{if not .UniqueIPs}} op-hint{{end}}">{{$s.Num .UniqueIPs}}</span></td>
+                    <td data-label="{{$.T.Get "Bandwidth"}}" class="is-num" data-sort-col="bytes" data-sort-value="{{.Bytes}}"><span class="op-mono">{{.Size}}</span></td>
+                    <td data-label="{{$.T.Get "404s"}}" class="is-num" data-sort-col="notfound" data-sort-value="{{.NotFound}}"><span class="op-mono{{if not .NotFound}} op-hint{{end}}">{{$s.Num .NotFound}}</span></td>
+                    <td data-label="{{$.T.Get "Errors"}}" class="is-num" data-sort-col="errors" data-sort-value="{{.ServerErrors}}">{{if .ServerErrors}}<span class="op-badge is-danger">{{$s.Num .ServerErrors}} 5xx</span>{{else}}<span class="op-mono op-hint">0</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Blocked"}}" class="is-num" data-sort-col="blocked" data-sort-value="{{add .WAFBlocked .RateLimited}}">{{if or .WAFBlocked .RateLimited}}<span class="op-mono" title="{{.WAFBlocked}} {{$.T.Get "by the firewall"}}, {{.RateLimited}} {{$.T.Get "rate limited"}}">{{$s.Num (add .WAFBlocked .RateLimited)}}</span>{{else}}<span class="op-mono op-hint">0</span>{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table></div>
+        {{else}}
+        <div class="op-empty"><b>{{.T.Get "No website traffic on this day"}}</b><span class="op-hint">{{.T.Get "Requests, visitors and errors show up here once your websites get visits."}}</span></div>
+        {{end}}
+    </section>
+
+    <div class="op-cols-2">
+        <section class="op-card" aria-labelledby="ds-logins">
+            <div class="op-card-head"><h2 id="ds-logins">{{.T.Get "Panel logins"}} <span class="op-hint">· {{len $s.Logins}}</span></h2>{{if .UserAllowed.login_history}}<a href="/account/login-history">{{.T.Get "Login history"}}</a>{{end}}</div>
+            {{if $s.Logins}}<ul class="ds-logins">{{range $s.Logins}}<li>
+                {{if .Flag}}<img class="ds-flag" src="/static/flags/{{.Flag}}.png" alt="{{.Country}}" title="{{.Country}}" onerror="this.style.visibility='hidden'">{{else}}<span class="ds-flag" title="{{$.T.Get "Country unknown"}}" aria-hidden="true"></span>{{end}}
+                <span class="ds-ip"><span class="op-mono">{{.IP}}</span></span>
+                {{if .New}}<span class="op-badge is-warning">{{$.T.Get "New IP"}}</span>{{end}}
+                <span class="op-mono op-hint">{{.Time.Format "15:04"}}</span>
+            </li>{{end}}</ul>
+            {{else}}<div class="op-empty"><b>{{.T.Get "No logins on this day"}}</b></div>{{end}}
+        </section>
+        <section class="op-card" aria-labelledby="ds-changes" x-data="dsChanges({{toJSON $s.Changes}})">
+            <div class="op-card-head"><h2 id="ds-changes">{{.T.Get "Changes to your account"}} <span class="op-hint">· {{len $s.Changes}}</span></h2>{{if .UserAllowed.activity}}<a href="/account/activity">{{.T.Get "Activity log"}}</a>{{end}}</div>
+            {{if gt (len $s.Changes) 10}}<label class="op-search ds-search">{{template "op_icon" "search"}}<input class="op-input" type="search" placeholder="{{.T.Get "Filter changes"}}" aria-label="{{.T.Get "Filter changes"}}" x-model="q"></label>{{end}}
+            <ul class="ds-changes" x-show="matches.length"><template x-for="(c, i) in shown" :key="i"><li><time x-text="c.slice(0, 5)"></time><span x-text="c.slice(6)"></span></li></template></ul>
+            <button class="op-btn op-btn-ghost op-btn-sm ds-more" type="button" x-show="matches.length > shown.length" x-cloak @click="all = true" x-text="{{toJSON (.T.Get "Show all")}} + ' ' + matches.length"></button>
+            <div class="op-empty" x-show="!matches.length"{{if $s.Changes}} x-cloak{{end}}><b>{{if $s.Changes}}{{.T.Get "No change matches"}}{{else}}{{.T.Get "No changes on this day"}}{{end}}</b></div>
+        </section>
+    </div>
+    {{end}}
+
+    {{if .UserAllowed.notifications}}
+    <section class="op-card ds-mail" aria-label="{{.T.Get "Email"}}" x-data="dsEmail({{.EmailOn}})">
+        <div><b>{{.T.Get "Email me this summary"}}</b><p>{{.T.Get "Each morning you get the day before"}}{{with .Email}}, {{$.T.Get "sent to"}} <span class="op-mono">{{.}}</span>{{end}}. {{.T.Get "Summaries stay on this page for 90 days either way."}}</p></div>
+        <div class="ds-toggle"><button class="op-switch" type="button" role="switch" :aria-checked="on.toString()" aria-checked="{{.EmailOn}}" :disabled="busy" @click="toggle()" aria-label="{{.T.Get "Email me this summary"}}"></button><a href="/account/notifications#daily-summary" class="op-hint">{{.T.Get "All notifications"}}</a></div>
+    </section>
+    {{end}}
+</div>
+
+<script src="{{static "js/table-sort.js"}}"></script>
+<script>
+function dsChanges(list) {
+    return {
+        list: list || [], q: '', all: false,
+        get matches() { const q = this.q.trim().toLowerCase(); return q ? this.list.filter((c) => c.toLowerCase().includes(q)) : this.list; },
+        get shown() { return this.all || this.q.trim() ? this.matches : this.matches.slice(0, 10); },
+    };
+}
+function dsEmail(on) {
+    const L = { on: {{toJSON (.T.Get "Daily summary emails turned on")}}, off: {{toJSON (.T.Get "Daily summary emails turned off")}}, failed: {{toJSON (.T.Get "Could not save the setting.")}} };
+    return {
+        on, busy: false,
+        toggle() {
+            const want = !this.on;
+            this.on = want;
+            this.busy = true;
+            const body = new FormData();
+            body.append('on', want ? '1' : '0');
+            fetch('/summary/email', { method: 'POST', body, headers: { 'X-CSRF-Token': csrf_token } })
+                .then((r) => r.json().then((d) => (r.ok ? d : Promise.reject(d.error || L.failed))))
+                .then((d) => { this.on = !!d.on; showToast(this.on ? L.on : L.off, 'success'); })
+                .catch((e) => { this.on = !want; showToast(typeof e === 'string' ? e : L.failed, 'error'); })
+                .finally(() => { this.busy = false; });
+        },
+    };
+}
+</script>
+<!-- END templates/system/summary.html -->
+{{end}}
+
+{{define "ds_delta"}}{{with .Tile.Delta}}<span class="op-badge {{$.Tile.Tone}}" title="{{$.T.Get "Compared with the day before"}}">{{.}}</span>{{end}}{{end}}
+
+{{define "ds_item"}}<li><div class="ds-txt"><span class="ds-dot {{.Tone}}" aria-hidden="true"></span><div><b>{{.Item.Title}}</b>{{with .Item.Detail}}<p>{{.}}</p>{{end}}{{if and .Item.Action (not .Item.Link)}}<p>{{.Item.Action}}</p>{{end}}</div></div>{{if and .Item.Action .Item.Link}}<a class="op-btn op-btn-secondary op-btn-sm" href="{{.Item.Link}}">{{.Item.Action}}</a>{{end}}</li>{{end}}

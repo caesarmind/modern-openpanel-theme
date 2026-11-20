@@ -1,0 +1,119 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mysql/remote_mysql.html -->
+<div class="op-content">
+{{$on := eq .RemoteMySQLDisplay "ON"}}
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "Remote Access"}}</h1>
+        <p class="op-meta">{{.T.Get "Enable remote access to connect to a database on this server from a another (remote) device or location over the internet."}}</p>
+    </div>
+    <div class="op-actions">
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <input type="hidden" name="action" value="{{if $on}}disable{{else}}enable{{end}}">
+            <button class="op-btn {{if $on}}op-btn-secondary{{else}}op-btn-primary{{end}}" type="submit">{{if $on}}{{.T.Get "Disable Remote Database Access"}}{{else}}{{.T.Get "Enable Remote Database Access"}}{{end}}</button>
+        </form>
+    </div>
+</div>
+
+<section class="op-card" x-data="{ addOpen: false }">
+    <div class="op-section">
+        <div><h3>{{.T.Get "Status"}}</h3><p>{{.T.Get "Remote access to databases is currently:"}}</p></div>
+        <form method="post" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            {{if $on}}
+            <span class="op-status is-success">{{.T.Get "Enabled"}}</span>
+            <input type="hidden" name="action" value="disable">
+            <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Disable"}}</button>
+            {{else if eq .RemoteMySQLDisplay "OFF"}}
+            <span class="op-status">{{.T.Get "Disabled"}}</span>
+            <input type="hidden" name="action" value="enable">
+            <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Enable"}}</button>
+            {{else}}
+            <span class="op-status is-warning">{{.T.Get "Unknown"}}</span>
+            <input type="hidden" name="action" value="enable">
+            <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Restart"}}</button>
+            {{end}}
+        </form>
+    </div>
+    <div class="op-section">
+        <div><h3 id="remote">{{.T.Get "Remote"}}</h3><p>{{.T.Get "Connection info when connecting to database"}} <b>{{.T.Get "from a remote server"}}</b>.</p></div>
+        <dl class="op-dl" style="max-width:420px"><dt>{{.T.Get "Server:"}}</dt><dd class="op-mono" id="remote_server">{{.ServerIP}}</dd><dt>{{.T.Get "Port:"}}</dt><dd class="op-mono" id="remote_port">{{.ContainerPort}}</dd></dl>
+    </div>
+    <div class="op-section">
+        <div><h3 id="local">{{.T.Get "Local"}}</h3><p>{{.T.Get "Connection info when connecting to database"}} <b>{{.T.Get "from a local server"}}</b>.</p></div>
+        <dl class="op-dl" style="max-width:420px"><dt>{{.T.Get "Server:"}}</dt><dd class="op-mono" id="local_server">{{.Service}}</dd><dt>{{.T.Get "Port:"}}</dt><dd class="op-mono" id="local_port">{{.MySQLPort}}</dd></dl>
+    </div>
+    {{if $on}}
+    <div class="op-section">
+        <div><h3 id="user-access">{{.T.Get "Per-User Access"}}</h3><p>{{.T.Get "Control which hosts each MySQL user is allowed to connect from."}}</p>
+            <button class="op-btn op-btn-secondary op-btn-sm" type="button" style="margin-top:10px" @click="addOpen = true">{{template "op_icon" "plus"}} {{.T.Get "Add Access"}}</button></div>
+        <div style="min-width:0">
+        {{template "bulk_open" (dict "T" .T "Table" "#remote-access-table" "Endpoint" "/mysql/remote-mysql/access/bulk")}}
+        <div class="op-table-wrap"><table id="remote-access-table" class="op-table">
+            <thead><tr><th class="is-shrink">{{template "bulk_head_input" .}}</th><th>{{.T.Get "Username"}}</th><th>{{.T.Get "Allowed From"}}</th><th class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th></tr></thead>
+            <tbody>
+            {{range .UserAccess}}{{$entry := .}}{{range $entry.Hosts}}{{$host := .}}
+            <tr x-data="{ editing: false }">
+                <td class="is-shrink"><input type="checkbox" class="bulk-select-box op-native-check" value="{{$entry.Username}}@{{$host}}" data-bulk-skip="" :checked="!!bulkSelected[{{toJSON (printf "%s@%s" $entry.Username $host)}}]" @change="bulkToggle($event.target)" aria-label="{{$.T.Get "Select"}} {{$entry.Username}}@{{$host}}"></td>
+                <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-cyan)">{{template "op_icon" "user"}}</span><div><b class="op-mono" style="font-size:13px">{{$entry.Username}}</b></div></div></td>
+                <td data-label="{{$.T.Get "Allowed From"}}">
+                    <span x-show="!editing"><span class="op-tag op-mono">{{$host}}</span>{{if eq $host "%"}} <span class="op-hint">{{$.T.Get "any host"}}</span>{{end}}</span>
+                    <form method="POST" action="/mysql/remote-mysql/access/edit" x-show="editing" x-cloak style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                        <input type="hidden" name="db_user" value="{{$entry.Username}}">
+                        <input type="hidden" name="old_host" value="{{$host}}">
+                        <input type="text" name="new_host" value="{{$host}}" class="op-input op-mono" style="width:180px;height:32px" aria-label="{{$.T.Get "Allowed Host"}}">
+                        <button type="submit" class="op-btn op-btn-primary op-btn-sm">{{$.T.Get "Save"}}</button>
+                        <button type="button" @click="editing = false" class="op-btn op-btn-ghost op-btn-sm">{{$.T.Get "Cancel"}}</button>
+                    </form>
+                </td>
+                <td class="is-shrink op-cell-menu" style="position:relative">
+                    <form method="POST" action="/mysql/remote-mysql/access/delete" hidden>
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                        <input type="hidden" name="db_user" value="{{$entry.Username}}">
+                        <input type="hidden" name="db_host" value="{{$host}}">
+                    </form>
+                    <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                        <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions"}} {{$entry.Username}}@{{$host}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                        <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                            <button type="button" @click="open = false; editing = true">{{template "op_icon" "pencil"}} {{$.T.Get "Edit"}}</button>
+                            <hr>
+                            <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Remove access for")}} + ' ' + {{toJSON (printf "%s@%s" $entry.Username $host)}} + '?')) $root.closest('td').querySelector('form').submit()">{{template "op_icon" "trash"}} {{$.T.Get "Delete"}}</button>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {{end}}{{else}}
+            <tr><td colspan="4"><div class="op-empty"><b>{{.T.Get "No MySQL users found."}}</b></div></td></tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        {{template "bulk_bar" .}}
+        </div>
+        </div>
+    </div>
+    {{end}}
+
+    <div class="op-scrim" x-show="addOpen" x-cloak @click="addOpen = false"></div>
+    <div class="op-sheet" role="dialog" aria-label="{{.T.Get "Add Access"}}" x-show="addOpen" x-cloak @keydown.escape.window="addOpen = false">
+        <h2>{{.T.Get "Add Access"}}</h2>
+        <form method="POST" action="/mysql/remote-mysql/access/add">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <div class="op-col" style="gap:14px;margin:16px 0 20px">
+                <label class="op-field"><span class="op-label">{{.T.Get "Username"}}</span><input type="text" name="db_user" class="op-input op-mono" pattern="[a-zA-Z0-9_]+" title="{{.T.Get "Only letters, numbers, and underscores are allowed."}}" required placeholder="{{.T.Get "Existing or new username"}}"><span class="op-hint">{{.T.Get "Only letters, numbers, and underscores are allowed."}}{{if .MySQLPrefix}} {{.T.Get "New users get the prefix"}} <code>{{.MySQLPrefix}}</code>{{end}}</span></label>
+                <label class="op-field"><span class="op-label">{{.T.Get "Allowed Host"}}</span><input type="text" name="db_host" class="op-input op-mono" required placeholder="%, localhost, 192.168.1.10..."></label>
+                <label class="op-field"><span class="op-label">{{.T.Get "Password"}}</span><input type="text" name="password" class="op-input op-mono" required minlength="8" title="{{.T.Get "At least 8 characters."}}"><span class="op-hint">{{.T.Get "If the username already exists, the new host inherits its existing database privileges."}}</span></label>
+            </div>
+            <div class="op-actions" style="justify-content:flex-end"><button type="button" class="op-btn op-btn-secondary" @click="addOpen = false">{{.T.Get "Cancel"}}</button><button type="submit" class="op-btn op-btn-primary">{{.T.Get "Grant Access"}}</button></div>
+        </form>
+    </div>
+</section>
+</div>
+
+<!-- END templates/mysql/remote_mysql.html -->
+{{end}}

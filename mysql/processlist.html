@@ -1,0 +1,79 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/mysql/processlist.html -->
+<div class="op-content">
+<div class="op-page-head">
+    <div>
+        <h1 class="op-title">{{.T.Get "MySQL Running Queries"}}</h1>
+        <p class="op-meta">{{.T.Get "List of all current processes running on the MySQL server, providing insights into ongoing queries, operations, and their associated details for better performance monitoring."}}</p>
+    </div>
+    <div class="op-actions"><a href="/mysql/processlist" class="op-btn op-btn-secondary">{{template "op_icon" "refresh"}} {{.T.Get "Refresh Processes"}}</a></div>
+</div>
+
+<section class="op-card" aria-label="{{.T.Get "Processes Table"}}" x-data="{ searchQuery: '', at: new Date().toLocaleTimeString() }">
+    <div class="op-toolbar">
+        <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search"}}" aria-label="{{.T.Get "Search processes"}}"></label>
+        <span class="op-hint" x-text="{{toJSON (.T.Get "Updated")}} + ' ' + at"></span>
+    </div>
+{{template "bulk_open" (dict "T" .T "Table" "#processlist-table" "Endpoint" "/mysql/processlist/bulk")}}
+    <div class="op-table-wrap">
+        <table id="processlist-table" class="op-table">
+            <thead>
+                <tr>
+{{template "bulk_head_checkbox" .}}
+                    <th scope="col">{{.T.Get "ID"}}</th>
+                    <th scope="col">{{.T.Get "User"}}</th>
+                    <th scope="col">{{.T.Get "Host"}}</th>
+                    <th scope="col">{{.T.Get "DB"}}</th>
+                    <th scope="col">{{.T.Get "Command"}}</th>
+                    <th scope="col" class="is-num">{{.T.Get "Time"}}</th>
+                    <th scope="col">{{.T.Get "State"}}</th>
+                    <th scope="col" class="op-col-wide">{{.T.Get "Info"}}</th>
+                    <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                </tr>
+            </thead>
+            <tbody>
+        {{range .ProcessList}}
+        {{$killable := and (eq .Command "Query") (ne .User "system user") (ne .User "event_scheduler") (ne .Info "SHOW FULL PROCESSLIST")}}
+        <tr x-show="searchQuery === '' || {{toJSON (printf "%v %s %s %s %s %s %s" .ID .User .Host .DB .Command .State .Info)}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
+{{$skip := ""}}{{if not $killable}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" (toString .ID) "Label" (toString .ID) "Skip" $skip)}}
+            <td data-label="{{$.T.Get "ID"}}"><span class="op-mono">{{.ID}}</span></td>
+            <td data-label="{{$.T.Get "User"}}"><span class="op-mono">{{.User}}</span></td>
+            <td data-label="{{$.T.Get "Host"}}"><span class="op-mono">{{.Host}}</span></td>
+            <td data-label="{{$.T.Get "DB"}}">{{if .DB}}<span class="op-mono">{{.DB}}</span>{{else}}<span class="op-hint">&ndash;</span>{{end}}</td>
+            <td data-label="{{$.T.Get "Command"}}"><span class="op-badge">{{.Command}}</span></td>
+            <td data-label="{{$.T.Get "Time"}}" class="is-num">{{if .Time}}<span class="op-mono">{{.Time}}s</span>{{end}}</td>
+            <td data-label="{{$.T.Get "State"}}"><span class="op-mono">{{.State}}</span></td>
+            <td data-label="{{$.T.Get "Info"}}" class="op-col-wide">{{if .Info}}<code class="op-mono" style="font-size:12px;overflow-wrap:anywhere">{{.Info}}</code>{{end}}</td>
+            <td class="is-shrink op-cell-menu" style="position:relative">
+                {{if $killable}}
+                <form method="POST" action="/mysql/processlist/kill" hidden>
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                    <input type="hidden" name="id" value="{{.ID}}"/>
+                </form>
+                <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                    <button class="op-icon-btn" type="button" aria-label="{{$.T.Get "Actions"}} {{.ID}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()">{{template "op_icon" "dots"}}</button>
+                    <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
+                        <button type="button" class="is-danger" @click="open = false; if (confirm({{toJSON ($.T.Get "Kill this query?")}})) $root.closest('td').querySelector('form').submit()">{{template "op_icon" "xcircle"}} {{$.T.Get "Kill"}}</button>
+                    </div>
+                </div>
+                {{end}}
+            </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="10"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "check"}}</span><b>{{.T.Get "No active processes."}}</b></div></td></tr>
+        {{end}}
+            </tbody>
+        </table>
+    </div>
+    <div class="op-tfoot"><span>{{len .ProcessList}} {{if eq (len .ProcessList) 1}}{{.T.Get "process"}}{{else}}{{.T.Get "processes"}}{{end}}</span></div>
+{{template "bulk_bar" .}}
+</div>
+</section>
+</div>
+
+<!-- END templates/mysql/processlist.html -->
+{{end}}

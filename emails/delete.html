@@ -1,0 +1,111 @@
+{{define "alpine_plugins"}}{{end}}
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+
+{{define "content"}}
+<!-- START templates/emails/delete.html -->
+
+{{if .Address}}
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Delete"}} <span class="punycode">{{.Address}}</span></h1>
+        <p class="op-meta">{{.T.Get "Delete email account and all it's data."}}</p>
+    </header>
+</div>
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+        <div class="op-form-grid">
+
+  <div class="op-field-wrap">
+                    <h6 class="font-bold">{{.T.Get "Click on the button below to permanently delete the account and all it's emails."}}</h6>
+                </div>
+
+        </div>
+
+        <div class="op-sep"><div class="op-divider"></div></div>
+
+<div class="op-actions op-actions-end">
+    <a href="/emails" class="op-btn op-btn-secondary">
+        {{.T.Get "Cancel"}}
+    </a>
+
+        <form id="delete-email-form" action="/emails/edit/{{.Address}}" method="POST" onsubmit="event.preventDefault(); deleteEmail({{toJSON .Address}});">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+            <input type="email" class="form-control" name="email_username" value="{{.Address}}" readonly hidden>
+    <button type="submit" class="op-btn op-btn-danger"><i class="bi bi-trash3"></i> {{.T.Get "Confirm Delete"}}</button>
+        </form>
+
+</div>
+
+<script>
+function deleteEmail(address) {
+    fetch(`/emails/edit/${address}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-Token': csrf_token,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: address })
+    })
+    .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else {
+            return response.json();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+    </script>
+
+</div>
+<!-- END form -->
+</section>
+
+{{else}}
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Select Email"}}</h1>
+        <p class="op-meta">{{.T.Get "Select email address to delete."}}</p>
+    </header>
+</div>
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+    <form class="mt-8" method="GET">
+	    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+       <div class="op-form-grid">
+
+
+            <div class="op-field-wrap">
+
+  <select id="domains" class="op-input" name="domain_name" onchange="redirectToSelectedVersion(this)">
+                          <option value="" disabled selected>{{.T.Get "Select address"}}</option>
+                {{range .Addresses}}
+                          <option class="punycode" value="{{.}}">{{.}}</option>
+                {{end}}
+                      </select>
+              <script>
+                  function redirectToSelectedVersion(selectElement) {
+                      var selectedVersion = selectElement.value;
+                      if (selectedVersion) {
+                          window.location.href = `/emails/delete/${selectedVersion}`;
+                      }
+                  }
+              </script>
+
+    </form>
+
+{{end}}
+
+<!-- END templates/emails/delete.html -->
+{{end}}

@@ -1,0 +1,428 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "flowbite_js"}}
+    <script defer src="{{static "vendor/flowbite/flowbite252.min.js"}}"></script>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/docker/containers.html -->
+
+<div class="op-content" x-data="{ limits: null }" @container-limits.window="limits = $event.detail">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow"><span id="containers-running-eyebrow">…</span> {{.T.Get "running"}}{{if .TotalCPU}} · {{.TotalCPU}} {{.T.Get "CPU cores"}}{{end}}{{if .TotalRAM}}, {{.TotalRAM}} GB{{end}}</div>
+            <h1 class="op-title">{{.T.Get "Containers"}}</h1>
+            <p class="op-meta">{{.T.Get "Every service on your account runs in its own container. Restart, open a shell or read logs here."}}</p>
+        </div>
+        <div class="op-actions">
+            {{if .UserAllowed.change_image}}<a href="/containers/image/change" class="op-btn op-btn-secondary">{{template "op_icon" "settings"}} {{.T.Get "Software Versions"}}</a>{{end}}
+            <span x-data="restartAll()" style="display:contents">
+                <button type="button" class="op-btn op-btn-ghost" x-show="!asking" @click="ask()" :disabled="busy">{{template "op_icon" "refresh"}} {{.T.Get "Restart All"}}</button>
+                <span x-show="asking" x-cloak class="op-actions" style="gap:8px;align-items:center"><span class="op-hint" x-text="question"></span><button type="button" class="op-btn op-btn-ghost op-btn-sm" @click="asking = false" :disabled="busy">{{.T.Get "Cancel"}}</button><button type="button" class="op-btn op-btn-primary op-btn-sm" @click="run()" :disabled="busy"><span x-show="!busy">{{.T.Get "Restart"}}</span><span x-show="busy" x-cloak>{{.T.Get "Running..."}}</span></button></span>
+            </span>
+            <a href="/containers/new" id="login_button" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Add a container"}}</a>
+        </div>
+    </div>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "apps"}} {{.T.Get "Running"}}</div><div class="op-kpi-value"><span id="kpi-running">…</span> <small>/ {{len .Rows}}</small></div><div class="op-kpi-note" id="kpi-running-note">&nbsp;</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "chart"}} {{.T.Get "CPU"}}</div><div class="op-kpi-value"><span id="kpi-cpu">…</span><small>%</small></div><div class="op-kpi-note">{{if .TotalCPU}}{{.T.Get "of"}} {{.TotalCPU}} {{.T.Get "cores"}}{{else}}{{.T.Get "No CPU limit"}}{{end}}</div><div class="op-progress"><span id="kpi-cpu-bar" style="width:0%"></span></div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "layout"}} {{.T.Get "Memory"}}</div><div class="op-kpi-value"><span id="kpi-ram">…</span> <small id="kpi-ram-unit">GB</small></div><div class="op-kpi-note">{{if .TotalRAM}}{{.T.Get "of"}} {{.TotalRAM}} GB{{else}}{{.T.Get "No memory limit"}}{{end}}</div><div class="op-progress"><span id="kpi-ram-bar" style="width:0%"></span></div></div>
+        <div class="op-kpi" x-data="containerImages()"><div class="op-kpi-label">{{template "op_icon" "box"}} {{.T.Get "Images"}}</div><div class="op-kpi-value"><span x-text="value">…</span> <small x-text="unit"></small></div><div class="op-kpi-note" x-text="note">&nbsp;</div></div>
+    </section>
+
+<script src="{{static "js/data-table.js"}}"></script>
+    <section class="op-card" aria-label="{{.T.Get "Containers Table"}}">
+{{template "bulk_open" (dict "T" .T "Table" "#containers-table" "Endpoint" "/containers/bulk")}}
+<div x-data="{ ...createTableController({
+        storageKey: 'containersColumnsV2',
+        columns: { status: true, cpu: true, ram: true, ports: true, pids: false, blockio: false, netio: false }
+    }), statusFilter: 'all', statsTick: 0,
+    rowVisible(el) {
+        return (this.searchQuery === '' || el.dataset.search.toLowerCase().includes(this.searchQuery.toLowerCase()))
+            && (this.statusFilter === 'all' || (this.statusFilter === 'running') === (el.dataset.running === '1'));
+    } }" @container-stats.window="statsTick++" x-cloak>
+        <div class="op-toolbar">
+            <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="searchQuery" placeholder="{{.T.Get "Search containers"}}" aria-label="{{.T.Get "Search containers"}}"></label>
+            <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                <button x-ref="btn" class="op-filter" type="button" :class="statusFilter !== 'all' && 'is-set'" :aria-expanded="open.toString()" @click="toggle()">{{.T.Get "Status"}}<b x-show="statusFilter !== 'all'" x-text="statusFilter === 'running' ? {{toJSON (.T.Get "Running")}} : {{toJSON (.T.Get "Stopped")}}"></b> {{template "op_icon" "chev"}}</button>
+                <div x-ref="menu" class="op-menu" x-show="open" x-cloak>
+                    <button type="button" @click="statusFilter = 'all'; open = false">{{.T.Get "All"}}</button>
+                    <button type="button" @click="statusFilter = 'running'; open = false">{{.T.Get "Running"}}</button>
+                    <button type="button" @click="statusFilter = 'stopped'; open = false">{{.T.Get "Stopped"}}</button>
+                </div>
+            </div>
+            <div x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+                <button x-ref="btn" class="op-filter" type="button" :aria-expanded="open.toString()" @click="toggle()">{{template "op_icon" "cols"}} {{.T.Get "Columns"}}</button>
+                <div x-ref="menu" class="op-menu" x-show="open" x-cloak>
+                    {{template "column_toggle" (dict "Key" "status" "Label" (.T.Get "Status"))}}
+                    {{template "column_toggle" (dict "Key" "cpu" "Label" (.T.Get "CPU"))}}
+                    {{template "column_toggle" (dict "Key" "ram" "Label" (.T.Get "Memory"))}}
+                    {{template "column_toggle" (dict "Key" "ports" "Label" (.T.Get "Ports"))}}
+                    {{template "column_toggle" (dict "Key" "pids" "Label" (.T.Get "PIDs"))}}
+                    {{template "column_toggle" (dict "Key" "blockio" "Label" (.T.Get "Block I/O"))}}
+                    {{template "column_toggle" (dict "Key" "netio" "Label" (.T.Get "Net I/O"))}}
+                </div>
+            </div>
+        </div>
+
+        <div class="op-table-wrap">
+            <table id="containers-table" class="op-table">
+                <thead>
+                    <tr>
+                        {{template "bulk_head_checkbox" .}}
+                        <th scope="col">{{.T.Get "Container"}}</th>
+                        <th x-show="columns.status" scope="col">{{.T.Get "Status"}}</th>
+                        <th x-show="columns.cpu" scope="col">{{.T.Get "CPU"}}</th>
+                        <th x-show="columns.ram" scope="col">{{.T.Get "Memory"}}</th>
+                        <th x-show="columns.ports" scope="col">{{.T.Get "Ports"}}</th>
+                        <th x-show="columns.pids" scope="col" class="is-num">{{.T.Get "PIDs"}}</th>
+                        <th x-show="columns.blockio" scope="col">{{.T.Get "Block I/O"}}</th>
+                        <th x-show="columns.netio" scope="col">{{.T.Get "Net I/O"}}</th>
+                        <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
+                    </tr>
+                </thead>
+        <tbody>
+        {{range .Rows}}
+        {{template "container_row" (dict "Row" . "T" $.T "TotalCPU" $.TotalCPU "TotalRAM" $.TotalRAM "CSRFToken" $.CSRFToken "UserAllowed" $.UserAllowed)}}
+        {{end}}
+        </tbody>
+            </table>
+        </div>
+        {{if .Rows}}
+        <div class="op-empty" x-show="(statsTick, true) && ![...$root.querySelectorAll('#containers-table tbody tr[data-service]')].some(r => rowVisible(r))" x-cloak><b>{{.T.Get "Nothing matches"}}</b><span class="op-hint">{{.T.Get "Try another search."}}</span></div>
+        {{else}}
+        <div class="op-empty"><b>{{.T.Get "No containers yet."}}</b><a href="/containers/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}} {{.T.Get "Add a container"}}</a></div>
+        {{end}}
+        <div class="op-tfoot"><span>{{len .Rows}} {{.T.Get "containers"}}</span></div>
+</div>
+{{template "bulk_bar" .}}
+</div>
+    </section>
+
+    <!-- resource limits dialog, opened from a row menu -->
+    <template x-teleport="body">
+        <div x-show="limits" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,0.5);" @keydown.escape.window="limits = null">
+            <div class="w-full mx-4 p-5 op-surface" style="max-width: 26rem;" @click.outside="limits = null">
+                <template x-if="limits">
+                    <div>
+                        <div class="flex items-start justify-between gap-4">
+                            <h2 class="op-h">{{.T.Get "Resource limits"}} <span class="font-mono" x-text="limits.name"></span></h2>
+                            <button type="button" class="op-icon-btn" @click="limits = null" aria-label="{{.T.Get "Close"}}">{{template "op_icon" "x"}}</button>
+                        </div>
+                        <p class="op-meta mb-4">{{.T.Get "0 = unlimited"}}</p>
+                        <form method="POST" :action="'/containers/cpu/' + limits.service" class="flex items-end gap-2 mb-3">
+                            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                            <label class="op-field" style="flex:1"><span class="op-label">{{.T.Get "CPU"}} ({{.T.Get "cores"}})</span>
+                                <input name="value" type="number" min="0" {{if ne .TotalCPU 0}}max="{{.TotalCPU}}"{{end}} step=".01" :value="limits.cpu" title="{{.T.Get "Max CPUs that this service can use. 0 = unlimited"}}" class="op-input"></label>
+                            <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save"}}</button>
+                        </form>
+                        <form method="POST" :action="'/containers/ram/' + limits.service" class="flex items-end gap-2 mb-3">
+                            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                            <label class="op-field" style="flex:1"><span class="op-label">{{.T.Get "Memory"}} (GB)</span>
+                                <input name="value" type="number" min="0" {{if ne .TotalRAM 0}}max="{{.TotalRAM}}"{{end}} step=".01" :value="limits.ram" title="{{.T.Get "Max Memory that this service can use. 0 = unlimited"}}" class="op-input"></label>
+                            <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save"}}</button>
+                        </form>
+                        <form method="POST" :action="'/containers/pids/' + limits.service" class="flex items-end gap-2">
+                            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                            <label class="op-field" style="flex:1"><span class="op-label">{{.T.Get "PIDs"}}</span>
+                                <input name="value" type="number" min="0" step="1" :value="limits.pids" title="{{.T.Get "Max processes that this service can run. 0 = unlimited"}}" class="op-input"></label>
+                            <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save"}}</button>
+                        </form>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+</div>
+
+
+<!-- JS for stats -->
+<script>
+const containersI18n = {
+    running: {{toJSON (.T.Get "Running")}},
+    isStopped: {{toJSON (.T.Get "is stopped")}},
+    areStopped: {{toJSON (.T.Get "are stopped")}},
+    allRunning: {{toJSON (.T.Get "All running")}}
+};
+const containersTotals = { cpu: {{.TotalCPU}}, ram: {{.TotalRAM}} };
+
+// "42.5MiB" -> bytes, and back to "42 MB" / "1.2 GB"
+function containerSizeBytes(text) {
+    var m = /([\d.]+)\s*([kmgt]?)i?b/i.exec(text || '');
+    if (!m) return 0;
+    var mult = { '': 1, k: 1024, m: 1048576, g: 1073741824, t: 1099511627776 }[m[2].toLowerCase()];
+    return parseFloat(m[1]) * mult;
+}
+
+function containerSizeText(bytes) {
+    return bytes >= 1073741824 ? (Math.round(bytes / 107374182.4) / 10) + ' GB' : Math.round(bytes / 1048576) + ' MB';
+}
+
+function setContainerTiles(running, total, stoppedNames, cpuSum, ramBytes) {
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    set('kpi-running', running);
+    set('containers-running-eyebrow', running + ' / ' + total);
+    if (stoppedNames.length === 0) set('kpi-running-note', containersI18n.allRunning);
+    else if (stoppedNames.length === 1) set('kpi-running-note', stoppedNames[0] + ' ' + containersI18n.isStopped);
+    else set('kpi-running-note', stoppedNames.length + ' ' + containersI18n.areStopped);
+    var cpuPct = containersTotals.cpu > 0 ? cpuSum / containersTotals.cpu : cpuSum;
+    set('kpi-cpu', Math.round(cpuPct * 10) / 10);
+    var gb = ramBytes / 1073741824;
+    // under a gigabyte reads better in MB
+    if (gb < 1) { set('kpi-ram', Math.round(ramBytes / 1048576)); set('kpi-ram-unit', 'MB'); }
+    else set('kpi-ram', Math.round(gb * 10) / 10);
+    var cpuBar = document.getElementById('kpi-cpu-bar');
+    if (cpuBar) cpuBar.style.width = Math.min(100, cpuPct) + '%';
+    var ramBar = document.getElementById('kpi-ram-bar');
+    if (ramBar && containersTotals.ram > 0) ramBar.style.width = Math.min(100, gb / containersTotals.ram * 100) + '%';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var rows = document.querySelectorAll('#containers-table tbody tr[data-service]');
+    fetch('/json/services', {
+        method: 'GET',
+        headers: {
+            'X-CSRF-TOKEN': csrf_token
+        }
+    })
+        .then(response => response.json())
+        .then(function(response) {
+            if (response.container_stats) {
+
+                var totalCount = 0;
+                var highUsageContainers = [];
+                var cpuSum = 0, ramBytes = 0;
+
+                if (response.container_stats.length === 0) {
+                    showToast('{{.T.Get "No container are currently running."}}', 'warning');
+                }
+
+                response.container_stats.forEach(function(container) {
+                    var containerName = container.Name;
+                    var containerId = containerName.replace(/\./g, '\\.');
+
+                    var statusCell = document.querySelector('#status-' + containerId);
+                    if (!statusCell) return;  // container not in this table, skip
+
+                    var row = statusCell.closest('tr');
+                    var startItem = document.querySelector('#start-item-' + containerId);
+                    var stopItem = document.querySelector('#stop-item-' + containerId);
+
+                    var allocatedCpuInput = document.querySelector('#cpu-allocated-' + containerId);
+                    var allocatedCpu = allocatedCpuInput ? (parseFloat(allocatedCpuInput.value) || 1) : 1;
+                    var rawCpuUsage = parseFloat(container.CPUPerc.replace('%', '')) || 0;
+                    var cpuUsage = (rawCpuUsage / (allocatedCpu * 100)) * 100;
+                    var memUsage = parseFloat(container.MemPerc.replace('%', '')) || 0;
+
+                    var allocatedPidsInput = document.querySelector('#pids-allocated-' + containerId);
+                    var allocatedPids = allocatedPidsInput ? (parseFloat(allocatedPidsInput.value) || 0) : 0;
+                    var rawPidsUsage = parseFloat(container.PIDs) || 0;
+                    var pidsUsage = allocatedPids > 0 ? (rawPidsUsage / allocatedPids) * 100 : 0;
+
+                    cpuSum += rawCpuUsage;
+                    ramBytes += containerSizeBytes(container.MemUsage.split('/')[0]);
+
+                    document.querySelector('#cpu-usage-' + containerId).textContent = container.CPUPerc;
+                    var cpuBar = document.querySelector('#cpu-bar-' + containerId);
+                    cpuBar.style.width = Math.min(100, cpuUsage) + '%';
+                    cpuBar.parentElement.classList.toggle('is-warning', cpuUsage >= 80 && cpuUsage < 90);
+                    cpuBar.parentElement.classList.toggle('is-danger', cpuUsage >= 90);
+                    var memParts = container.MemUsage.split('/');
+                    document.querySelector('#ram-usage-' + containerId).textContent = containerSizeText(containerSizeBytes(memParts[0])) + (memParts[1] ? ' / ' + containerSizeText(containerSizeBytes(memParts[1])) : '');
+                    var memBar = document.querySelector('#ram-bar-' + containerId);
+                    memBar.style.width = Math.min(100, memUsage) + '%';
+                    memBar.parentElement.classList.toggle('is-warning', memUsage >= 80 && memUsage < 90);
+                    memBar.parentElement.classList.toggle('is-danger', memUsage >= 90);
+
+                    document.querySelector('#blockio-' + containerId).textContent = container.BlockIO;
+                    document.querySelector('#netio-' + containerId).textContent = container.NetIO;
+                    document.querySelector('#pids-usage-' + containerId).textContent = container.PIDs;
+
+                    statusCell.innerHTML = '<span class="op-status is-success">' + containersI18n.running + '</span>';
+                    if (row) row.dataset.running = '1';
+
+                    // Container is running: show "Stop" in the actions menu instead of "Start".
+                    if (startItem) startItem.classList.add('hidden');
+                    if (stopItem) stopItem.classList.remove('hidden');
+
+                    if (cpuUsage >= 90 || memUsage >= 90 || pidsUsage >= 90) {
+                        highUsageContainers.push(containerName);
+                    }
+
+                    totalCount++;
+                });
+
+                var stoppedNames = [...rows].filter(r => r.dataset.running !== '1').map(r => r.dataset.name);
+                setContainerTiles(totalCount, rows.length, stoppedNames, cpuSum, ramBytes);
+                window.dispatchEvent(new CustomEvent('container-stats'));
+
+                if (typeof reportHealthIssues === 'function' && highUsageContainers.length) {
+                    let issue;
+                    if (highUsageContainers.length === 1) {
+                        issue = { id: 'resource-limit:' + highUsageContainers[0], severity: 'warning', message: "{{.T.Get "Container"}} " + highUsageContainers[0] + " {{.T.Get "is reaching its CPU/RAM/PIDs limit."}}" };
+                    } else if (highUsageContainers.length === 2) {
+                        issue = { id: 'resource-limit:' + highUsageContainers.join(','), severity: 'warning', message: "{{.T.Get "Containers"}} " + highUsageContainers.join(', ') + " {{.T.Get "are reaching their CPU/RAM/PIDs limit."}}" };
+                    } else {
+                        issue = { id: 'resource-limit:multiple', severity: 'warning', message: highUsageContainers.length + " {{.T.Get "containers are reaching their CPU/RAM/PIDs limit."}}" };
+                    }
+                    reportHealthIssues('containers', [issue], 24);
+                }
+            }
+        })
+        .catch(function(error) {
+            console.error("Error fetching container stats:", error);
+            showToast('{{.T.Get "Error fetching docker stats for containers."}}', 'error');
+            ['kpi-running', 'kpi-cpu', 'kpi-ram'].forEach(function (id) { var el = document.getElementById(id); if (el) el.textContent = '?'; });
+            var eyebrow = document.getElementById('containers-running-eyebrow');
+            if (eyebrow) eyebrow.textContent = '? / ' + rows.length;
+        });
+});
+
+</script>
+<!-- END JS for stats -->
+
+<script>
+// Images tile, one call on load
+function containerImages() {
+    return {
+        value: '…', unit: '', note: '',
+        init() {
+            fetch('/json/containers/images')
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(d => {
+                    const [n, u] = String(d.size || '0 B').split(' ');
+                    this.value = n;
+                    this.unit = u || '';
+                    this.note = d.count + ' ' + {{toJSON (.T.Get "images")}} + (d.unused ? ', ' + d.unused + ' ' + {{toJSON (.T.Get "unused")}} : '');
+                })
+                .catch(() => { this.value = '—'; this.note = {{toJSON (.T.Get "Not available")}}; });
+        },
+    };
+}
+
+// restarts every running container through the bulk endpoint
+function restartAll() {
+    return {
+        asking: false, busy: false, items: [], question: '',
+        ask() {
+            this.items = [...document.querySelectorAll('#containers-table tbody tr[data-service][data-running="1"]')].map(r => r.dataset.service);
+            if (!this.items.length) { showToast({{toJSON (.T.Get "No container are currently running.")}}, 'warning'); return; }
+            this.question = {{toJSON (.T.Get "Restart all running containers?")}} + ' (' + this.items.length + ')';
+            this.asking = true;
+        },
+        run() {
+            this.busy = true;
+            fetch('/containers/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
+                body: JSON.stringify({ action: 'restart', value: '', items: this.items }),
+            })
+                .then(r => r.json().catch(() => ({})).then(d => { if (!r.ok) throw new Error(d.error || ''); }))
+                .then(() => window.location.reload())
+                .catch(e => { showToast(e.message || {{toJSON (.T.Get "Error occurred during bulk action.")}}, 'error'); this.busy = false; this.asking = false; });
+        },
+    };
+}
+</script>
+
+<script>
+// search table based on ?s= in the url
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('s');
+    if (s) {
+        setTimeout(() => {
+            const searchInput = document.querySelector('[x-model="searchQuery"]');
+            if (searchInput) {
+                const scope = Alpine.$data(searchInput.closest('[x-data]'));
+                if (scope) {
+                    scope.searchQuery = s;
+                }
+                searchInput.value = s;
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        }, 100);
+    }
+});
+</script>
+
+<!-- END templates/docker/containers.html -->
+{{end}}
+
+{{define "column_toggle"}}
+<button type="button" class="op-menu-row" @click.stop="columns.{{.Key}} = !columns.{{.Key}}">{{.Label}} <span class="op-switch" role="switch" :aria-checked="String(!!columns.{{.Key}})"></span></button>
+{{end}}
+
+{{define "container_row"}}
+{{$row := .Row}}
+{{$t := .T}}
+<tr data-service="{{$row.Service}}" data-name="{{$row.DisplayName}}" data-search="{{$row.DisplayName}} {{$row.Service}} {{$row.Image}}" data-row-check
+    x-show="(statsTick, true) && rowVisible($el)" class="domain_row">
+
+    {{$skip := ""}}{{if not $row.ShowManage}}{{$skip = "delete"}}{{end}}
+    {{template "bulk_row_checkbox" (dict "Key" $row.Service "Label" $row.DisplayName "Skip" $skip "T" $t)}}
+
+    <td>
+        <div class="op-row-title">
+            <span class="op-ico-tile is-sm" style="--hue:var(--color-hue-{{$row.Hue}})">{{template "op_icon" $row.Icon}}</span>
+            <div><b>{{$row.DisplayName}}</b><span class="op-sub op-mono">{{$row.Image}}{{if $row.ImageTrusted}} <span class="is-success" title="{{$t.Get "Verified image"}}">✓</span>{{end}}</span></div>
+        </div>
+    </td>
+
+    <td x-show="columns.status" data-label="{{$t.Get "Status"}}" id="status-{{$row.Service}}"><span class="op-status is-muted">{{$t.Get "Stopped"}}</span></td>
+
+    <td x-show="columns.cpu" data-label="{{$t.Get "CPU"}}">
+        <input id="cpu-allocated-{{$row.Service}}" type="hidden" value="{{if $row.CPUUnlimited}}{{.TotalCPU}}{{else}}{{$row.CPUValue}}{{end}}">
+        <div class="op-meter">
+            <span class="op-meter-text"><span id="cpu-usage-{{$row.Service}}">0%</span> / {{if $row.CPUUnlimited}}∞{{else}}{{$row.CPUValue}} {{if eq $row.CPUValue "1"}}{{$t.Get "core"}}{{else}}{{$t.Get "cores"}}{{end}}{{end}}</span>
+            <div class="op-progress"><span id="cpu-bar-{{$row.Service}}" style="width:0%"></span></div>
+        </div>
+    </td>
+
+    <td x-show="columns.ram" data-label="{{$t.Get "Memory"}}">
+        <div class="op-meter">
+            <span class="op-meter-text" id="ram-usage-{{$row.Service}}">0 MB / {{if $row.RAMUnlimited}}∞{{else}}{{$row.RAMGB}} GB{{end}}</span>
+            <div class="op-progress"><span id="ram-bar-{{$row.Service}}" style="width:0%"></span></div>
+        </div>
+    </td>
+
+    <td x-show="columns.ports" data-label="{{$t.Get "Ports"}}">{{if $row.Ports}}<span class="op-mono" title="{{$row.PortsTitle}}">{{$row.Ports}}</span>{{else}}<span class="op-faint">—</span>{{end}}</td>
+
+    <td x-show="columns.pids" data-label="{{$t.Get "PIDs"}}" class="is-num">
+        <input id="pids-allocated-{{$row.Service}}" type="hidden" value="{{if $row.PIDsUnlimited}}0{{else}}{{$row.PIDsValue}}{{end}}">
+        <span class="op-mono"><span id="pids-usage-{{$row.Service}}">--</span> / {{if or $row.PIDsUnlimited (not $row.PIDsValue)}}∞{{else}}{{$row.PIDsValue}}{{end}}</span>
+    </td>
+    <td x-show="columns.blockio" data-label="{{$t.Get "Block I/O"}}" id="blockio-{{$row.Service}}" class="op-mono">--</td>
+    <td x-show="columns.netio" data-label="{{$t.Get "Net I/O"}}" id="netio-{{$row.Service}}" class="op-mono">--</td>
+
+    <td class="is-shrink op-cell-menu" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
+        <button x-ref="btn" class="op-icon-btn" type="button" :aria-expanded="open.toString()" @click="toggle()" aria-label="{{$t.Get "Actions for"}} {{$row.DisplayName}}">{{template "op_icon" "dots"}}</button>
+        <div x-ref="menu" class="op-menu" x-show="open" x-cloak>
+            {{if .UserAllowed.terminal}}<a href="/containers/terminal/{{$row.Service}}">{{template "op_icon" "code"}} {{$t.Get "Terminal"}}</a>{{end}}
+            <a href="/containers/logs?container={{$row.Service}}&lines=20">{{template "op_icon" "logs"}} {{$t.Get "Logs"}}</a>
+            <form method="POST" action="/containers/restart/{{$row.Service}}">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <button type="submit">{{template "op_icon" "refresh"}} {{$t.Get "Restart"}}</button>
+            </form>
+            <form id="start-item-{{$row.Service}}" method="POST" action="/containers/start/{{$row.DisplayName}}">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <button type="submit">{{template "op_icon" "arrowright"}} {{$t.Get "Start"}}</button>
+            </form>
+            <form id="stop-item-{{$row.Service}}" class="hidden" method="POST" action="/containers/stop/{{$row.Service}}">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <button type="submit">{{template "op_icon" "ban"}} {{$t.Get "Stop"}}</button>
+            </form>
+            <button type="button" @click="open = false; setTimeout(() => $dispatch('container-limits', { service: {{toJSON $row.Service}}, name: {{toJSON $row.DisplayName}}, cpu: {{if $row.CPUUnlimited}}'0'{{else}}{{toJSON $row.CPUValue}}{{end}}, ram: {{if $row.RAMUnlimited}}'0'{{else}}{{toJSON $row.RAMGB}}{{end}}, pids: {{if $row.PIDsUnlimited}}'0'{{else}}{{toJSON $row.PIDsValue}}{{end}} }), 0)">{{template "op_icon" "dash"}} {{$t.Get "Resource limits"}}</button>
+            {{if and .UserAllowed.change_image $row.ImageChangeable}}<a href="/containers/image/change/{{$row.Service}}">{{template "op_icon" "up"}} {{$t.Get "Change version"}}</a>{{end}}
+            {{if $row.ShowManage}}
+            <a href="/containers/edit/{{$row.Service}}">{{template "op_icon" "pencil"}} {{$t.Get "Edit"}}</a>
+            <hr>
+            <a href="/containers/delete/{{$row.Service}}" class="is-danger">{{template "op_icon" "trash"}} {{$t.Get "Delete"}}</a>
+            {{end}}
+        </div>
+    </td>
+</tr>
+{{end}}

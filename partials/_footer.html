@@ -1,0 +1,80 @@
+{{define "footer"}}<!-- START templates/partials/_footer.html -->
+<div class="op-sidebar-foot">
+
+    {{if ne .MenuStyle "modern"}}
+    <button type="button" class="op-nav-tool" x-data="{ allOpen: false }" @click="allOpen = !allOpen; $dispatch('sidebar-toggle-all', { open: allOpen })" :title="allOpen ? '{{.T.Get "Collapse all"}}' : '{{.T.Get "Expand all"}}'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-show="allOpen"><path d="M4 14h6m0 0v6m0-6-7 7"/><path d="M20 10h-6m0 0V4m0 6 7-7"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-show="!allOpen"><path d="M3 8h6V3"/><path d="m3 8 7-7"/><path d="M21 16h-6v5"/><path d="m21 16-7 7"/></svg>
+        <span x-text="allOpen ? '{{.T.Get "Collapse all"}}' : '{{.T.Get "Expand all"}}'">{{.T.Get "Expand all"}}</span>
+    </button>
+    {{end}}
+
+    <div class="op-user-wrap" x-data="{ isOpen: false }" @click.away="isOpen = false" @keydown.escape="isOpen = false">
+        <div dir="ltr" id="popup-menu" :class="{ 'hidden': !isOpen }" class="op-menu op-user-menu hidden" role="menu">
+            <div class="op-menu-note">OpenPanel {{.PanelVersion}}</div>
+            <hr>
+
+            {{template "themeswitcher" .}}
+
+            <div class="op-menu-row" role="group" id="tour-menu-style">
+                <span>{{.T.Get "Menu style"}}</span>
+                <span class="op-seg">
+                    <button type="button" @click="setMenuStyle('classic')" title="{{.T.Get "Classic"}}" :aria-pressed="($store.menuStyle.value === 'classic').toString()">{{template "op_icon" "listdetails"}}</button>
+                    <button type="button" @click="setMenuStyle('modern')" title="{{.T.Get "Modern"}}" :aria-pressed="($store.menuStyle.value === 'modern').toString()">{{template "op_icon" "layout"}}</button>
+                </span>
+            </div>
+
+            {{if eq .RequestPath "/dashboard"}}
+            <div class="op-menu-row" role="group" id="tour-dashboard-layout">
+                <span>{{.T.Get "Layout"}}</span>
+                <span class="op-seg">
+                    <button type="button" @click="setDashboardLocked(!$store.dashboardLocked.value)" :title="$store.dashboardLocked.value ? '{{.T.Get "Unlock layout"}}' : '{{.T.Get "Lock layout"}}'" :aria-pressed="$store.dashboardLocked.value.toString()"><i class="bi" :class="$store.dashboardLocked.value ? 'bi-lock-fill' : 'bi-unlock'"></i></button>
+                    <button type="button" @click="resetDashboardLayout()" title="{{.T.Get "Reset layout"}}">{{template "op_icon" "refresh"}}</button>
+                </span>
+            </div>
+            <div class="op-menu-row" role="group" id="tour-icons-position">
+                <span>{{.T.Get "Icons position"}}</span>
+                <span class="op-seg">
+                    <button type="button" @click="setDashboardIconView('icon')" title="{{.T.Get "Top"}}" :aria-pressed="($store.dashboardIconView.value === 'icon').toString()">{{template "op_icon" "apps"}}</button>
+                    <button type="button" @click="setDashboardIconView('list')" title="{{.T.Get "Start"}}" :aria-pressed="($store.dashboardIconView.value === 'list').toString()">{{template "op_icon" "list"}}</button>
+                </span>
+            </div>
+            {{end}}
+
+            {{if eq .RequestPath "/files"}}
+            <div class="op-menu-row" role="group" id="tour-filemanager-style">
+                <span>{{.T.Get "Buttons style"}}</span>
+                <span class="op-seg">
+                    <button type="button" @click="setFilemanagerView('classic')" title="{{.T.Get "Classic"}}" :aria-pressed="($store.filemanagerView.value === 'classic').toString()"><i class="bi bi-list"></i></button>
+                    <button type="button" @click="setFilemanagerView('modern')" title="{{.T.Get "Modern"}}" :aria-pressed="($store.filemanagerView.value === 'modern').toString()"><i class="bi bi-grid-3x3-gap"></i></button>
+                </span>
+            </div>
+            {{end}}
+            <hr>
+
+            {{if not .IsEnterprise}}
+            <a role="menuitem" href="https://openpanel.com/docs/changelog/{{.PanelVersion}}/" target="_blank" rel="noopener">{{.T.Get "Changelog"}} <span class="op-menu-ext">{{template "op_icon" "out"}}</span></a>
+            <a role="menuitem" href="https://openpanel.com/docs/panel/intro/" target="_blank" rel="noopener">{{.T.Get "Documentation"}} <span class="op-menu-ext">{{template "op_icon" "out"}}</span></a>
+            <a role="menuitem" href="https://community.openpanel.org/t/openpanel" target="_blank" rel="noopener">{{.T.Get "Community Forums"}} <span class="op-menu-ext">{{template "op_icon" "out"}}</span></a>
+            <hr>
+            {{end}}
+            <button type="button" role="menuitem" id="tour-start-button" @click="isOpen = false; OPTour.start(true)">{{.T.Get "Take the tour"}}</button>
+            <a role="menuitem" href="/logout">{{.T.Get "Sign out"}}</a>
+        </div>
+
+        <button id="user-btn-info" class="op-user" type="button" @click="isOpen = !isOpen" :aria-expanded="isOpen.toString()" aria-haspopup="menu" aria-label="{{.T.Get "User settings"}}">
+            {{if eq .AvatarType "gravatar"}}
+            <img src="{{.GravatarURL}}" class="op-avatar" alt="">
+            {{else if eq .AvatarType "letter"}}
+            <span class="op-avatar" aria-hidden="true">{{firstUpper .CurrentUsername}}</span>
+            {{else}}
+            <span class="op-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg></span>
+            {{end}}
+            <span class="op-user-text"><b>{{.CurrentUsername}}</b><span>{{.HostingPlanName}}</span></span>
+            <svg class="op-user-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5"></path><path d="m7 9 5-5 5 5"></path></svg>
+        </button>
+    </div>
+
+</div>
+<!-- END templates/partials/_footer.html -->
+{{end}}

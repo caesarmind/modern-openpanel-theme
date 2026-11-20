@@ -1,0 +1,66 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/inodes.html -->
+<section class="op-content" aria-label="{{.T.Get "Inodes Usage Header"}}">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow">/home/{{.CurrentUsername}}{{range .Breadcrumbs}}/{{.Name}}{{end}}</div>
+            <h1 class="op-title">{{.T.Get "Inode Usage"}}</h1>
+            <p class="op-meta">{{.T.Get "Find what takes up space or file count, then open it in the File Manager."}}</p>
+        </div>
+        <div class="op-actions">
+            <div class="op-segmented" role="group" aria-label="{{.T.Get "Measure"}}">
+                <a href="/disk-usage/" role="button" aria-pressed="false">{{.T.Get "Disk space"}}</a>
+                <a href="/inodes-explorer/" role="button" aria-pressed="true">{{.T.Get "Inodes"}}</a>
+            </div>
+        </div>
+    </div>
+
+    <section class="op-card op-du">
+        <div class="op-card-head">
+            <h2>{{.T.Get "Folders by file count"}}</h2>
+            <button type="button" onclick="location.reload(true); return false;" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "refresh"}} {{.T.Get "Rescan"}}</button>
+        </div>
+        <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-du-crumbs">
+            {{if .ShowUpLink}}<a id="goUp" class="op-icon-btn" href="{{.UpLink}}" title="{{.T.Get "Up One Level"}}" aria-label="{{.T.Get "Up One Level"}}">{{template "op_icon" "cornerup"}}</a>{{end}}
+            <a class="op-tag op-mono" href="/inodes-explorer/">{{.CurrentUsername}}</a>
+            {{range .Breadcrumbs}}<span class="op-hint">/</span><a class="op-tag op-mono" href="{{.Path}}"{{if .Last}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}
+        </nav>
+        <ul class="op-du-list" id="folders_to_navigate">
+            {{range .Rows}}
+            <li data-size="{{.Count}}">
+                <div class="op-du-row">
+                    <a class="op-du-name" href="{{.Href}}"><span class="op-file-ico fm-folder">{{template "op_icon" "folder"}}</span><span>{{.Directory}}</span></a>
+                    <span class="op-mono op-du-size">{{.Count}}</span>
+                    {{if .FileManagerHref}}<a class="op-icon-btn op-du-open" href="{{.FileManagerHref}}" title="{{$.T.Get "File Manager"}}" aria-label="{{$.T.Get "File Manager"}}">{{template "op_icon" "out"}}</a>{{end}}
+                </div>
+                <span class="op-progress op-du-bar"><span style="width:0%"></span></span>
+            </li>
+            {{else}}
+            <li class="op-du-empty"><span class="op-hint">{{.T.Get "No folders here."}}</span></li>
+            {{end}}
+        </ul>
+    </section>
+</section>
+
+<script>
+// bars are sized against the biggest folder on the page
+(function () {
+    function parse(v) {
+        const m = String(v).trim().match(/^(\d+(?:\.\d+)?)\s*([BKMGT])?/i);
+        if (!m) return 0;
+        const n = parseFloat(m[1]);
+        return n * ({ B: 1, K: 1024, M: 1048576, G: 1073741824, T: 1099511627776 }[(m[2] || '').toUpperCase()] || 1);
+    }
+    const rows = [...document.querySelectorAll('#folders_to_navigate li[data-size]')];
+    const sizes = rows.map(r => parse(r.dataset.size));
+    const max = Math.max(1, ...sizes);
+    rows.forEach((r, i) => { const bar = r.querySelector('.op-du-bar span'); if (bar) bar.style.width = Math.max(1, Math.round(sizes[i] * 100 / max)) + '%'; });
+})();
+</script>
+<!-- END templates/files/inodes.html -->
+{{end}}

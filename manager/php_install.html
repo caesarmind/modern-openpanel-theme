@@ -1,0 +1,41 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/manager/php_install.html -->
+<div class="op-content">
+{{if .Domains}}
+{{template "op_iw_kit" .}}
+<script>
+(function () {
+  var K = window.opIWKit;
+  // fields, checks and run checkpoints mirror phpapp/install.go
+  window.opIWConfig = {
+    slug: 'php', name: {{toJSON (.T.Get "PHP application")}}, title: {{toJSON (.T.Get "Install PHP Application")}}, cta: {{toJSON (.T.Get "Create PHP application")}},
+    desc: {{toJSON (.T.Get "Set up a Composer project in an existing domain.")}}, endpoint: '/php/install', logo: {{toJSON (static "images/apps/php.svg")}},
+    domains: {{toJSON .Domains}}, strength: {{.PasswordStrength}}, t: K.t, php: { needs: true, block: true },
+    success: ['application setup completed'], manager: '/sites',
+    steps: [K.steps.where, { id: 'project', label: {{toJSON (.T.Get "Project")}}, title: {{toJSON (.T.Get "Composer project (optional)")}}, desc: {{toJSON (.T.Get "Leave it empty to use the files already in the folder.")}} }, K.steps.review],
+    summary: ['initial_project'],
+    fields: [
+      { name: 'initial_project', step: 'project', label: {{toJSON (.T.Get "Initial project")}}, validate: 'project', mono: true, placeholder: {{toJSON (.T.Get "e.g. laravel/laravel or https://example.com/project.zip")}}, hint: {{toJSON (.T.Get "Created when the folder is empty: a Composer package name or an https:// archive URL (.zip, .tar.gz, .tgz, .tar).")}}, empty: {{toJSON (.T.Get "Use the existing files")}} },
+      { name: 'autorun_composer_install', step: 'project', type: 'check', label: {{toJSON (.T.Get "Run composer install after creating the project")}}, hint: {{toJSON (.T.Get "Installs dependencies from composer.json in the PHP container.")}}, on: {{toJSON (.T.Get "Yes")}}, offLabel: {{toJSON (.T.Get "No")}} },
+      { name: 'composer_optimize_autoloader', step: 'project', type: 'check', label: {{toJSON (.T.Get "Optimize autoloader (--optimize-autoloader)")}}, hint: {{toJSON (.T.Get "Recommended for production installs.")}}, disabledWhen: function (v) { return !v.autorun_composer_install; }, on: {{toJSON (.T.Get "Yes")}}, offLabel: {{toJSON (.T.Get "No")}} }
+    ],
+    run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Setting up project files")}}, ['Downloading and extracting', 'Creating Composer project']), K.run.step({{toJSON (.T.Get "Running Composer")}}, ['Running composer install', 'Saving application settings']), K.run.step({{toJSON (.T.Get "Saving to Site Manager")}}, ['Installation finished', 'application setup completed'])],
+    creds: []
+  };
+})();
+</script>
+{{template "op_install_wizard" .}}
+{{else}}
+<div class="op-card op-empty op-block-card">
+    <p class="op-strong">{{.T.Get "No domains yet"}}</p>
+    <p class="op-hint">{{.T.Get "Add your first domain to get started"}}</p>
+    <a href="/domains/new" class="op-btn op-btn-primary">{{template "op_icon" "plus"}}{{.T.Get "New domain"}}</a>
+</div>
+{{end}}
+</div>
+<!-- END templates/manager/php_install.html -->
+{{end}}

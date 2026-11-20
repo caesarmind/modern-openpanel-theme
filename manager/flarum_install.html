@@ -1,0 +1,20 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* flarum's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from flarum/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Flarum forum software.")}},
+  adminPath: '/admin',
+  php: { min: '8.1', block: true },
+  steps: [K.steps.where, K.step('site', { title: {{toJSON (.T.Get "Forum and admin account")}} }), K.steps.db, K.steps.review],
+  summary: ['site_name', 'flarum_version', 'admin_username', 'db_name'],
+  fields: [
+    K.text('site_name', {{toJSON (.T.Get "Forum title")}}, { value: {{toJSON (.T.Get "Flarum")}}, required: true, placeholder: {{toJSON (.T.Get "My Flarum Forum")}} }),
+    K.version('flarum_version', function () { return K.gh('https://api.github.com/repos/flarum/core/tags?per_page=100', /^\d+\.\d+\.\d+$/, function (t) { return (t.name.match(/^v?(\d+\.\d+\.\d+)$/) || [])[1]; }); }),
+    K.email(), K.user(), K.pass()
+  ].concat(K.db('flarum')),
+  run: [K.run.pre, K.run.php, K.run.step({{toJSON (.T.Get "Creating the Composer project")}}, ['Creating Composer project', 'Linking public root', 'Setting files permissions']), K.run.db, K.run.step({{toJSON (.T.Get "Running the Flarum installer")}}, ['Running Flarum installer']), K.run.save(['Registering cron job'])],
+  creds: K.creds()
+}{{end}}

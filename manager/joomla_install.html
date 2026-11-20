@@ -1,0 +1,21 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}{{template "cmsinstall_page" .}}{{end}}
+
+{{/* joomla's install wizard: its fields, run checkpoints (matched against the NDJSON status lines from joomla/install.go) and done screen */}}
+{{define "cms_app"}}{
+  desc: {{toJSON (.T.Get "Joomla content management system (CMS).")}},
+  adminPath: '/administrator/',
+  steps: [K.steps.where, K.steps.site, K.steps.db, K.steps.review],
+  summary: ['site_name', 'joomla_version', 'admin_username', 'db_name'],
+  fields: [
+    K.text('site_name', {{toJSON (.T.Get "Website name")}}, { required: true, placeholder: {{toJSON (.T.Get "My Joomla Site")}} }),
+    K.version('joomla_version', function () { return K.gh('https://api.github.com/repos/joomla/joomla-cms/releases?per_page=100', /^\d+\.\d+\.\d+$/, function (r) { return !r.prerelease && !r.draft ? r.tag_name : ''; }); }),
+    K.email(), K.user(),
+    K.text('admin_name', {{toJSON (.T.Get "Full name")}}, { value: 'Administrator', required: true }),
+    K.pass()
+  ].concat(K.db('joomla')),
+  run: [K.run.pre, K.run.php, K.run.dl('Joomla'), K.run.ex(), K.run.db, K.run.step({{toJSON (.T.Get "Running the Joomla CLI installer")}}, ['Running Joomla CLI installer']), K.run.save(['Deploying admin login helper'])],
+  creds: K.creds()
+}{{end}}

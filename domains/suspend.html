@@ -1,0 +1,88 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "content"}}
+<!-- START templates/domains/suspend.html -->
+
+{{if .DomainName}}
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Suspend domain"}} <span class="punycode">{{.DomainName}}</span></h1>
+        <p class="op-meta"> {{.T.Get "Suspending the domain will immediately disable website access, while Email and other services remain operational."}}</p>
+    </header>
+</div>
+
+
+
+
+<!-- form -->
+<div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
+    <form class="mt-8" method="POST" action="/domains/suspend">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+    <div class="op-form-grid">
+  <div class="op-field-wrap">
+    <label for="db_user" class="op-label op-label-row">{{.T.Get "Confirm suspend of domain:"}} <span class="punycode">{{.DomainName}}</span></label>
+
+    <div class="op-join">
+
+<input type="hidden" name="domain_name" value="{{.DomainName}}" readonly>
+
+    </div>
+  </div>
+
+  <div class="op-field-wrap">
+    <label for="comment" class="op-label op-label-row">{{.T.Get "Reason (optional)"}}</label>
+
+    <div class="op-join">
+        <input type="text" id="comment" name="comment" placeholder="{{.T.Get "e.g. Unpaid invoice #4521 - contact billing"}}" class="op-input">
+    </div>
+  </div>
+
+
+      </div>
+
+        <div class="op-sep"><div class="op-divider"></div></div>
+
+
+
+<div class="op-actions op-actions-end">
+    <a href="/domains" class="op-btn op-btn-secondary">
+        {{.T.Get "Back to Domains"}}
+    </a>
+    <button id="confirm-suspend" type="submit" class="op-btn op-btn-primary">{{.T.Get "Confirm Suspend"}}<svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+        </svg>
+    </button>
+</div>
+
+    </form>
+</div>
+<!-- END form -->
+
+
+
+{{else}}
+
+
+<div class="op-page-head op-cms-head">
+    <header>
+        <h1 class="op-title">{{.T.Get "Select Domain to Suspend"}}</h1>
+        <p class="op-meta"> {{.T.Get "Suspending the domain will immediately disable website access, while Email and other services remain operational."}}</p>
+    </header>
+</div>
+
+    {{if .Domains}}
+        {{template "domain_selector" (dict "T" .T "Domains" .Domains "RedirectBase" "/domains/suspend?domain=")}}
+    {{else}}
+        {{template "no_domain" .}}
+    {{end}}
+
+</section>
+
+
+{{end}}
+
+
+<!-- END templates/domains/suspend.html -->
+{{end}}

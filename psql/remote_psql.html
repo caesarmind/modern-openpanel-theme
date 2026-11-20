@@ -1,0 +1,53 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "content"}}
+<!-- START templates/psql/remote_psql.html -->
+{{$on := eq .RemotePostgreSQLDisplay "ON"}}
+<div class="op-content" aria-label="{{.T.Get "Remote PostgreSQL Header"}}">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "Remote PostgreSQL Access"}}</h1>
+            <p class="op-meta">{{.T.Get "Connect to a PostgreSQL database on this server from a another (remote) device or location over the internet."}}</p>
+        </div>
+        <div class="op-actions">
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                <input type="hidden" name="action" value="{{if eq .RemotePostgreSQLDisplay "OFF"}}enable{{else}}disable{{end}}">
+                <button type="submit" class="op-btn {{if eq .RemotePostgreSQLDisplay "OFF"}}op-btn-primary{{else}}op-btn-secondary{{end}}">{{if eq .RemotePostgreSQLDisplay "OFF"}}{{.T.Get "Enable Remote PostgreSQL Access"}}{{else}}{{.T.Get "Disable Remote PostgreSQL Access"}}{{end}}</button>
+            </form>
+        </div>
+    </div>
+
+    <section class="op-card">
+        <div class="op-section">
+            <div><h3>{{.T.Get "Status"}}</h3><p>{{.T.Get "Remote access to PostgreSQL is currently:"}}</p></div>
+            <form method="post" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+                {{if $on}}
+                <span class="op-status is-success">{{.T.Get "Enabled"}}</span>
+                <input type="hidden" name="action" value="disable">
+                <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Disable"}}</button>
+                {{else if eq .RemotePostgreSQLDisplay "OFF"}}
+                <span class="op-status">{{.T.Get "Disabled"}}</span>
+                <input type="hidden" name="action" value="enable">
+                <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Enable"}}</button>
+                {{else}}
+                <span class="op-status is-warning">{{.T.Get "Unknown"}}</span>
+                <input type="hidden" name="action" value="enable">
+                <button type="submit" class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Click to Restart"}}</button>
+                {{end}}
+            </form>
+        </div>
+        <div class="op-section">
+            <div><h3 id="remote">{{.T.Get "Remote"}}</h3><p>{{.T.Get "Connection info when connecting to database"}} <b>{{.T.Get "from a remote server"}}</b>.</p></div>
+            <dl class="op-dl" style="max-width:420px"><dt>{{.T.Get "Server:"}}</dt><dd class="op-mono">{{.ServerIP}}</dd><dt>{{.T.Get "Port:"}}</dt><dd class="op-mono">{{.ContainerPort}}</dd></dl>
+        </div>
+        <div class="op-section">
+            <div><h3 id="local">{{.T.Get "Local"}}</h3><p>{{.T.Get "Connection info when connecting to database"}} <b>{{.T.Get "from a local server"}}</b>.</p></div>
+            <dl class="op-dl" style="max-width:420px"><dt>{{.T.Get "Server:"}}</dt><dd class="op-mono">postgres</dd><dt>{{.T.Get "Port:"}}</dt><dd class="op-mono">5432</dd></dl>
+        </div>
+    </section>
+</div>
+<!-- END templates/psql/remote_psql.html -->
+{{end}}

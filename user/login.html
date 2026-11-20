@@ -1,0 +1,106 @@
+{{define "content"}}
+<!-- START templates/user/login.html -->
+
+<div class="op-auth-card"><div class="op-auth-body">
+{{/* field errors go under their field, everything else in the alert; a flash's category sets the alert's colour */}}
+{{$message := .ErrorMessage}}{{$tone := "danger"}}{{if .ErrorTone}}{{$tone = .ErrorTone}}{{end}}
+{{$field := ""}}{{if .ErrorMessage}}{{if .TwofaEnabled}}{{$field = "code"}}{{else if .UnrecognizedError}}{{$field = "user"}}{{else if .PasswordError}}{{$field = "pass"}}{{end}}{{end}}
+{{with .FirstFlash}}{{$message = $.T.Get .Text}}{{$field = ""}}{{if eq .Category "success"}}{{$tone = "success"}}{{else if eq .Category "info"}}{{$tone = "info"}}{{else if eq .Category "warning"}}{{$tone = "warning"}}{{else}}{{$tone = "danger"}}{{end}}{{end}}
+
+    <div class="op-auth-head">
+        <h1 class="op-auth-title">{{if .TwofaEnabled}}{{.T.Get "Two-factor authentication"}}{{else}}{{.T.Get "Sign in to your account"}}{{end}}</h1>
+        {{if .TwofaEnabled}}<p class="op-auth-sub">{{.T.Get "Enter the 6-digit code from your authenticator app."}}</p>{{end}}
+    </div>
+
+    {{if and $message (not $field)}}
+    <div class="op-alert is-{{$tone}}" role="alert">{{if eq $tone "success"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg>{{else}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>{{end}}<span>{{$message}}</span></div>
+    {{end}}
+
+    <form method="POST" class="op-auth-form" action="/login">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+
+{{if not .TwofaEnabled}}
+        <label class="op-field"><span class="op-label">{{.T.Get "Username"}}</span>
+            <input type="text" name="username" id="username" class="op-input{{if eq $field "user"}} is-invalid{{end}}" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="{{.T.Get "username"}}"{{if .Username}} value="{{.Username}}"{{end}}{{if or (eq $field "user") (not .Username)}} autofocus{{end}}{{if eq $field "user"}} aria-invalid="true" aria-describedby="username-error"{{end}}>
+            {{if eq $field "user"}}<span class="op-auth-err" id="username-error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>{{$message}}</span></span>{{end}}
+        </label>
+        <div class="op-field">
+            <div class="op-label-row" style="margin:0"><label class="op-label" for="password">{{.T.Get "Password"}}</label>{{if eq .PasswordReset "yes"}}<a class="op-auth-link" href="/reset_password" tabindex="-1">{{.T.Get "Forgot password?"}}</a>{{end}}</div>
+            <span class="op-auth-pass">
+                <input type="password" name="password" id="password" placeholder="••••••••" class="op-input{{if eq $field "pass"}} is-invalid{{end}}" required autocomplete="current-password"{{if and .Username (ne $field "user")}} autofocus{{end}}{{if eq $field "pass"}} aria-invalid="true" aria-describedby="password-error"{{end}}>
+                <button type="button" id="password-toggle" aria-pressed="false" aria-label="{{.T.Get "Show password"}}" data-show="{{.T.Get "Show password"}}" data-hide="{{.T.Get "Hide password"}}"><svg class="is-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg><svg class="is-hide" hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.585 10.587a2 2 0 0 0 2.829 2.828"/><path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87"/><path d="M3 3l18 18"/></svg></button>
+            </span>
+            <span class="op-auth-caps" id="password-caps" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px"><path d="M9 20h6v-4h4l-7 -8l-7 8h4z"/></svg> {{.T.Get "Caps Lock is on"}}</span>
+            {{if eq $field "pass"}}<span class="op-auth-err" id="password-error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>{{$message}}</span></span>{{end}}
+        </div>
+{{else}}
+        <input type="hidden" name="user_id" value="{{.UserID}}">
+        <label class="op-field"><span class="op-label">{{.T.Get "Two-Factor Authentication Code"}}</span>
+            <input autofocus id="twofa_code" name="twofa_code" class="op-input op-auth-code{{if eq $field "code"}} is-invalid{{end}}" required inputmode="numeric" autocomplete="one-time-code" placeholder="000000"{{if eq $field "code"}} aria-invalid="true" aria-describedby="twofa-error"{{end}}>
+            {{if eq $field "code"}}<span class="op-auth-err" id="twofa-error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>{{$message}}</span></span>{{end}}
+        </label>
+{{end}}
+
+{{if and .CaptchaProvider (not .TwofaEnabled)}}
+<div style="display:flex;justify-content:center">
+{{if eq .CaptchaProvider "google"}}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<div class="g-recaptcha" data-sitekey="{{.CaptchaSiteKey}}"></div>
+{{else if eq .CaptchaProvider "turnstile"}}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<div class="cf-turnstile" data-sitekey="{{.CaptchaSiteKey}}"></div>
+{{else}}
+<!-- "custom" provider: add your own widget markup/script here, populating an input named "{{.CaptchaFieldName}}" with the response token before submit -->
+<input type="hidden" name="{{.CaptchaFieldName}}" data-custom-captcha-response>
+{{end}}
+</div>
+{{end}}
+
+        <button type="submit" class="op-btn op-btn-primary" style="width:100%">{{if .TwofaEnabled}}{{.T.Get "Verify"}}{{else}}{{.T.Get "Sign In"}}{{end}}</button>
+    </form>
+
+{{if not .TwofaEnabled}}
+<div class="op-auth-or">{{.T.Get "or"}}</div>
+<button type="button" id="passkey-login-btn" class="op-btn op-btn-secondary" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px"><path d="M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z"/><path d="M15 9h.01"/></svg> {{.T.Get "Sign in with a passkey"}}</button>
+<script>window.PasskeyI18n = { registerStart: '{{.T.Get "Failed to start passkey registration."}}', save: '{{.T.Get "Failed to save passkey."}}', loginStart: '{{.T.Get "Failed to start passkey login."}}', login: '{{.T.Get "Passkey login failed."}}' };</script>
+<script src="{{static "js/passkeys.js"}}"></script>
+<script>
+    document.getElementById('passkey-login-btn').addEventListener('click', async function () {
+        if (!window.PublicKeyCredential) {
+            alert("{{.T.Get "Passkeys require this panel to be accessed over HTTPS with a domain name."}}");
+            return;
+        }
+        try {
+            const result = await loginWithPasskey();
+            window.location.href = result.redirect || '/dashboard';
+        } catch (e) {
+            alert(e.message);
+        }
+    });
+</script>
+{{end}}
+
+{{if not .TwofaEnabled}}<script>
+// show/hide the password and warn about Caps Lock, the login layout has no Alpine
+(function () {
+  var input = document.getElementById('password'), btn = document.getElementById('password-toggle'), caps = document.getElementById('password-caps');
+  if (!input || !btn) return;
+  btn.addEventListener('click', function () {
+    var show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(show));
+    btn.setAttribute('aria-label', show ? btn.dataset.hide : btn.dataset.show);
+    btn.querySelector('.is-show').hidden = show;
+    btn.querySelector('.is-hide').hidden = !show;
+    input.focus();
+  });
+  ['keydown', 'keyup'].forEach(function (ev) {
+    input.addEventListener(ev, function (e) { caps.hidden = !(e.getModifierState && e.getModifierState('CapsLock')); });
+  });
+})();
+</script>{{end}}
+{{if .TwofaEnabled}}<a class="op-auth-link" href="/login" style="align-self:center">{{.T.Get "Back to sign in"}}</a>{{end}}
+</div></div>
+
+<!-- END templates/user/login.html -->
+{{end}}
