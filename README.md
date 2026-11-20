@@ -9,10 +9,9 @@ Modern is a redesigned theme for the OpenPanel 2.x user panel: a dark sidebar, t
 ```bash
 git clone https://github.com/stefanpejcic/modern-openpanel-theme /etc/openpanel/openpanel/templates/modern
 opencli config update template modern
-podman restart openpanel
 ```
 
-The restart makes the panel load the theme. You can also pick **Modern** in **OpenAdmin > Settings > OpenPanel > Theme**.
+The command restarts the panel so the theme loads right away. You can also pick **Modern** in **OpenAdmin > Settings > OpenPanel > Theme**.
 
 ## What's inside
 
