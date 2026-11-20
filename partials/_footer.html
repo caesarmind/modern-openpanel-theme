@@ -16,6 +16,16 @@
 
             {{template "themeswitcher" .}}
 
+            {{if and .ThemeSwitch (gt (len .ThemeOptions) 1)}}
+            <form class="op-menu-row" role="group" id="user-theme" method="post" action="/account/theme">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <label for="user-theme-select">{{.T.Get "Panel theme"}}</label>
+                <select id="user-theme-select" name="theme" class="op-select" style="width:auto;max-width:9.5rem;height:30px;padding:0 8px" onchange="this.form.submit()">
+                    {{range .ThemeOptions}}<option value="{{.Folder}}"{{if eq .Folder $.ThemeFolder}} selected{{end}}>{{.Name}}</option>{{end}}
+                </select>
+            </form>
+            {{end}}
+
             <div class="op-menu-row" role="group" id="tour-menu-style">
                 <span>{{.T.Get "Menu style"}}</span>
                 <span class="op-seg">
