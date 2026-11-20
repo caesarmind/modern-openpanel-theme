@@ -1,7 +1,7 @@
 Theme Name: Modern
 Theme URI: https://github.com/stefanpejcic/modern-openpanel-theme
-Author: OpenPanel
-Author URI: https://openpanel.com
+Author: Arshile Gogen
+Author URI: https://github.com/caesarmind
 Version: 1.0.0
 License: OpenPanel EULA
 License URI: https://github.com/stefanpejcic/OpenPanel/blob/main/LICENSE
