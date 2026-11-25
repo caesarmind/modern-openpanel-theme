@@ -135,13 +135,27 @@
         <form class="op-col" x-show="mode === 'raw'" x-cloak style="gap:12px" method="POST" action="/emails/filter/{{.Email}}/raw">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
             <span class="op-hint op-mono" style="overflow-wrap:anywhere">{{.SieveFile}}</span>
+            {{template "editor_draft" (dict "T" .T "Class" "")}}
             <textarea id="raw_content" name="new_content" rows="16" class="op-input op-mono op-sieve-raw" spellcheck="false" aria-label="{{.T.Get "Sieve file"}}">{{.RawContent}}</textarea>
             <div class="op-form-foot"><button type="submit" class="op-btn op-btn-primary">{{.T.Get "Save file"}}</button></div>
         </form>
     </section>
 </div>
 
+<script src="{{static "js/editor-draft.js"}}"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const ta = document.getElementById('raw_content');
+    if (!ta) return;
+    opEditorDraft({
+        key: 'sieve:' + {{toJSON .CurrentUsername}} + ':' + {{toJSON .Email}},
+        initial: ta.defaultValue,
+        get: () => ta.value,
+        set: (v) => { ta.value = v; ta.focus(); },
+        onChange: (cb) => ta.addEventListener('input', cb),
+        form: ta.form,
+    });
+});
 function filterPage() {
     return {
         mode: {{toJSON .ViewMode}},

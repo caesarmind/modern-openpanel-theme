@@ -1,0 +1,15 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/imunifyav_gui.html -->
+{{/* the page tabs and the Summary link share one strip, the ImunifyAV app fills the rest of the window */}}
+<div class="op-iav-bar">
+    {{template "op_page_tabs" .}}
+    <a href="/imunifyav/summary" id="imunifyav-summary" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "listdetails"}} {{.T.Get "Summary"}}</a>
+</div>
+<iframe id="imunifyav-gui" title="ImunifyAV" src="/imav/#/login?token={{.Token}}" class="op-iav-frame"></iframe>
+<!-- END templates/files/imunifyav_gui.html -->
+{{end}}

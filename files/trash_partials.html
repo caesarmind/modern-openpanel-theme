@@ -276,6 +276,26 @@
         });
     }
 
+    // 2.0.29+: one request for every selected row so the activity log gets a single combined entry
+    function runBatch(rows, url, method, doneMsg, single) {
+        if (rows.length < 2 || !(window.opPanelAtLeast && opPanelAtLeast('2.0.29'))) { runEach(rows, single, doneMsg); return; }
+        var params = new URLSearchParams();
+        rows.forEach(function (row) { params.append('filename', row.dataset.file); });
+        fetch(url + '?' + params, { method: method, headers: { 'X-CSRF-Token': csrf_token } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) return 0;
+                var failed = data.failed || [{ name: rows[0].dataset.file, error: data.error || '{{.T.Get "Unknown error"}}' }];
+                failed.forEach(function (f) { showToast(f.name + ': ' + f.error, 'error'); });
+                return failed.length;
+            })
+            .catch(function (e) { showToast(e.message, 'error'); return rows.length; })
+            .then(function (failed) {
+                showToast(failed ? i18n.failed : doneMsg, failed ? 'warning' : 'success');
+                setTimeout(function () { location.reload(); }, failed ? 1500 : 500);
+            });
+    }
+
     function postAll(action) {
         var form = document.createElement('form');
         form.method = 'POST';
@@ -324,11 +344,11 @@
         restoreButton.addEventListener('click', function () {
             var rows = selectedTrashRows();
             startConfirm('restore', rows, function () {
-                runEach(rows, function (row) {
+                runBatch(rows, '/file-manager/restoreTrash', 'POST', i18n.restored, function (row) {
                     return fetch('/file-manager/restoreTrash?filename=' + encodeURIComponent(row.dataset.file), {
                         method: 'POST', headers: { 'X-CSRF-Token': csrf_token }
                     });
-                }, i18n.restored);
+                });
             });
         });
     }
@@ -338,11 +358,11 @@
         deleteTrashButton.addEventListener('click', function () {
             var rows = selectedTrashRows();
             startConfirm('delete', rows, function () {
-                runEach(rows, function (row) {
+                runBatch(rows, '/file-manager/deleteTrash', 'DELETE', i18n.deleted, function (row) {
                     return fetch('/file-manager/deleteTrash?filename=' + encodeURIComponent(row.dataset.file) + '&item_type=' + encodeURIComponent(row.dataset.type), {
                         method: 'DELETE', headers: { 'X-CSRF-Token': csrf_token }
                     });
-                }, i18n.deleted);
+                });
             });
         });
     }

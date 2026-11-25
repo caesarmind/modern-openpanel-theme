@@ -20,6 +20,9 @@
 </span>
 <p x-show="j.database || (j.items || []).length" class="max-w-xl truncate text-xs op-muted" x-text="j.database || (j.items || []).map(i => itemLabel(i, j.target)).join(', ')"></p>{{end}}
 
+{{define "bk_job_by"}}<span x-text="j.by || '–'"></span>
+<p x-show="j.ip" class="text-xs op-muted op-mono" x-text="j.ip"></p>{{end}}
+
 {{define "content"}}
 <!-- START templates/files/backup_restore.html -->
 
@@ -41,6 +44,8 @@
     reindexing: {{if .Reindexing}}true{{else}}false{{end}},
     barStyle: {},
     jobs: { queue: [], logs: [] },
+    cancelling: {},
+    logJob: null,
     jobsTimer: null,
     pollInterval: null,
     init() {
@@ -175,6 +180,66 @@
     },
     fmtUnix(sec) {
         return sec ? this.fmtDate(new Date(sec * 1000).toISOString()) : '';
+    },
+    // a running restore stops at its next read or import step, the queue refresh shows when it's gone
+    async cancelJob(j) {
+        const msg = j.status === 'running' ? this.$refs.cancelRunningMsg.textContent : this.$refs.cancelQueuedMsg.textContent;
+        if (!confirm(msg)) return;
+        this.cancelling[j.id] = true;
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+            formData.append('id', j.id);
+            const resp = await fetch('/backups/jobs/cancel', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (!data.cancelled) {
+                delete this.cancelling[j.id];
+                showToast(data.error || resp.statusText, 'error');
+            }
+        } catch (e) {
+            delete this.cancelling[j.id];
+            showToast(e.toString(), 'error');
+        }
+        this.loadJobs();
+    },
+    fmtSecs(secs) {
+        secs = Math.max(0, Math.round(secs));
+        const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+        if (h) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+        return m ? m + 'm ' + String(s).padStart(2, '0') + 's' : s + 's';
+    },
+    stepLabel(key) {
+        const el = this.$refs.stepLabels?.querySelector('[data-step=' + JSON.stringify(key) + ']');
+        return el ? el.textContent : key;
+    },
+    // bytes per second for a whole restore, from the running one or else the last finished one with a size
+    restoreRate() {
+        const run = this.jobs.queue.find(j => j.status === 'running');
+        if (run && run.size && run.progress && run.progress.percent > 2 && run.started) {
+            const elapsed = (Date.now() - new Date(run.started)) / 1000;
+            if (elapsed > 0) return run.size / (elapsed / (run.progress.percent / 100));
+        }
+        const last = this.jobs.logs.find(j => j.status === 'done' && j.size && j.started && j.finished);
+        if (last) {
+            const took = (new Date(last.finished) - new Date(last.started)) / 1000;
+            if (took > 0) return last.size / took;
+        }
+        return 0;
+    },
+    // seconds until the queued job at idx starts, -1 when there's nothing to go on
+    waitFor(idx) {
+        const rate = this.restoreRate();
+        let secs = 0;
+        for (const j of this.jobs.queue.slice(0, idx)) {
+            if (j.status === 'running') {
+                if (!j.progress || j.progress.eta < 0) return -1;
+                secs += j.progress.eta;
+            } else {
+                if (!rate || !j.size) return -1;
+                secs += j.size / rate;
+            }
+        }
+        return secs;
     },
     fmtSize(bytes) {
         const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -443,7 +508,8 @@
             <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M4 13m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M17 17l0 .01"/><path d="M4 15l2.5 -8.5a2 2 0 0 1 1.9 -1.5h7.2a2 2 0 0 1 1.9 1.5l2.5 8.5"/></svg>{{.T.Get "Total Size"}}</div><div class="op-kpi-value" x-text="fmtSize(backups.reduce((sum, b) => sum + (b.size || 0), 0))"></div><div class="op-kpi-note">{{.T.Get "all archives together"}}</div></div>
             <div class="op-kpi"><div class="op-kpi-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg>{{.T.Get "Last Restore"}}
                     <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'done'">· {{.T.Get "Done"}}</span>
-                    <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'failed'" class="is-danger">· {{.T.Get "Failed"}}</span></div><div class="op-kpi-value" style="font-size:20px">
+                    <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'failed'" class="is-danger">· {{.T.Get "Failed"}}</span>
+                    <span x-show="!jobs.queue.length && jobs.logs[0]?.status === 'cancelled'">· {{.T.Get "Cancelled"}}</span></div><div class="op-kpi-value" style="font-size:20px">
                     <span x-show="jobs.queue.length" class="inline-flex items-center gap-1.5"><i class="bi bi-arrow-repeat animate-spin"></i><span x-text="jobs.queue.length"></span> {{.T.Get "in queue"}}</span>
                     <span x-show="!jobs.queue.length" x-text="jobs.logs[0] ? fmtDate(jobs.logs[0].finished) : '–'"></span>
                 </div><div class="op-kpi-note" x-show="!jobs.queue.length &amp;&amp; !jobs.logs[0]">{{.T.Get "No restores yet."}}</div></div>
@@ -467,6 +533,27 @@
         </section>
     </div>
 
+    <div x-ref="stepLabels" class="hidden">
+        <span data-step="running">{{.T.Get "Restoring..."}}</span>
+        <span data-step="reading">{{.T.Get "Reading the backup"}}</span>
+        <span data-step="download">{{.T.Get "Downloading the backup"}}</span>
+        <span data-step="files">{{.T.Get "Restoring files"}}</span>
+        <span data-step="databases">{{.T.Get "Restoring databases"}}</span>
+        <span data-step="database">{{.T.Get "Restoring database"}}</span>
+        <span data-step="apply">{{.T.Get "Applying cron jobs, DNS and vhosts"}}</span>
+        <span data-step="html">{{.T.Get "Restoring website files"}}</span>
+        <span data-step="vhosts">{{.T.Get "Restoring domains"}}</span>
+        <span data-step="domains">{{.T.Get "Restoring domain"}}</span>
+        <span data-step="mail">{{.T.Get "Restoring emails"}}</span>
+        <span data-step="mailboxes">{{.T.Get "Restoring mailboxes"}}</span>
+        <span data-step="crons">{{.T.Get "Restoring cron jobs"}}</span>
+        <span data-step="dns">{{.T.Get "Restoring DNS zones"}}</span>
+        <span data-step="dns_zones">{{.T.Get "Restoring DNS zones"}}</span>
+        <span data-step="paths">{{.T.Get "Restoring selected files"}}</span>
+    </div>
+    <span x-ref="cancelQueuedMsg" class="hidden">{{.T.Get "Remove this restore from the queue?"}}</span>
+    <span x-ref="cancelRunningMsg" class="hidden">{{.T.Get "Stop this restore? Whatever was restored so far stays, and a database that was being restored will be left incomplete."}}</span>
+
     <!-- restore queue -->
     <div x-show="tab === 'queue'" x-cloak class="op-card">
         <!-- queue: one restore runs at a time, the rest wait their turn -->
@@ -482,23 +569,52 @@
                         <th class="op-th">{{.T.Get "What"}}</th>
                         <th class="op-th">{{.T.Get "From backup"}}</th>
                         <th class="op-th">{{.T.Get "Added"}}</th>
+                        <th class="op-th">{{.T.Get "Started by"}}</th>
                         <th class="op-th">{{.T.Get "Status"}}</th>
+                        <th class="op-th" style="width:1px"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
                     </tr>
                 </thead>
                 <tbody class="op-tbody">
-                    <template x-for="j in jobs.queue" :key="j.id">
+                    <template x-for="(j, idx) in jobs.queue" :key="j.id">
                         <tr>
                             <td class="p-4 text-sm">{{template "bk_job_what" .}}</td>
                             <td class="op-td" x-text="fmtDate(j.created) || '–'"></td>
                             <td class="op-td" x-text="fmtDate(j.queued)"></td>
+                            <td class="op-td">{{template "bk_job_by" .}}</td>
                             <td class="op-td">
-                                <span x-show="j.status === 'running'" class="inline-flex items-center gap-1.5 op-strong"><i class="bi bi-arrow-repeat animate-spin"></i>{{.T.Get "Restoring..."}} <span class="op-muted" x-text="fmtDuration(j.started, null)"></span></span>
-                                <span x-show="j.status === 'queued'">{{.T.Get "Waiting"}}</span>
+                                <template x-if="j.status === 'running'">
+                                    <div style="min-width:12rem">
+                                        <div class="inline-flex w-full items-center gap-1.5 op-strong" style="white-space:nowrap"><i class="bi bi-arrow-repeat animate-spin"></i><span x-text="stepLabel(j.progress?.step || 'running')"></span><span x-show="j.progress && j.progress.detail" class="op-mono text-xs" x-text="j.progress?.detail"></span><span class="ml-auto text-xs op-muted" x-show="j.progress && j.progress.percent >= 0" x-text="Math.floor(j.progress?.percent) + '%'"></span></div>
+                                        <div x-show="j.progress && j.progress.percent >= 0" class="op-progress" style="margin-top:6px;height:6px"><div class="op-progress-fill" :style="'width:' + Math.min(100, Math.max(0, j.progress?.percent || 0)) + '%'"></div></div>
+                                        <p class="mt-1 text-xs op-muted" style="white-space:nowrap">
+                                            <span x-show="j.progress && j.progress.phases > 1">{{.T.Get "Step"}} <span x-text="j.progress?.phase"></span>/<span x-text="j.progress?.phases"></span> ·</span>
+                                            <span x-show="j.progress && j.progress.size" x-text="fmtSize(j.progress?.done || 0) + ' / ' + fmtSize(j.progress?.size || 0)"></span>
+                                            <span x-show="j.progress && !j.progress.size && j.progress.done" x-text="fmtSize(j.progress?.done || 0)"></span>
+                                            <span x-show="j.progress && j.progress.rate > 0" x-text="'· ' + fmtSize(j.progress?.rate || 0) + '/s'"></span>
+                                            <span x-show="j.progress && j.progress.items > 0">· <span x-text="j.progress?.items"></span> {{.T.Get "files"}}</span>
+                                            <span>· <span x-text="fmtDuration(j.started, null)"></span></span>
+                                            <span x-show="j.progress && j.progress.eta >= 0">· {{.T.Get "Time left"}} ~<span x-text="fmtSecs(j.progress?.eta || 0)"></span></span>
+                                        </p>
+                                    </div>
+                                </template>
+                                <template x-if="j.status === 'queued'">
+                                    <div style="white-space:nowrap">
+                                        <span>{{.T.Get "Waiting"}}</span>
+                                        <span x-show="j.size" class="text-xs op-muted" x-text="'· ' + fmtSize(j.size)"></span>
+                                        <p class="mt-1 text-xs op-muted">
+                                            <span x-show="waitFor(idx) >= 0">{{.T.Get "Starts in"}} ~<span x-text="fmtSecs(waitFor(idx))"></span></span>
+                                            <span x-show="waitFor(idx) < 0">{{.T.Get "Starts after the restores above"}}</span>
+                                        </p>
+                                    </div>
+                                </template>
+                            </td>
+                            <td class="op-td" style="text-align:right;white-space:nowrap">
+                                <button type="button" class="op-btn op-btn-secondary op-btn-sm is-danger" @click="cancelJob(j)" :disabled="cancelling[j.id]">{{template "op_icon" "xcircle"}} <span x-show="!cancelling[j.id]">{{.T.Get "Cancel"}}</span><span x-show="cancelling[j.id]">{{.T.Get "Stopping..."}}</span></button>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="!jobs.queue.length">
-                        <td colspan="4" class="text-center op-td">{{.T.Get "Nothing is being restored right now."}}</td>
+                        <td colspan="6" class="text-center op-td">{{.T.Get "Nothing is being restored right now."}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -517,6 +633,7 @@
                         <th class="op-th">{{.T.Get "What"}}</th>
                         <th class="op-th">{{.T.Get "From backup"}}</th>
                         <th class="op-th">{{.T.Get "Restored"}}</th>
+                        <th class="op-th">{{.T.Get "Started by"}}</th>
                         <th class="op-th">{{.T.Get "Took"}}</th>
                         <th class="op-th">{{.T.Get "Status"}}</th>
                     </tr>
@@ -527,16 +644,19 @@
                             <td class="p-4 text-sm">{{template "bk_job_what" .}}</td>
                             <td class="op-td" x-text="fmtDate(j.created) || '–'"></td>
                             <td class="op-td" x-text="fmtDate(j.finished)"></td>
+                            <td class="op-td">{{template "bk_job_by" .}}</td>
                             <td class="op-td" x-text="fmtDuration(j.started, j.finished)"></td>
                             <td class="op-td">
                                 <span x-show="j.status === 'done'" class="op-badge is-success">{{.T.Get "Done"}}</span>
                                 <span x-show="j.status === 'failed'" class="op-badge is-danger">{{.T.Get "Failed"}}</span>
+                                <span x-show="j.status === 'cancelled'" class="op-badge">{{.T.Get "Cancelled"}}</span>
+                                <button type="button" class="op-btn op-btn-ghost op-btn-sm" @click="logJob = j">{{template "op_icon" "listdetails"}} {{.T.Get "View log"}}</button>
                                 <p x-show="j.message" class="mt-1 max-w-xl text-xs" :class="j.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'" x-text="j.message"></p>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="!jobs.logs.length">
-                        <td colspan="5" class="text-center op-td">{{.T.Get "No restores yet."}}</td>
+                        <td colspan="6" class="text-center op-td">{{.T.Get "No restores yet."}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -791,6 +911,42 @@
     </div>
 
     <!-- Restore summary modal -->
+    <!-- restore log: one finished restore, its size and speed and how long each step took -->
+    <template x-teleport="body">
+    <div x-show="logJob" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,0.5);" @keydown.escape.window="logJob = null" @click.self="logJob = null">
+        <div class="op-modal op-scope" role="dialog" aria-modal="true" aria-label="{{.T.Get "Restore log"}}" style="max-height: 85vh;">
+            <div class="op-modal-head">
+                <h2 class="op-h">{{.T.Get "Restore log"}}</h2>
+                <button type="button" class="op-icon-btn" @click="logJob = null" aria-label="{{.T.Get "Close"}}">{{template "op_icon" "x"}}</button>
+            </div>
+            <template x-if="logJob">
+                <div class="op-modal-body" style="display:grid;gap:14px">
+                    <template x-for="j in [logJob]" :key="j.id"><div>{{template "bk_job_what" .}}</div></template>
+                    <p x-show="logJob.message" class="text-xs" :class="logJob.status === 'failed' ? 'is-danger' : 'op-muted'" x-text="logJob.message"></p>
+                    <dl class="op-dl">
+                        <dt class="op-muted">{{.T.Get "From backup"}}</dt><dd x-text="fmtDate(logJob.created) || '–'"></dd>
+                        <dt class="op-muted">{{.T.Get "Started by"}}</dt><dd><span x-text="logJob.by || '–'"></span> <span x-show="logJob.ip" class="op-muted op-mono" x-text="'(' + logJob.ip + ')'"></span></dd>
+                        <dt class="op-muted">{{.T.Get "Restored"}}</dt><dd x-text="fmtDate(logJob.finished)"></dd>
+                        <dt class="op-muted">{{.T.Get "Took"}}</dt><dd x-text="fmtDuration(logJob.started, logJob.finished)"></dd>
+                        <template x-if="logJob.size"><dt class="op-muted">{{.T.Get "Size"}}</dt></template>
+                        <template x-if="logJob.size"><dd><span x-text="fmtSize(logJob.size)"></span> <span x-show="logJob.started && logJob.finished && new Date(logJob.finished) > new Date(logJob.started)" class="op-muted" x-text="'· ' + fmtSize(logJob.size / ((new Date(logJob.finished) - new Date(logJob.started)) / 1000)) + '/s'"></span></dd></template>
+                        <template x-if="logJob.progress && logJob.progress.items > 0"><dt class="op-muted">{{.T.Get "Files restored"}}</dt></template>
+                        <template x-if="logJob.progress && logJob.progress.items > 0"><dd x-text="logJob.progress.items"></dd></template>
+                    </dl>
+                    <div x-show="logJob.progress && (logJob.progress.steps || []).length">
+                        <p class="op-strong text-xs" style="margin:0 0 8px">{{.T.Get "Steps"}}</p>
+                        <ul class="op-card" style="padding:0;margin:0;list-style:none;font-size:12px">
+                            <template x-for="st in (logJob.progress?.steps || [])">
+                                <li class="flex items-center justify-between gap-3" style="padding:8px 12px;box-shadow:inset 0 -1px 0 var(--color-raised)"><span class="truncate"><span x-text="stepLabel(st.step)"></span> <span x-show="st.detail" class="op-mono op-muted" x-text="st.detail"></span></span><span class="op-muted" style="flex:none" x-text="fmtSecs(st.seconds)"></span></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    </template>
+
     <div x-show="summaryOpen" x-cloak
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
         @keydown.escape.window="closeSummary()" @click.self="closeSummary()">

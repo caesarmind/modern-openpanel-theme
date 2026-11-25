@@ -115,6 +115,18 @@ function opConfEditor(cfg) {
                 self.update();
             });
             this.update();
+            // unsaved edits stay in this browser and come back as a Restore banner, same keys as the built-in theme
+            if (cfg.draft && window.opEditorDraft) {
+                opEditorDraft({
+                    key: cfg.draft,
+                    root: this.$root.querySelector('[data-op-draft]'),
+                    initial: this.$refs.ta.defaultValue,
+                    get: function () { return cm.getValue(); },
+                    set: function (v) { cm.setValue(v); cm.focus(); },
+                    onChange: function (cb) { cm.on('change', cb); },
+                    form: this.$root,
+                });
+            }
             window.addEventListener('beforeunload', function (e) { if (self.dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
         },
         update() {

@@ -18,6 +18,22 @@
         .slice(0, 10);
     });
   }
+  {{if .WPProfiles}}
+  function wpSetField() {
+    var profiles = {{toJSON .WPProfiles}};
+    var describe = function (v) {
+      if (v === 'none') return {{toJSON (.T.Get "No extra plugins or themes are installed.")}};
+      var p = profiles.find(function (x) { return x.slug === v; });
+      if (!p) return {{toJSON (.T.Get "Installs the server's default plugins and themes, or your own wpcli_plugins.txt and wpcli_themes.txt if you have them.")}};
+      return {{toJSON (.T.Get "Plugins")}} + ': ' + ((p.plugins || []).join(', ') || '-') + ' · ' + {{toJSON (.T.Get "Themes")}} + ': ' + ((p.themes || []).join(', ') || '-');
+    };
+    return {
+      name: 'wp_set', step: 'db', type: 'select', label: {{toJSON (.T.Get "Plugins & themes set")}}, value: '',
+      options: [{ value: '', label: {{toJSON (.T.Get "Default")}} }].concat(profiles.map(function (p) { return { value: p.slug, label: p.name }; }), [{ value: 'none', label: {{toJSON (.T.Get "None, clean WordPress")}} }]),
+      check: function (v) { return { text: describe(v), tone: 'info' }; }, checkInit: true,
+    };
+  }
+  {{end}}
   // fields, checks and run checkpoints mirror wordpress/install.go
   window.opIWConfig = {
     slug: 'wordpress', name: 'WordPress', title: {{toJSON (.T.Get "Install WordPress")}}, cta: {{toJSON (.T.Get "Install WordPress")}},
@@ -35,7 +51,12 @@
       { name: 'db_prefix', step: 'db', label: {{toJSON (.T.Get "Table prefix")}}, gen: 'prefix', required: true, validate: 'dbprefix', mono: true, half: true },
       { name: 'db_user', step: 'db', label: {{toJSON (.T.Get "Database user")}}, prefix: true, gen: lower8, required: true, validate: 'dbname', mono: true, half: true },
       { name: 'db_password', step: 'db', label: {{toJSON (.T.Get "Database password")}}, type: 'password', gen: 'alnum12', required: true, validate: 'dbpass', half: true },
+{{if .WPProfiles}}
+      // plugin and theme profiles from the server, "" keeps the default sets, "none" installs a clean WordPress
+      wpSetField(),
+{{else}}
       { name: 'sets_note', step: 'db', type: 'note', label: {{toJSON (.T.Get "Plugin and theme sets your hosting provider set up are installed right after WordPress, nothing to pick here.")}} }
+{{end}}
     ],
     run: [
       K.run.step({{toJSON (.T.Get "Starting PHP container")}}, ['Starting PHP container']),

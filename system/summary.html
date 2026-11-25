@@ -120,6 +120,39 @@
         {{end}}
     </section>
 
+    {{if $s.Databases}}
+    <!-- database servers: size, traffic and errors for the day, -1 means the number isn't known -->
+    <section class="op-card" aria-labelledby="ds-dbs">
+        <div class="op-card-head"><h2 id="ds-dbs">{{.T.Get "Databases"}} <span class="op-hint">· {{len $s.Databases}}</span></h2><span class="op-hint">{{.T.Get "Size, traffic and errors for each database server."}}</span></div>
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr>
+                <th>{{.T.Get "Server"}}</th>
+                <th class="is-num">{{.T.Get "Size"}}</th>
+                <th class="is-num">{{.T.Get "Queries"}}</th>
+                <th class="is-num">{{.T.Get "Connections"}}</th>
+                <th class="is-num">{{.T.Get "Failed logins"}}</th>
+                <th class="is-num">{{.T.Get "Slow queries"}}</th>
+                <th class="is-num">{{.T.Get "Deadlocks"}}</th>
+                <th class="is-num">{{.T.Get "Errors"}}</th>
+            </tr></thead>
+            <tbody>
+                {{range $s.Databases}}
+                <tr>
+                    <td class="op-cell-title"><div class="op-row-title"><div><b><a href="{{.Link}}" style="color:inherit">{{.Engine}}</a></b>{{if .Counters}}<span class="op-sub">{{$s.Num .Databases}} {{$.T.Get "databases"}}</span>{{end}}</div></div></td>
+                    <td data-label="{{$.T.Get "Size"}}" class="is-num"><span class="op-mono">{{if .Counters}}{{.Sized}}{{else}}–{{end}}</span></td>
+                    <td data-label="{{$.T.Get "Queries"}}" class="is-num">{{if ge .Queries 0}}<span class="op-mono">{{.Num .Queries}}</span> <span class="op-hint">{{$.T.Get .QueriesLabel}}</span>{{else}}<span class="op-faint">–</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Connections"}}" class="is-num">{{if ge .Connections 0}}<span class="op-mono">{{.Num .Connections}}</span>{{else}}<span class="op-faint">–</span>{{end}}{{if and (ge .PeakConnections 0) (gt .MaxConnections 0)}}<span class="op-sub">{{$.T.Get "Peak"}} {{.PeakConnections}} / {{.MaxConnections}}</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Failed logins"}}" class="is-num">{{if gt .FailedLogins 0}}<span class="op-mono is-warning">{{.Num .FailedLogins}}</span>{{else}}<span class="op-faint">–</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Slow queries"}}" class="is-num">{{if gt .SlowQueries 0}}<span class="op-mono is-warning">{{.Num .SlowQueries}}</span>{{else}}<span class="op-faint">–</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Deadlocks"}}" class="is-num">{{if gt .Deadlocks 0}}<span class="op-mono is-danger">{{.Num .Deadlocks}}</span>{{else}}<span class="op-faint">–</span>{{end}}</td>
+                    <td data-label="{{$.T.Get "Errors"}}" class="is-num">{{if or .Errors (gt .Refused 0)}}<span class="op-chips" style="justify-content:flex-end;gap:4px">{{if .Errors}}<span class="op-badge is-danger">{{$s.Num .Errors}} {{$.T.Get "errors"}}</span>{{end}}{{if gt .Refused 0}}<span class="op-badge is-danger">{{.Num .Refused}} {{$.T.Get "refused"}}</span>{{end}}</span>{{else}}<span class="op-faint">–</span>{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table></div>
+    </section>
+    {{end}}
+
     <div class="op-cols-2">
         <section class="op-card" aria-labelledby="ds-logins">
             <div class="op-card-head"><h2 id="ds-logins">{{.T.Get "Panel logins"}} <span class="op-hint">· {{len $s.Logins}}</span></h2>{{if .UserAllowed.login_history}}<a href="/account/login-history">{{.T.Get "Login history"}}</a>{{end}}</div>

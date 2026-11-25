@@ -121,6 +121,8 @@
           this.v[f.name] = val;
           if (f.versions) this.loadVersions(f);
           if (f.options) this.opts[f.name] = f.options;
+          // a hint that describes the starting value, like the picked plugin and theme set
+          if (f.check && f.checkInit) Promise.resolve(f.check(val, this)).then((h) => { this.hints[f.name] = h || null; });
         });
         const want = new URLSearchParams(location.search).get('domain');
         const hit = want && this.domains.find((d) => d.DomainURL === want || String(d.DomainID) === want);

@@ -1,0 +1,91 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+{{define "flowbite_js"}}{{end}}
+
+{{define "content"}}
+<!-- START templates/files/imunifyav.html -->
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">ImunifyAV</h1>
+            <p class="op-meta">{{.T.Get "Malware ImunifyAV found in your files, and the scans of your account."}}</p>
+        </div>
+        {{if not .NotRunning}}{{if not .Error}}
+        <form method="post" action="/imunifyav/scan" class="op-actions">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            {{if .GUIReady}}<a href="/imunifyav" id="imunifyav-open-gui" class="op-btn op-btn-secondary">{{template "op_icon" "external"}} {{.T.Get "Open full ImunifyAV"}}</a>{{end}}
+            {{if not .ScanAllowed}}
+            <p id="imunifyav-scan-off" class="op-hint">{{.T.Get "Starting scans is turned off on this server."}}</p>
+            {{else}}
+            <button type="submit" id="imunifyav-scan" {{if .Scanning}}disabled{{end}} class="op-btn op-btn-primary">{{if .Scanning}}{{template "op_icon" "loader"}} {{.T.Get "Scan running…"}}{{else}}{{template "op_icon" "shieldcheck"}} {{.T.Get "Scan my files"}}{{end}}</button>
+            {{end}}
+        </form>
+        {{end}}{{end}}
+    </div>
+
+    {{if .NotRunning}}
+    <section class="op-card" id="imunifyav-not-running"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "shieldcheck"}}</span><b>{{.T.Get "ImunifyAV isn't available right now"}}</b><span class="op-hint">{{.T.Get "It isn't installed or running on this server. Contact your hosting provider if you expected it here."}}</span></div></section>
+    {{else if .Error}}
+    <div class="op-alert is-danger" role="alert">{{template "op_icon" "alert"}}<span>{{.Error}}</span></div>
+    {{else}}
+
+    <section class="op-kpis" aria-label="{{.T.Get "Summary"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "shield"}} {{.T.Get "Status"}}</div>
+            <div id="imunifyav-status" class="op-kpi-value{{if and .Infected (not .Scanning)}} is-danger{{end}}" style="font-size:20px">{{if .Scanning}}{{.T.Get "Scanning"}}{{else if .Infected}}{{.Infected}} {{.T.Get "infected"}}{{else if .LastScan}}{{.T.Get "Clean"}}{{else}}{{.T.Get "Not scanned yet"}}{{end}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "clock"}} {{.T.Get "Last scan"}}</div><div class="op-kpi-value" style="font-size:20px">{{if .LastScan}}{{.LastScan}}{{else}}{{.T.Get "Never"}}{{end}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "info"}} {{.T.Get "What to do"}}</div><div class="op-kpi-note" style="margin-top:6px;white-space:normal;overflow:visible;text-overflow:clip">{{if .Infected}}{{.T.Get "Remove or replace the files below, then scan again. Contact your hosting provider if you need help cleaning them."}}{{else}}{{.T.Get "ImunifyAV also scans the server on its own schedule."}}{{end}}</div></div>
+    </section>
+
+    <section class="op-card" aria-labelledby="iav-hits">
+        <div class="op-card-head"><h2 id="iav-hits">{{.T.Get "Infected files"}}{{if .Hits}} <span class="op-hint">· {{len .Hits}}</span>{{end}}</h2></div>
+        {{if not .Hits}}
+        <div class="op-empty" id="imunifyav-no-hits"><span class="op-ico-tile">{{template "op_icon" "shieldcheck"}}</span><b>{{.T.Get "No malware found."}}</b></div>
+        {{else}}
+        <div class="op-table-wrap"><table id="imunifyav-hits" class="op-table">
+            <thead><tr><th scope="col">{{.T.Get "File"}}</th><th scope="col">{{.T.Get "Signature"}}</th><th scope="col">{{.T.Get "Detected"}}</th><th scope="col">{{.T.Get "Status"}}</th></tr></thead>
+            <tbody>
+            {{range .Hits}}
+            <tr>
+                <td class="op-cell-title"><span class="op-mono" style="overflow-wrap:anywhere">{{.Path}}</span></td>
+                <td data-label="{{$.T.Get "Signature"}}" style="overflow-wrap:anywhere" class="op-hint">{{.Signature}}</td>
+                <td data-label="{{$.T.Get "Detected"}}" style="white-space:nowrap">{{.Detected}}</td>
+                <td data-label="{{$.T.Get "Status"}}">{{if .Found}}<span class="op-badge is-danger">{{$.T.Get "Found"}}</span>{{else}}<span class="op-badge">{{.Status}}</span>{{end}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        {{end}}
+    </section>
+
+    <section class="op-card" aria-labelledby="iav-scans">
+        <div class="op-card-head"><h2 id="iav-scans">{{.T.Get "Scans"}}</h2></div>
+        {{if not .Scans}}
+        <div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "history"}}</span><span class="op-hint">{{.T.Get "Scans you start and scheduled scans of your account show up here."}}</span></div>
+        {{else}}
+        <div class="op-table-wrap"><table id="imunifyav-scans" class="op-table">
+            <thead><tr><th scope="col">{{.T.Get "Started"}}</th><th scope="col" class="is-num">{{.T.Get "Files"}}</th><th scope="col">{{.T.Get "Result"}}</th></tr></thead>
+            <tbody>
+            {{range .Scans}}
+            <tr>
+                <td class="op-cell-title"><div class="op-row-title"><div><b>{{.Started}}</b>{{with .Duration}}<span class="op-sub">{{$.T.Get "took"}} {{.}}</span>{{end}}</div></div></td>
+                <td data-label="{{$.T.Get "Files"}}" class="is-num"><span class="op-mono">{{.Files}}</span></td>
+                <td data-label="{{$.T.Get "Result"}}">
+                    {{if eq .Status "running"}}<span class="op-badge is-info">{{$.T.Get "Running"}}</span>
+                    {{else if eq .Status "failed"}}<span class="op-badge is-danger">{{$.T.Get "Failed"}}</span>{{with .Message}} <span class="op-hint">{{.}}</span>{{end}}
+                    {{else if eq .Status "aborted"}}<span class="op-badge">{{$.T.Get "Stopped early"}}</span>
+                    {{else if .Found}}<span class="op-badge is-danger">{{.Found}} {{$.T.Get "infected"}}</span>
+                    {{else}}<span class="op-badge is-success">{{$.T.Get "Clean"}}</span>{{end}}
+                </td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        {{end}}
+    </section>
+
+    {{if .Scanning}}<script>setTimeout(function () { location.reload(); }, 15000);</script>{{end}}
+    {{end}}
+</div>
+<!-- END templates/files/imunifyav.html -->
+{{end}}

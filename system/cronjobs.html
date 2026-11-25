@@ -15,6 +15,7 @@
 
 {{if eq .View "table"}}
 <script src="{{static "js/cron-times.js"}}"></script>
+<script src="{{static "js/editor-draft.js"}}"></script>
 <script>
 // the jobs table: search, filters, run times in the cron time zone and last-run failures from ofelia's log lines
 function cronPage(locale, timeZone, jobs) {
@@ -495,6 +496,7 @@ function confirmDelete(button) {
 <!-- crons file editor -->
 <div class="op-alert is-warning" role="status">{{template "op_icon" "alert"}}<span>{{.T.Get "Editing the crons file is intended for advanced users only. If you mistyped the cron entry in the file, you will not be warned as opposed to when saving cronjobs in table mode."}} {{.T.Get "The panel still refuses image=, network= and the job-run, job-local and job-service-run job types."}}</span></div>
 
+{{template "editor_draft" (dict "T" .T "Class" "")}}
 <div class="op-cron-code" x-data="cronFileEditor()">
 <section class="op-card" style="min-width:0" aria-label="{{.T.Get "Crons File Editor"}}">
     <div class="op-toolbar" style="justify-content:space-between">
@@ -550,6 +552,15 @@ function cronFileEditor() {
             sync();
             window.addEventListener('beforeunload', (e) => { if (this.dirty) e.preventDefault(); });
             document.getElementById('cron-file-form').addEventListener('submit', () => { this.dirty = false; this.cm.save(); });
+            const ta = document.getElementById('editor');
+            opEditorDraft({
+                key: 'cron:' + {{toJSON .CurrentUsername}},
+                initial: ta.defaultValue,
+                get: () => this.cm.getValue(),
+                set: (v) => { this.cm.setValue(v); this.cm.focus(); },
+                onChange: (cb) => this.cm.on('change', cb),
+                form: document.getElementById('cron-file-form'),
+            });
         },
         save() { this.dirty = false; this.cm.save(); document.getElementById('cron-file-form').requestSubmit(); },
         open(m) { this.mode = this.mode === m ? '' : m; if (this.mode) this.$nextTick(() => this.$refs[m].focus()); },

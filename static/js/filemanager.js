@@ -580,6 +580,32 @@ function initActionButtons() {
             const saveBtn = editor.querySelector('[data-act="save"]');
             editor.querySelectorAll('button, input').forEach(b => b.disabled = true);
 
+            // 2.0.29+: one request for the whole selection so the activity log gets a single combined entry
+            if (total > 1 && window.opPanelAtLeast && opPanelAtLeast('2.0.29')) {
+                const params = new URLSearchParams({ path_param: FM.pathParam, mode: permanent ? 'permanent' : 'trash' });
+                items.forEach(({ fileName, itemType }) => { params.append('filename', fileName); params.append('item_type', itemType); });
+                fetch(`/file-manager/delete?${params}`, {
+                    method: 'DELETE', headers: { 'X-CSRF-Token': csrf_token }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) return 0;
+                    const failedList = data.failed || [{ name: items[0].fileName, error: data.error }];
+                    failedList.forEach(f => showToast(`${FM.i18n.deleteError} "${f.name}": ${f.error}`, 'error'));
+                    return failedList.length;
+                })
+                .catch(e => { showToast(`${FM.i18n.deleteError}: ${e.message}`, 'error'); return total; })
+                .then(failedCount => {
+                    if (failedCount) {
+                        showToast(failedCount >= total ? FM.i18n.deleteFailed : FM.i18n.deletePartial, 'warning');
+                    } else {
+                        showToast(permanent ? FM.i18n.deleted : FM.i18n.movedToTrash, 'success');
+                    }
+                    setTimeout(() => location.reload(), failedCount ? 1500 : 500);
+                });
+                return;
+            }
+
             items.forEach(({ fileName, itemType }) => {
                 fetch(`/file-manager/delete?filename=${encodeURIComponent(fileName)}&path_param=${encodeURIComponent(FM.pathParam)}&item_type=${encodeURIComponent(itemType)}&mode=${permanent ? 'permanent' : 'trash'}`, {
                     method: 'DELETE', headers: { 'X-CSRF-Token': csrf_token }
@@ -619,12 +645,25 @@ function initActionButtons() {
         }
     });
 
+    // a new tab per file, named so opening the same file again reuses its tab, opener stays so the editor can report saves
+    function openFileWindow(url, key) {
+        let hash = 0;
+        for (const c of key) hash = (hash * 31 + c.charCodeAt(0)) | 0;
+        const win = window.open(url, 'opfile' + (hash >>> 0).toString(36));
+        if (win) win.focus();
+    }
+
+    // the editor tab tells us after a save so sizes and dates in the list are current
+    window.addEventListener('message', (e) => {
+        if (e.origin === location.origin && e.data && e.data.type === 'op-file-saved') location.reload();
+    });
+
     // VIEW FILE
     document.getElementById('viewButton').addEventListener('click', () => {
         const row = document.querySelector('#filemanager_table tbody tr.selected-row');
         let name = row.dataset.file;
         if (name === 'wp-config.php') name = 'wp_temp_openpanel-config.php';
-        window.open(`/file-manager/view-file/${encodeURIComponent(FM.pathParam + '/')}${encodeURIComponent(name)}`, '_blank');
+        openFileWindow(`/file-manager/view-file/${encodeURIComponent(FM.pathParam + '/')}${encodeURIComponent(name)}`, 'view:' + FM.pathParam + '/' + name);
     });
 
     // EDIT FILE
@@ -632,7 +671,7 @@ function initActionButtons() {
         const row = document.querySelector('#filemanager_table tbody tr.selected-row');
         let name = row.dataset.file;
         if (name === 'wp-config.php') name = 'wp_temp_openpanel-config.php';
-        window.open(`/file-manager/edit-file/${encodeURIComponent(FM.pathParam + '/')}${encodeURIComponent(name)}`, '_blank');
+        openFileWindow(`/file-manager/edit-file/${encodeURIComponent(FM.pathParam + '/')}${encodeURIComponent(name)}`, 'edit:' + FM.pathParam + '/' + name);
     });
 
     // RENAME (inline in the name cell)
@@ -1011,17 +1050,34 @@ function openPicker(action, items) {
         const errors = [];
 
         if (action === 'copy' || action === 'move') {
-            let done = 0;
-            showStatus('info', `${FM.i18n.working} 0/${items.length}`);
-            await Promise.all(items.map(({ fileName, itemType }) =>
-                fetch(`/file-manager/${action}?item_name=${encodeURIComponent(fileName)}&path_param=${encodeURIComponent(FM.pathParam)}&item_type=${encodeURIComponent(itemType)}&destination_path=${encodeURIComponent(dest)}`, {
+            if (items.length > 1 && window.opPanelAtLeast && opPanelAtLeast('2.0.29')) {
+                // 2.0.29+: one request for the whole selection so the activity log gets a single combined entry
+                const params = new URLSearchParams({ path_param: FM.pathParam, destination_path: dest });
+                items.forEach(({ fileName, itemType }) => { params.append('item_name', fileName); params.append('item_type', itemType); });
+                showStatus('info', FM.i18n.working);
+                await fetch(`/file-manager/${action}?${params}`, {
                     method: 'POST', headers: { 'X-CSRF-Token': csrf_token }
                 })
                 .then(r => r.json())
-                .then(data => { if (!data.success) throw new Error(data.error || FM.i18n.unknownError); })
-                .catch(e => errors.push(`${fileName}: ${e.message}`))
-                .finally(() => { done++; showStatus('info', `${FM.i18n.working} ${done}/${items.length}`); })
-            ));
+                .then(data => {
+                    if (data.success) return;
+                    (data.failed || [{ name: items[0].fileName, error: data.error || FM.i18n.unknownError }])
+                        .forEach(f => errors.push(`${f.name}: ${f.error}`));
+                })
+                .catch(e => errors.push(e.message));
+            } else {
+                let done = 0;
+                showStatus('info', `${FM.i18n.working} 0/${items.length}`);
+                await Promise.all(items.map(({ fileName, itemType }) =>
+                    fetch(`/file-manager/${action}?item_name=${encodeURIComponent(fileName)}&path_param=${encodeURIComponent(FM.pathParam)}&item_type=${encodeURIComponent(itemType)}&destination_path=${encodeURIComponent(dest)}`, {
+                        method: 'POST', headers: { 'X-CSRF-Token': csrf_token }
+                    })
+                    .then(r => r.json())
+                    .then(data => { if (!data.success) throw new Error(data.error || FM.i18n.unknownError); })
+                    .catch(e => errors.push(`${fileName}: ${e.message}`))
+                    .finally(() => { done++; showStatus('info', `${FM.i18n.working} ${done}/${items.length}`); })
+                ));
+            }
         } else {
             // compress and extract answer with a redirect + flash, so just wait and reload to show it
             const body = new URLSearchParams({ csrf_token });

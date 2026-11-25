@@ -26,12 +26,10 @@
     <div class="mt-8">
         <div class="op-form-grid">
 
-            <div class="op-field-wrap">
-                <label for="directory-select" class="op-label op-label-row">{{.T.Get "Choose a directory:"}}<span class="is-danger">*</span></label>
-
-                <div class="op-join">
-                    <input type="text" id="directory-select" class="block w-full op-input" value="/var/www/html/" placeholder="/var/www/html/">
-                </div>
+            <div class="op-field-wrap op-folder-pick">
+                <span class="op-label op-label-row">{{.T.Get "Choose a directory:"}}<span class="is-danger">*</span></span>
+                {{/* the panel's folder browser over /json/folders, #directory-select keeps the path this page sends */}}
+                {{template "folder_picker" .}}
             </div>
       </div>
 
@@ -66,6 +64,7 @@
 
     document.getElementById('start-scan-btn').addEventListener('click', function () {
         document.getElementById('start-scan-btn').style.display = 'none';
+        if (window.folderPicker) folderPicker.lock(true);
         document.getElementById('scanning-btn').style.display = 'flex';
 
         const selectedDirectory = document.getElementById('directory-select').value;
@@ -103,6 +102,7 @@
         .finally(() => {
             document.getElementById('scanning-btn').style.display = 'none';
             document.getElementById('start-scan-btn').style.display = 'flex';
+            if (window.folderPicker) folderPicker.lock(false);
         });
     });
 </script>

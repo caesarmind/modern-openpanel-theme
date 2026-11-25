@@ -1,0 +1,60 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "bot_policy_help"}}
+<div class="op-alert is-info" role="note">{{template "op_icon" "info"}}<span><b>{{.T.Get "How each policy works"}}</b>
+    <span class="op-bot-help">
+        <span><b>{{.T.Get "Allow"}}</b> {{.T.Get "Lets known AI crawlers and search engines access the site normally."}}</span>
+        <span><b>{{.T.Get "Rate-limit (%(limit)s/min)" "limit" (print .RateLimit)}}</b> {{.T.Get "Caps known AI crawlers at %(limit)s requests/minute per crawler per site (HTTP 429); normal visitors and search engines (Googlebot, Bingbot) are unaffected." "limit" (print .RateLimit)}}</span>
+        <span><b>{{.T.Get "Block (403)"}}</b> {{.T.Get "Immediately blocks known AI crawlers with HTTP 403; normal visitors and search engines are unaffected."}}</span>
+    </span>
+</span></div>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/system/bot_control.html -->
+<div class="op-content" x-data="{ q: '' }">
+    <div class="op-page-head">
+        <div>
+            <h1 class="op-title">{{.T.Get "AI & bot control"}}</h1>
+            <p class="op-meta">{{.T.Get "Allow, rate-limit, or block known AI crawlers per site without affecting search engines like Googlebot or Bingbot."}}</p>
+        </div>
+    </div>
+
+    {{template "bot_policy_help" .}}
+
+    {{if not .Rows}}
+    <section class="op-card"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "robot"}}</span><b>{{.T.Get "No domains found for this account."}}</b></div></section>
+    {{else}}
+    <section class="op-card" aria-label="{{.T.Get "Domains"}}">
+        {{if gt (len .Rows) 8}}<div class="op-toolbar"><label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" x-model="q" placeholder="{{.T.Get "Search domains"}}" aria-label="{{.T.Get "Search domains"}}"></label></div>{{end}}
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th scope="col">{{.T.Get "Domain"}}</th><th scope="col">{{.T.Get "AI crawler policy"}}</th><th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th></tr></thead>
+            <tbody>
+            {{range .Rows}}{{$p := printf "%s" .Policy}}
+            <tr x-show="!q || {{toJSON .DomainURL}}.includes(q.toLowerCase())">
+                <td class="op-cell-title"><div class="op-row-title"><span class="op-file-ico" style="--hue:var(--color-hue-{{if eq $p "block"}}red{{else if eq $p "ratelimit"}}orange{{else}}green{{end}})">{{template "op_icon" "robot"}}</span><div><b class="punycode" style="overflow-wrap:anywhere"><a href="/server/bot-control/{{.DomainURL}}" style="color:inherit">{{.DomainURL}}</a></b></div></div></td>
+                <td data-label="{{$.T.Get "AI crawler policy"}}">
+                    <form method="post" action="/server/bot-control/{{.DomainURL}}" class="op-actions" style="gap:8px;align-items:center">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"/>
+                        <input type="hidden" name="return_to" value="list"/>
+                        <select name="policy" onchange="this.form.submit()" class="op-select op-select-sm" style="width:auto" aria-label="{{$.T.Get "AI crawler policy"}} {{.DomainURL}}">
+                            <option value="allow" {{if eq $p "allow"}}selected{{end}}>{{$.T.Get "Allow"}}</option>
+                            <option value="ratelimit" {{if eq $p "ratelimit"}}selected{{end}}>{{$.T.Get "Rate-limit"}}</option>
+                            <option value="block" {{if eq $p "block"}}selected{{end}}>{{$.T.Get "Block"}}</option>
+                        </select>
+                        {{if eq $p "block"}}<span class="op-badge is-danger">{{$.T.Get "Blocked (403)"}}</span>{{else if eq $p "ratelimit"}}<span class="op-badge is-warning">{{$.T.Get "Rate-limited (%(limit)s/min)" "limit" (print $.RateLimit)}}</span>{{else}}<span class="op-badge is-success">{{$.T.Get "Allowed"}}</span>{{end}}
+                    </form>
+                </td>
+                <td class="is-shrink"><a class="op-btn op-btn-secondary op-btn-sm" href="/server/bot-control/{{.DomainURL}}">{{template "op_icon" "chart"}} {{$.T.Get "Who's hitting me"}}</a></td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table></div>
+        <div class="op-tfoot"><span>{{len .Rows}} {{.T.Get "domains"}}</span></div>
+    </section>
+    {{end}}
+</div>
+<!-- END templates/system/bot_control.html -->
+{{end}}

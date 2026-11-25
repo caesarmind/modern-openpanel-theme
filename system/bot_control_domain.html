@@ -1,0 +1,113 @@
+{{define "main_class"}}op-scope{{end}}
+{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "alpine_plugins"}}{{end}}
+
+{{define "bot_policy_help"}}
+<div class="op-alert is-info" role="note">{{template "op_icon" "info"}}<span><b>{{.T.Get "How each policy works"}}</b>
+    <span class="op-bot-help">
+        <span><b>{{.T.Get "Allow"}}</b> {{.T.Get "Lets known AI crawlers and search engines access the site normally."}}</span>
+        <span><b>{{.T.Get "Rate-limit (%(limit)s/min)" "limit" (print .RateLimit)}}</b> {{.T.Get "Caps known AI crawlers at %(limit)s requests/minute per crawler per site (HTTP 429); normal visitors and search engines (Googlebot, Bingbot) are unaffected." "limit" (print .RateLimit)}}</span>
+        <span><b>{{.T.Get "Block (403)"}}</b> {{.T.Get "Immediately blocks known AI crawlers with HTTP 403; normal visitors and search engines are unaffected."}}</span>
+    </span>
+</span></div>
+{{end}}
+
+{{define "content"}}
+<!-- START templates/system/bot_control_domain.html -->
+{{$p := printf "%s" .Policy}}
+<div class="op-content">
+    <div class="op-page-head">
+        <div>
+            <div class="op-eyebrow"><a href="/server/bot-control" style="color:var(--color-accent-text)">{{.T.Get "AI & bot control"}}</a></div>
+            <h1 class="op-title punycode" style="overflow-wrap:anywhere">{{.Domain}}</h1>
+            <p class="op-meta">{{.T.Get "Control known AI crawlers and inspect who is hitting this site."}}</p>
+        </div>
+        <form method="post" action="/server/bot-control/{{.Domain}}" class="op-segmented" role="group" aria-label="{{.T.Get "AI crawler policy"}}">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
+            <button type="submit" name="policy" value="allow" aria-pressed="{{if eq $p "allow"}}true{{else}}false{{end}}"{{if eq $p "allow"}} class="is-on"{{end}}>{{.T.Get "Allow"}}</button>
+            <button type="submit" name="policy" value="ratelimit" aria-pressed="{{if eq $p "ratelimit"}}true{{else}}false{{end}}"{{if eq $p "ratelimit"}} class="is-on"{{end}}>{{.T.Get "Rate-limit (%(limit)s/min)" "limit" (print .RateLimit)}}</button>
+            <button type="submit" name="policy" value="block" aria-pressed="{{if eq $p "block"}}true{{else}}false{{end}}"{{if eq $p "block"}} class="is-on"{{end}}>{{.T.Get "Block (403)"}}</button>
+        </form>
+    </div>
+
+    {{template "bot_policy_help" .}}
+
+    <div class="op-toolbar" style="justify-content:space-between;padding:0">
+        <h2 class="op-h" style="margin:0">{{.T.Get "Who's hitting me"}}</h2>
+        <div class="op-segmented" role="group" aria-label="{{.T.Get "Time range"}}">
+            <a href="/server/bot-control/{{.Domain}}?window=1h"{{if eq .Report.Window "1h"}} class="is-on" aria-current="true"{{end}}>1h</a>
+            <a href="/server/bot-control/{{.Domain}}?window=24h"{{if eq .Report.Window "24h"}} class="is-on" aria-current="true"{{end}}>24h</a>
+            <a href="/server/bot-control/{{.Domain}}?window=7d"{{if eq .Report.Window "7d"}} class="is-on" aria-current="true"{{end}}>7d</a>
+        </div>
+    </div>
+
+    <section class="op-kpis" aria-label="{{.T.Get "Who's hitting me"}}">
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "pulse"}} {{.T.Get "Total requests"}}</div><div class="op-kpi-value">{{.Report.TotalRequests}}</div><div class="op-kpi-note">{{.Report.Window}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "robot"}} {{.T.Get "AI crawler & scraper hits"}}</div><div class="op-kpi-value{{if .Report.AIRequests}} is-warning{{end}}">{{.Report.AIRequests}}</div></div>
+        <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "ban"}} {{.T.Get "AI crawlers blocked / throttled"}}</div><div class="op-kpi-value{{if .Report.BlockedCount}} is-danger{{end}}">{{.Report.BlockedCount}}</div></div>
+    </section>
+
+    {{if .Report.LogMissing}}
+    <section class="op-card"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "logs"}}</span><b>{{.T.Get "No access log file found for this domain yet. Traffic stats will appear once Caddy logs requests."}}</b></div></section>
+    {{else}}
+    <div class="op-cols-2">
+        <section class="op-card" aria-labelledby="bc-bots">
+            <div class="op-card-head"><h2 id="bc-bots">{{.T.Get "Top bots & user-agents"}}</h2></div>
+            <div class="op-table-wrap"><table class="op-table">
+                <thead><tr><th scope="col">{{.T.Get "Agent"}}</th><th scope="col">{{.T.Get "Category"}}</th><th scope="col" class="is-num">{{.T.Get "Hits"}}</th><th scope="col" class="is-num">{{.T.Get "Blocked"}}</th></tr></thead>
+                <tbody>
+                {{range .Report.TopBots}}
+                <tr>
+                    <td class="op-cell-title"><b>{{.Name}}</b> <span class="op-hint">{{.Operator}}</span></td>
+                    <td data-label="{{$.T.Get "Category"}}"><span class="op-tag">{{.Category}}</span></td>
+                    <td data-label="{{$.T.Get "Hits"}}" class="is-num"><span class="op-mono">{{.Requests}}</span> <span class="op-hint">{{.SharePct}}%</span></td>
+                    <td data-label="{{$.T.Get "Blocked"}}" class="is-num">{{if .Blocked}}<span class="op-mono is-danger">{{.Blocked}}</span>{{else}}<span class="op-faint">0</span>{{end}}</td>
+                </tr>
+                {{else}}
+                <tr><td colspan="4" class="op-hint" style="text-align:center;padding:24px">{{$.T.Get "No requests in this window."}}</td></tr>
+                {{end}}
+                </tbody>
+            </table></div>
+        </section>
+        <section class="op-card" aria-labelledby="bc-nets">
+            <div class="op-card-head"><h2 id="bc-nets">{{.T.Get "Top networks & ASNs"}}</h2></div>
+            <div class="op-table-wrap"><table class="op-table">
+                <thead><tr><th scope="col">{{.T.Get "Network"}}</th><th scope="col">{{.T.Get "ASN"}}</th><th scope="col" class="is-num">{{.T.Get "IPs"}}</th><th scope="col" class="is-num">{{.T.Get "Hits"}}</th></tr></thead>
+                <tbody>
+                {{range .Report.TopNetworks}}
+                <tr>
+                    <td class="op-cell-title"><span class="op-mono">{{.Network}}</span></td>
+                    <td data-label="{{$.T.Get "ASN"}}">{{.ASN}}</td>
+                    <td data-label="{{$.T.Get "IPs"}}" class="is-num"><span class="op-mono">{{.UniqueIPs}}</span></td>
+                    <td data-label="{{$.T.Get "Hits"}}" class="is-num"><span class="op-mono">{{.Requests}}</span></td>
+                </tr>
+                {{else}}
+                <tr><td colspan="4" class="op-hint" style="text-align:center;padding:24px">{{$.T.Get "No requests in this window."}}</td></tr>
+                {{end}}
+                </tbody>
+            </table></div>
+        </section>
+    </div>
+
+    <section class="op-card" aria-labelledby="bc-urls">
+        <div class="op-card-head"><h2 id="bc-urls">{{.T.Get "Top hit URLs"}}</h2></div>
+        <div class="op-table-wrap"><table class="op-table">
+            <thead><tr><th scope="col">{{.T.Get "Path"}}</th><th scope="col" class="is-num">{{.T.Get "Total hits"}}</th><th scope="col" class="is-num">{{.T.Get "Bot hits"}}</th><th scope="col" class="is-num">{{.T.Get "Blocked"}}</th></tr></thead>
+            <tbody>
+            {{range .Report.TopURLs}}
+            <tr>
+                <td class="op-cell-title"><span class="op-mono" style="overflow-wrap:anywhere">{{.Path}}</span></td>
+                <td data-label="{{$.T.Get "Total hits"}}" class="is-num"><span class="op-mono">{{.Requests}}</span></td>
+                <td data-label="{{$.T.Get "Bot hits"}}" class="is-num">{{if .BotRequests}}<span class="op-mono is-warning">{{.BotRequests}}</span>{{else}}<span class="op-faint">0</span>{{end}}</td>
+                <td data-label="{{$.T.Get "Blocked"}}" class="is-num">{{if .Blocked}}<span class="op-mono is-danger">{{.Blocked}}</span>{{else}}<span class="op-faint">0</span>{{end}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" class="op-hint" style="text-align:center;padding:24px">{{$.T.Get "No requests in this window."}}</td></tr>
+            {{end}}
+            </tbody>
+        </table></div>
+    </section>
+    {{end}}
+</div>
+<!-- END templates/system/bot_control_domain.html -->
+{{end}}

@@ -165,7 +165,10 @@
             </div>
 
             <div class="op-col" x-show="view === 'tools'" x-cloak>
-                {{range .Sections}}{{if .Items}}
+                {{range .Sections}}
+                {{/* the admin's custom section goes before the section it was placed in front of */}}
+                {{if eq $root.CustomSectionPosition (printf "before_%s" .Key)}}{{template "customsection" $root}}{{end}}
+                {{if .Items}}
                 <section class="op-card" style="--hue:var(--color-hue-{{template "dash_hue" .Key}})" data-labels="{{range .Items}}{{lower .Label}}|{{end}}" x-data="{ open: true }" x-show="!find || $el.dataset.labels.includes(find.toLowerCase())">
                     <div class="op-card-head"><h2 class="op-with-icon"><span class="op-cat-dot"></span>{{.Title}} <span class="op-count">{{len .Items}}</span></h2><button class="op-chev" type="button" :aria-expanded="open.toString()" @click="open = !open" :aria-label="open ? '{{$root.T.Get "Hide icons"}}' : '{{$root.T.Get "Show icons"}}'">{{template "op_icon" "up"}}</button></div>
                     <div class="op-tool-grid" x-show="open || find">

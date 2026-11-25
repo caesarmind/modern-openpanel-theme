@@ -3408,3 +3408,40 @@ div:has(> main.op-scope) { min-width: 0; }
 
 /* logo_dark: the login card shows whichever logo suits the mode */
 html.dark .op-logo-light, html:not(.dark) .op-logo-dark { display: none !important; }
+
+/* editor drafts: the unsaved copy banner and its diff (partials/_editor_draft.html, filled by the panel's js/editor-draft.js) */
+.op-draft[hidden], .op-draft [hidden] { display: none !important; }
+.op-draft { display: grid; gap: 8px; }
+.op-draft-diff { overflow: hidden; padding: 0; }
+.op-draft-diff-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--color-raised); font-size: 12px; color: var(--color-muted); }
+.op-draft-diff-head .is-del { color: var(--color-danger); } .op-draft-diff-head .is-add { color: var(--color-success); }
+.op-draft-body { margin: 0; max-height: 384px; overflow: auto; padding: 8px 0; font: 400 12px/20px var(--op-font-mono); color: var(--color-heading); }
+.op-draft-body > div { padding: 0 14px; white-space: pre-wrap; word-break: break-all; color: var(--color-muted); background: none; }
+.op-draft-body > div.bg-emerald-50 { color: var(--color-heading); background: color-mix(in srgb, var(--color-success) 14%, transparent); }
+.op-draft-body > div.bg-red-50 { color: var(--color-heading); background: color-mix(in srgb, var(--color-danger) 14%, transparent); }
+
+/* the panel's folder browser (partials/folder_picker.html) in Modern colors, used on Fix Permissions */
+.op-folder-pick .col-span-full > div:first-child { background: var(--color-inset); border-radius: var(--op-radius-sm); }
+.op-folder-pick #folderPickerSelected { color: var(--color-heading); }
+.op-folder-pick #folderPicker > div { border-color: var(--color-raised); border-radius: var(--op-radius-sm); background: var(--color-panel); }
+.op-folder-pick #folderPickerCrumbs { background: var(--color-inset); border-color: var(--color-raised); }
+.op-folder-pick #folderPickerList > li { border-color: var(--color-raised); color: var(--color-heading); }
+.op-folder-pick #folderPickerList > li.bg-gray-50, .op-folder-pick #folderPickerList button:hover { background: var(--color-inset); }
+.op-folder-pick #folderPickerToggle { color: var(--color-accent-text); }
+.op-folder-pick #directory-select { border-color: var(--color-raised); background: var(--color-panel); color: var(--color-heading); }
+.op-folder-pick input[type="radio"] { accent-color: var(--color-accent); }
+
+/* AI & bot control: the three policies under the info alert */
+.op-bot-help { display: grid; gap: 4px; margin-top: 4px; color: var(--color-body); }
+.op-bot-help b { color: var(--color-heading); margin-right: 4px; }
+
+/* ImunifyAV app page: tabs and the Summary link on one strip, the embedded app fills the window under it */
+.op-iav-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; box-shadow: inset 0 -1px 0 var(--color-raised); }
+@media (width >= 48rem) { .op-iav-bar { padding: 0 24px; } }
+.op-iav-bar .op-tabs { box-shadow: none; background: none; padding: 0; margin: 0; flex: 1; min-width: 0; }
+.op-iav-bar > .op-btn { flex: none; margin: 6px 0; }
+.op-iav-frame { display: block; width: 100%; border: 0; height: calc(100vh - 7rem); }
+/* segmented links (time ranges) look like the segmented buttons */
+.op-segmented > a { display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: 9999px; color: var(--color-body); font: 500 13px/20px var(--op-font-sans); text-decoration: none; }
+.op-segmented > a:hover { color: var(--color-heading); }
+.op-segmented > a[aria-current="true"] { background: var(--color-raised); color: var(--color-heading); }

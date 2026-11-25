@@ -7,7 +7,7 @@
 {{template "op_conf_editor_assets" .}}
 {{$kind := ""}}{{if eq .Service "apache"}}{{$kind = "apache"}}{{else if or (eq .Service "nginx") (eq .Service "openresty") (eq .Service "openlitespeed")}}{{$kind = "brace"}}{{end}}
 
-<form method="post" class="op-content" aria-label="{{.T.Get "WebServer Conf Editor Header"}}" x-data="opConfEditor({ kind: {{toJSON $kind}},{{with .TestFailure}} unsaved: true, errorLine: {{.Line}},{{end}} busy: { save: {{toJSON (.T.Get "Saving the configuration")}}, restore: {{toJSON (.T.Get "Restoring the default configuration")}}, steps: {{toJSON (.T.Get "Writing the file|Testing the configuration|Reloading the web server")}}, note: {{toJSON (.T.Get "Stay on this page until it finishes.")}} } })" @submit="onSubmit($event)" @keydown.window.ctrl.s.prevent="save()" @keydown.window.meta.s.prevent="save()">
+<form method="post" class="op-content" aria-label="{{.T.Get "WebServer Conf Editor Header"}}" x-data="opConfEditor({ kind: {{toJSON $kind}}, draft: {{toJSON (printf "webconf:%s:%s" .CurrentUsername .Service)}},{{with .TestFailure}} unsaved: true, errorLine: {{.Line}},{{end}} busy: { save: {{toJSON (.T.Get "Saving the configuration")}}, restore: {{toJSON (.T.Get "Restoring the default configuration")}}, steps: {{toJSON (.T.Get "Writing the file|Testing the configuration|Reloading the web server")}}, note: {{toJSON (.T.Get "Stay on this page until it finishes.")}} } })" @submit="onSubmit($event)" @keydown.window.ctrl.s.prevent="save()" @keydown.window.meta.s.prevent="save()">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
 
     <div class="op-page-head">

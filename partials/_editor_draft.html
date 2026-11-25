@@ -1,0 +1,15 @@
+{{define "editor_draft"}}{{/* call with (dict "T" .T "Class" "extra classes"), static/js/editor-draft.js fills it when this browser has an unsaved copy that differs from the saved file */}}
+<div data-op-draft hidden data-locale="{{.T.Locale}}" class="op-draft {{.Class}}">
+    <div class="op-alert is-info" role="status">{{template "op_icon" "history"}}<span>{{.T.Get "This browser has an unsaved copy of this file from"}} <b data-op-draft-time></b>.<span data-op-draft-stale hidden> {{.T.Get "The file has changed since then, so restoring will overwrite those changes in the editor."}}</span></span>
+        <span class="op-actions">
+            <button type="button" data-op-draft-view aria-expanded="false" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "listdetails"}} {{.T.Get "View changes"}}</button>
+            <button type="button" data-op-draft-restore class="op-btn op-btn-primary op-btn-sm">{{.T.Get "Restore"}}</button>
+            <button type="button" data-op-draft-discard class="op-btn op-btn-secondary op-btn-sm">{{.T.Get "Discard"}}</button>
+        </span>
+    </div>
+    <div data-op-draft-diff hidden class="op-card op-draft-diff">
+        <div class="op-draft-diff-head"><span><span class="is-del">− {{.T.Get "in the saved file"}}</span> · <span class="is-add">+ {{.T.Get "in the browser copy"}}</span></span><span data-op-draft-stats class="op-mono"></span></div>
+        <pre data-op-draft-body class="op-draft-body"></pre>
+    </div>
+</div>
+{{end}}

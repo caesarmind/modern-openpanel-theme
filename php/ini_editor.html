@@ -6,6 +6,7 @@
 {{if .Version}}
     <link rel="stylesheet" href="{{static "vendor/codemirror/codemirror.min.css"}}">
     <script src="{{static "vendor/codemirror/codemirror.min.js"}}"></script>
+    <script src="{{static "js/editor-draft.js"}}"></script>
 
 <form method="post" class="op-content">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
@@ -23,6 +24,7 @@
 
     <div class="op-alert" role="status">{{template "op_icon" "info"}}<span>{{.T.Get "For the common settings,"}} <a href="/php/php{{.Version}}/options" style="color:var(--color-accent-text)">{{.T.Get "Options"}}</a> {{.T.Get "is safer: it checks values before saving. A syntax error here stops PHP-FPM from starting."}}</span></div>
 
+    {{template "editor_draft" (dict "T" .T "Class" "")}}
     <section class="op-card">
         <div id="editor-container" class="op-cm">
             <textarea id="editor" name="editor_content" rows="40" cols="100" aria-label="php.ini">{{.FileContent}}</textarea>
@@ -38,6 +40,14 @@
     });
     const count = document.getElementById('ini-line-count');
     if (count) cm.on('change', () => { count.textContent = cm.lineCount(); });
+    opEditorDraft({
+        key: 'phpini:' + {{toJSON .CurrentUsername}} + ':' + {{toJSON .Version}},
+        initial: cm.getTextArea().defaultValue,
+        get: () => cm.getValue(),
+        set: (v) => { cm.setValue(v); cm.focus(); },
+        onChange: (cb) => cm.on('change', cb),
+        form: cm.getTextArea().closest('form'),
+    });
 })();
 </script>
 

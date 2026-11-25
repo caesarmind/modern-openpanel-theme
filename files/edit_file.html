@@ -1,5 +1,5 @@
 {{define "main_class"}}op-scope{{end}}
-{{define "page_tabs"}}{{template "op_page_tabs" .}}{{end}}
+{{define "page_tabs"}}{{end}}
 {{define "alpine_plugins"}}{{end}}
 {{define "flowbite_js"}}{{end}}
 
@@ -7,53 +7,22 @@
 <!-- START templates/files/edit_file.html -->
 
 <style>
-    html, body { height: 100%; margin: 0; }
-    .container-fluid { padding: 0; }
-    .editor-container { min-height: 90vh; height: 100%; }
-
-    #editor-container.fullscreen {
-        position: fixed; top: 0; left: 0;
-        width: 100%; height: 100%;
-        z-index: 9999; background-color: #1e1e1e;
-    }
-    .editor-header { display: flex; padding: 0px 10px; justify-content: space-between; align-items: center; }
-    #editor-container .op-page-head { background: var(--color-panel); }
-    #editor-container.fullscreen h3 { display: none; }
-    #fullscreenButton { margin-left: 10px; }
-
-    /* textarea editor */
-    #editor-text {
-        width: 100%; min-height: 90vh; height: 100%;
-        background: #1e1e1e; color: #d4d4d4;
-        font-family: 'Courier New', monospace; font-size: 14px;
-        border: none; outline: none; resize: none;
-        padding: 16px; box-sizing: border-box;
-        tab-size: 4;
-    }
-
-    /* CodeMirror */
-    .CodeMirror {
-        height: 90vh !important;
-        font-size: 14px;
-    }
-    #editor-container.fullscreen .CodeMirror {
-        height: 100vh !important;
-    }
-
-    /* Ace */
-    #editor-ace {
-        width: 100%;
-        min-height: 90vh;
-        height: 100%;
-    }
-    #editor-container.fullscreen #editor-ace {
-        height: 100vh;
-    }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    /* the editor fills the tab above the sidebar and header (2.0.29 also renders the page bare): toolbar on top, editor below */
+    #editor-container { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--color-panel); }
+    #editor-container .op-page-head { flex: none; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--color-raised); background: var(--color-panel); }
+    @media (width >= 48rem) { #editor-container .op-page-head { padding: 14px 24px; } }
+    #editor-container .op-title { font-size: 18px; line-height: 26px; }
+    #editor-body { flex: 1; min-height: 0; }
+    #editor-body > * { height: 100%; }
+    #editor-text { display: block; width: 100%; height: 100%; padding: 16px; box-sizing: border-box; border: none; outline: none; resize: none; tab-size: 4; background: var(--color-panel); color: var(--color-heading); font: 400 14px/22px var(--op-font-mono); }
+    .CodeMirror { height: 100% !important; font-size: 14px; }
+    #editor-ace { width: 100%; }
+    #editorcontentvalue.is-busy { opacity: .6; cursor: progress; }
 </style>
 
-
 {{if eq .Editor "monaco"}}
-    <link rel="stylesheet" href="{{static "vendor/monaco/editor.main.css"}}">
+    <link rel="stylesheet" href="{{static "vendor/monaco/vs/editor/editor.main.css"}}">
     <script src="{{static "vendor/monaco/loader.js"}}"></script>
 {{else if eq .Editor "ace"}}
     <script src="{{static "vendor/ace/ace.min.js"}}"></script>
@@ -82,10 +51,9 @@
 <form method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
 
-    <section aria-label="{{.T.Get "File Editor Header"}}" id="editor-container" x-data="{ isFullscreen: true }" :class="{ 'fullscreen': isFullscreen }">
-        <div class="op-page-head op-cms-head"
-             :class="{ 'sm:p-6 lg:p-8': !isFullscreen }">
-            <div>
+    <section aria-label="{{.T.Get "File Editor Header"}}" id="editor-container">
+        <div class="op-page-head">
+            <div style="min-width:0">
 
                 {{if eq .FilePath "wpcli_themes.txt"}}
                     <div class="op-wp-title">
@@ -108,15 +76,15 @@
                     </div>
 
       <!-- START breadcrumbs -->
-      <p class="text-sm flex op-muted">
-<a href="/files" title="{{.T.Get "Open in File Manager"}}" class="transition op-muted">/var/www/html/</a>{{range .Breadcrumbs}}{{if .Last}}{{.Name}}{{else}}<a href="/files/{{.Path}}" title="{{$.T.Get "Open in File Manager"}}">{{.Name}}</a>{{end}}{{if not .Last}}/{{end}}{{end}}</p>
+      <p class="op-meta op-mono" style="overflow-wrap:anywhere">/var/www/html/{{range .Breadcrumbs}}{{if .Last}}<b style="color:var(--color-heading)">{{.Name}}</b>{{else}}{{.Name}}/{{end}}{{end}}</p>
       <!-- END breadcrumbs -->
 
                 {{end}}
 
             </div>
 
-            <div class="editor-header mt-2 gap-2 sm:mt-0 sm:flex">
+
+            <div class="op-actions">
 
                 <div class="relative" x-data="{ open: false }">
                     <button type="button"
@@ -140,15 +108,16 @@
                     </div>
                 </div>
 
+                <button type="button" id="closeWindowButton" hidden class="op-btn op-btn-secondary">{{template "op_icon" "x"}} {{.T.Get "Close"}}</button>
                 <button type="submit" id="editorcontentvalue" class="op-btn op-btn-primary">{{.T.Get "Save"}}</button>
-                <button type="button" @click="isFullscreen = !isFullscreen" id="fullscreenButton" class="op-btn op-btn-secondary"><i class="bi bi-arrows-fullscreen"></i></button>
             </div>
         </div>
 
         <input type="hidden" name="editor_content" id="editor_content">
 
+        <div id="editor-body">
         {{if eq .Editor "text"}}
-            <textarea id="editor-text" spellcheck="false" autocorrect="off" autocapitalize="off">{{.FileContent}}</textarea>
+            <textarea id="editor-text" aria-label="{{.T.Get "Edit file"}}" spellcheck="false" autocorrect="off" autocapitalize="off">{{.FileContent}}</textarea>
         {{else if eq .Editor "codemirror"}}
             <textarea id="editor-codemirror" style="display:none;">{{.FileContent}}</textarea>
             <div id="editor-codemirror-mount"></div>
@@ -157,6 +126,7 @@
         {{else}}
             <div class="editor-container" id="editor"></div>
         {{end}}
+        </div>
 
     </section>
 </form>
@@ -167,35 +137,34 @@
     const filePath    = {{.FilePathJSON}};
     const fileContent = {{.FileContentJSON}};
     const editorType  = '{{.Editor}}';
+    const isDark      = document.documentElement.classList.contains('dark');
     const i18n = {
-        unsavedChanges: "{{.T.Get "You have unsaved changes. Leave anyway?"}}"
+        unsavedChanges: "{{.T.Get "You have unsaved changes. Leave anyway?"}}",
+        leave: "{{.T.Get "Leave"}}",
+        saved: "{{.T.Get "File saved successfully"}}",
+        saveFailed: "{{.T.Get "Error saving file."}}"
     };
 
     function getExtension(name) {
         return name.split('.').pop().toLowerCase();
     }
 
-    const editorContainer = document.getElementById('editor-container');
     const hiddenInput     = document.getElementById('editor_content');
     const saveBtn         = document.getElementById('editorcontentvalue');
-    const fullscreenBtn   = document.getElementById('fullscreenButton');
 
 
     let editor = null;   // used by Monaco and Ace
     let cm     = null;   // used by CodeMirror
+    let getContent = () => fileContent;   // each backend swaps in its own getter
 
 
-
-    // ?fullscreen
-    const urlParams   = new URLSearchParams(window.location.search);
-    let isFullscreen  = urlParams.get('fullscreen') === 'true';
-    editorContainer.classList.toggle('fullscreen', isFullscreen);
-
-    fullscreenBtn.addEventListener('click', () => {
-        isFullscreen = !isFullscreen;
-        editorContainer.classList.toggle('fullscreen', isFullscreen);
-        if (window._editorLayout) window._editorLayout(); // Monaco / Ace relayout
-    });
+    // opened from the file manager as its own window: offer Close, and tell the file manager after a save
+    const opener = (() => { try { return window.opener && window.opener !== window && window.opener.location.origin === location.origin ? window.opener : null; } catch (e) { return null; } })();
+    if (opener) {
+        const closeBtn = document.getElementById('closeWindowButton');
+        closeBtn.hidden = false;
+        closeBtn.addEventListener('click', () => window.close());
+    }
 
     // Ctrl/Cmd+S to save, regardless of which editor backend is active
     document.addEventListener('keydown', (e) => {
@@ -234,7 +203,7 @@
             const lang   = languageMap[getExtension(filePath)] || 'plaintext';
             const editor = monaco.editor.create(document.getElementById('editor'), {
                 value: fileContent, language: lang,
-                theme: 'vs-dark', automaticLayout: true, lineNumbers: 'on',
+                theme: isDark ? 'vs-dark' : 'vs', automaticLayout: true, lineNumbers: 'on',
             });
 
             window._editorLayout = () => editor.layout();
@@ -251,9 +220,7 @@
                 if (pos) setHashLine(pos.lineNumber);
             });
 
-            saveBtn.addEventListener('click', () => {
-                hiddenInput.value = editor.getValue();
-            });
+            getContent = () => editor.getValue();
 
             editor.onDidChangeModelContent(() => { isDirty = true; });
         });
@@ -270,8 +237,8 @@
         };
 
         const aceEl  = document.getElementById('editor-ace');
-        const editor = ace.edit(aceEl);
-        editor.setTheme('ace/theme/monokai');
+        editor = ace.edit(aceEl);
+        editor.setTheme(isDark ? 'ace/theme/monokai' : 'ace/theme/chrome');
 
         const mode = aceModMap[getExtension(filePath)] || 'text';
         editor.session.setMode('ace/mode/' + mode);
@@ -287,9 +254,7 @@
             setHashLine(editor.getCursorPosition().row + 1);
         });
 
-        saveBtn.addEventListener('click', () => {
-            hiddenInput.value = editor.getValue();
-        });
+        getContent = () => editor.getValue();
     }
 
     // CODEMIRROR
@@ -311,10 +276,10 @@
     const mode    = cmModeMap[getExtension(filePath)] || 'null';
     const mountEl = document.getElementById('editor-codemirror-mount');
 
-    const cm = CodeMirror(mountEl, {
+    cm = CodeMirror(mountEl, {
         value: fileContent,
         mode: mode,
-        theme: 'dracula',
+        theme: isDark ? 'dracula' : 'default',
         lineNumbers: true,
         matchBrackets: true,
         autoCloseBrackets: true,
@@ -325,18 +290,8 @@
         extraKeys: { Tab: (cm) => cm.replaceSelection('    ') },
     });
 
-    function initCMSize() {
-        const h = isFullscreen ? '100vh' : '90vh';
-        cm.setSize('100%', h);
-        cm.refresh();   // fixes missing cursor
-    }
-    requestAnimationFrame(() => requestAnimationFrame(initCMSize));
-
-    window._editorLayout = () => {
-        const h = editorContainer.classList.contains('fullscreen') ? '100vh' : '90vh';
-        cm.setSize('100%', h);
-        cm.refresh();
-    };
+    // refresh once laid out or the cursor goes missing
+    requestAnimationFrame(() => requestAnimationFrame(() => cm.refresh()));
 
     const line = getHashLine();
     if (line) {
@@ -350,13 +305,7 @@
         setHashLine(cm.getCursor().line + 1);
     });
 
-    fullscreenBtn.addEventListener('click', () => {
-        requestAnimationFrame(() => window._editorLayout());
-    });
-
-    saveBtn.addEventListener('click', () => {
-        hiddenInput.value = cm.getValue();
-    });
+    getContent = () => cm.getValue();
 }
 
     // PLAIN TEXT
@@ -373,9 +322,7 @@
             }
         });
 
-        saveBtn.addEventListener('click', () => {
-            hiddenInput.value = ta.value;
-        });
+        getContent = () => ta.value;
     }
 
     // UNSAVED CHANGES
@@ -391,7 +338,44 @@
         document.getElementById('editor-text').addEventListener('input', () => { isDirty = true; });
     }
 
-    saveBtn.closest('form').addEventListener('submit', () => { isDirty = false; });
+    // the editor covers the page, so a flash from a form post (panels before 2.0.29) comes back as a toast instead
+    document.querySelectorAll('#alert-stack [role="alert"] .ms-3').forEach((el) => {
+        const text = el.textContent.trim();
+        if (text) showToast(text, /error|fail|could not|invalid/i.test(text) ? 'error' : 'success');
+    });
+
+    // save over fetch instead of a form post so the page doesn't reload and undo/redo history stays
+    const form = saveBtn.closest('form');
+    let saving = false;
+    form.addEventListener('submit', async (e) => {
+        // panels before 2.0.29 answer the save with a redirect, not JSON, so post the form the old way
+        if (!(window.opPanelAtLeast && opPanelAtLeast('2.0.29'))) { hiddenInput.value = getContent(); isDirty = false; return; }
+        e.preventDefault();
+        if (saving) return;
+        saving = true;
+        saveBtn.disabled = true;
+        saveBtn.classList.add('is-busy');
+        const sent = getContent();
+        hiddenInput.value = sent;
+        const url = new URL(location.href);
+        url.hash = '';
+        url.searchParams.set('output', 'json');
+        try {
+            const res = await fetch(url, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || i18n.saveFailed);
+            // only clean if nothing was typed while the request was out
+            if (getContent() === sent) isDirty = false;
+            showToast(data.message || i18n.saved, 'success');
+            if (opener) { try { opener.postMessage({ type: 'op-file-saved', path: filePath }, location.origin); } catch (err) {} }
+        } catch (err) {
+            showToast(err.message || i18n.saveFailed, 'error');
+        } finally {
+            saving = false;
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('is-busy');
+        }
+    });
 
     window.addEventListener('beforeunload', (e) => {
         if (!isDirty) return;
@@ -406,8 +390,14 @@
         const href = anchor.getAttribute('href');
         if (!href || href.startsWith('#')) return;
         if (anchor.closest('[x-data]')) return;
-        const confirmed = window.confirm(i18n.unsavedChanges);
-        if (!confirmed) e.preventDefault();
+        e.preventDefault();
+        const ask = window.opConfirm ? window.opConfirm(i18n.unsavedChanges, { ok: i18n.leave, danger: true }) : Promise.resolve(window.confirm(i18n.unsavedChanges));
+        ask.then((ok) => {
+            if (!ok) return;
+            isDirty = false;
+            if (anchor.target === '_blank') window.open(anchor.href, '_blank');
+            else window.location.href = anchor.href;
+        });
     });
 
 
