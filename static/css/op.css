@@ -3592,3 +3592,9 @@ textarea.op-input.op-code-area { min-height: 60vh; }
 /* CMS cache cards are narrow: keep "Rebuild X cache" on one line and let the button drop below */
 [x-data*="CacheComponent"] .op-setting-row { flex-wrap: wrap; }
 [x-data*="CacheComponent"] .op-setting-label { white-space: nowrap; }
+
+/* sidebar logo: with a dark logo set, the light one only shows when settings.css gives the sidebar a light background */
+.op-logo .op-logo-on-light { display: none; }
+/* 2.0.28 output.css paints the active sidebar link in fixed cyan in dark mode, follow the accent instead (OpenAdmin's Customize colours) */
+html.dark #sidebar a[data-active="true"] { background-color: var(--color-accent-soft); color: var(--color-accent-text); }
+html.dark #sidebar a[data-active="true"] i { color: var(--color-accent-text); }

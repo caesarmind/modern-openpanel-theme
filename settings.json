@@ -1,0 +1,70 @@
+{
+  "groups": [
+    {
+      "title": "Accent colour",
+      "description": "Primary buttons, links, toggles, progress bars and focus rings. Text in the accent colour is darkened in light mode and lightened in dark mode when it needs to be, so it stays readable.",
+      "fields": [
+        {
+          "key": "accent_light",
+          "label": "Light mode",
+          "default": "#4f46e5",
+          "css": "html:not(.dark) { --color-accent: {{accent_light}}; --color-accent-text: oklch(from {{accent_light}} min(l, 0.5) c h); --color-on-accent: {{accent_light.on}}; --color-accent-soft: color-mix(in srgb, {{accent_light}} 9%, transparent); }"
+        },
+        {
+          "key": "accent_dark",
+          "label": "Dark mode",
+          "default": "#47ebeb",
+          "css": "html.dark, .dark { --color-accent: {{accent_dark}}; --color-accent-text: oklch(from {{accent_dark}} max(l, 0.75) c h); --color-on-accent: {{accent_dark.on}}; --color-accent-soft: color-mix(in srgb, {{accent_dark}} 10%, transparent); }"
+        }
+      ]
+    },
+    {
+      "title": "Sidebar in light mode",
+      "description": "Navy by default. With a light background the sidebar shows the logo for light backgrounds.",
+      "fields": [
+        {
+          "key": "sidebar_light_bg",
+          "label": "Background",
+          "default": "#161a2b",
+          "css": ":where(html:not(.dark)) :is(.op-sidebar, .op-panel-sidebar) { background: {{sidebar_light_bg}}; --color-page: {{sidebar_light_bg}}; --color-inset: {{sidebar_light_bg}}; --color-panel: color-mix(in oklab, {{sidebar_light_text}} 9%, {{sidebar_light_bg}}); --color-raised: color-mix(in oklab, {{sidebar_light_text}} 20%, {{sidebar_light_bg}}); --color-muted: color-mix(in oklab, {{sidebar_light_text}} 72%, {{sidebar_light_bg}}); --color-faint: color-mix(in oklab, {{sidebar_light_text}} 45%, {{sidebar_light_bg}}); --color-heading: color-mix(in oklab, {{sidebar_light_text}} 55%, {{sidebar_light_bg.on}}); color-scheme: {{sidebar_light_bg.tone}}; }\nhtml:not(.dark) .op-logo .op-logo-on-dark, html:not(.dark) .op-logo .op-logo-on-light { display: none; }\nhtml:not(.dark) .op-logo .op-logo-on-{{sidebar_light_bg.tone}} { display: inline; }"
+        },
+        {
+          "key": "sidebar_light_text",
+          "label": "Text",
+          "default": "#d3d7e6",
+          "css": ":where(html:not(.dark)) :is(.op-sidebar, .op-panel-sidebar) { --color-body: {{sidebar_light_text}}; --color-heading: color-mix(in oklab, {{sidebar_light_text}} 55%, {{sidebar_light_bg.on}}); --color-muted: color-mix(in oklab, {{sidebar_light_text}} 72%, {{sidebar_light_bg}}); --color-faint: color-mix(in oklab, {{sidebar_light_text}} 45%, {{sidebar_light_bg}}); --color-panel: color-mix(in oklab, {{sidebar_light_text}} 9%, {{sidebar_light_bg}}); --color-raised: color-mix(in oklab, {{sidebar_light_text}} 20%, {{sidebar_light_bg}}); }"
+        },
+        {
+          "key": "sidebar_light_active",
+          "label": "Selected item",
+          "default": "#8b85ff",
+          "css": ":where(html:not(.dark)) :is(.op-sidebar, .op-panel-sidebar) { --color-accent: {{sidebar_light_active}}; --color-accent-text: {{sidebar_light_active}}; --color-on-accent: {{sidebar_light_active.on}}; --color-accent-soft: color-mix(in srgb, {{sidebar_light_active}} 16%, transparent); }"
+        }
+      ]
+    },
+    {
+      "title": "Sidebar in dark mode",
+      "description": "Shares the page background by default.",
+      "fields": [
+        {
+          "key": "sidebar_dark_bg",
+          "label": "Background",
+          "default": "#14141f",
+          "css": ":where(html.dark) :is(.op-sidebar, .op-panel-sidebar) { background: {{sidebar_dark_bg}}; --color-page: {{sidebar_dark_bg}}; --color-inset: {{sidebar_dark_bg}}; --color-panel: color-mix(in oklab, {{sidebar_dark_text}} 9%, {{sidebar_dark_bg}}); --color-raised: color-mix(in oklab, {{sidebar_dark_text}} 20%, {{sidebar_dark_bg}}); --color-muted: color-mix(in oklab, {{sidebar_dark_text}} 72%, {{sidebar_dark_bg}}); --color-faint: color-mix(in oklab, {{sidebar_dark_text}} 45%, {{sidebar_dark_bg}}); --color-heading: color-mix(in oklab, {{sidebar_dark_text}} 55%, {{sidebar_dark_bg.on}}); color-scheme: {{sidebar_dark_bg.tone}}; }\nhtml.dark .op-logo .op-logo-on-dark, html.dark .op-logo .op-logo-on-light { display: none; }\nhtml.dark .op-logo .op-logo-on-{{sidebar_dark_bg.tone}} { display: inline; }"
+        },
+        {
+          "key": "sidebar_dark_text",
+          "label": "Text",
+          "default": "#cfd7e2",
+          "css": ":where(html.dark) :is(.op-sidebar, .op-panel-sidebar) { --color-body: {{sidebar_dark_text}}; --color-heading: color-mix(in oklab, {{sidebar_dark_text}} 55%, {{sidebar_dark_bg.on}}); --color-muted: color-mix(in oklab, {{sidebar_dark_text}} 72%, {{sidebar_dark_bg}}); --color-faint: color-mix(in oklab, {{sidebar_dark_text}} 45%, {{sidebar_dark_bg}}); --color-panel: color-mix(in oklab, {{sidebar_dark_text}} 9%, {{sidebar_dark_bg}}); --color-raised: color-mix(in oklab, {{sidebar_dark_text}} 20%, {{sidebar_dark_bg}}); }"
+        },
+        {
+          "key": "sidebar_dark_active",
+          "label": "Selected item",
+          "default": "#47ebeb",
+          "css": ":where(html.dark) :is(.op-sidebar, .op-panel-sidebar) { --color-accent: {{sidebar_dark_active}}; --color-accent-text: {{sidebar_dark_active}}; --color-on-accent: {{sidebar_dark_active.on}}; --color-accent-soft: color-mix(in srgb, {{sidebar_dark_active}} 16%, transparent); }"
+        }
+      ]
+    }
+  ]
+}
