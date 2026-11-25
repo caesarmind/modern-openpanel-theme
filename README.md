@@ -7,7 +7,7 @@ Modern is a redesigned theme for the OpenPanel 2.x user panel: a dark sidebar, t
 ## Install
 
 ```bash
-git clone https://github.com/stefanpejcic/modern-openpanel-theme /etc/openpanel/openpanel/templates/modern
+git clone https://github.com/caesarmind/modern-openpanel-theme /etc/openpanel/openpanel/templates/modern
 opencli config update template modern
 ```
 
