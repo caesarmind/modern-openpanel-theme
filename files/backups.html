@@ -25,7 +25,7 @@
     <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "server"}} {{$.T.Get "Stored"}}</div><div class="op-kpi-value">{{if .TotalSize}}{{.TotalSize}}{{else}}&ndash;{{end}}</div><div class="op-kpi-note">{{$.T.Get "all"}} {{.Count}} {{$.T.Get "archives"}}</div></div>
     <div class="op-kpi"><div class="op-kpi-label">{{template "op_icon" "refresh"}} {{$.T.Get "Schedule"}}</div>
         <div class="op-kpi-value">{{if eq .Schedule "@daily" "@midnight"}}{{$.T.Get "Daily"}}{{else if eq .Schedule "@hourly"}}{{$.T.Get "Hourly"}}{{else if eq .Schedule "@weekly"}}{{$.T.Get "Weekly"}}{{else if eq .Schedule "@monthly"}}{{$.T.Get "Monthly"}}{{else if .Schedule}}{{$.T.Get "Custom"}}{{else}}&ndash;{{end}}</div>
-        <div class="op-kpi-note op-mono">{{if .Schedule}}{{.Schedule}}, {{end}}{{if or (eq .Retention "") (eq .Retention "-1") (eq .Retention "0")}}{{$.T.Get "keeps every copy"}}{{else}}{{$.T.Get "keeps"}} {{.Retention}} {{$.T.Get "days"}}{{end}}</div></div>
+        <div class="op-kpi-note op-mono" style="white-space:normal;overflow:visible;text-overflow:clip">{{if .Schedule}}{{.Schedule}}, {{end}}{{if or (eq .Retention "") (eq .Retention "-1") (eq .Retention "0")}}{{$.T.Get "keeps every copy"}}{{else}}{{$.T.Get "keeps"}} {{.Retention}} {{$.T.Get "days"}}{{end}}</div></div>
 </section>
 {{end}}
 
@@ -101,7 +101,7 @@
     </table></div>
     <div class="op-tfoot"><span>{{$.T.Get "Showing"}} {{len .Recent}} {{$.T.Get "of"}} {{.Count}} {{$.T.Get "copies"}}</span><a href="/backups/list" style="color:var(--color-accent-text)">{{$.T.Get "Open Restore & Download"}}</a></div>
     {{else if not .IndexError}}
-    <div class="op-empty">{{template "op_icon" "archive"}}<b>{{$.T.Get "No backups found"}}</b><p>{{$.T.Get "Once the first backup runs, it shows up here."}} <a href="/backups/list">{{$.T.Get "Reindex the destination"}}</a></p></div>
+    <div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "archive"}}</span><b>{{$.T.Get "No backups found"}}</b><span class="op-hint">{{$.T.Get "Once the first backup runs, it shows up here."}} <a href="/backups/list" style="color:var(--color-accent-text)">{{$.T.Get "Reindex the destination"}}</a></span></div>
     {{end}}
 </section>
 {{end}}

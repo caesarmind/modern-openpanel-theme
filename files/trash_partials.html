@@ -1,10 +1,6 @@
 {{define "empty_trash"}}
 <!-- START templates/files/filemanager/empty_trash.html -->
-<div class="row flex flex-col items-center text-center justify-center h-72">
-   <svg  xmlns="http://www.w3.org/2000/svg"  width="120"  height="120"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="1.25"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-folder-x"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11 19h-6a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v4" /><path d="M15 19l2 2l4 -4" /></svg>
-
-   <div class="fs-1 fw-bolder text-dark mb-4">{{.T.Get "No files in the Trash."}}</div>
-</div>
+<section class="op-card" id="trash-empty"><div class="op-empty"><span class="op-ico-tile">{{template "op_icon" "trash"}}</span><b>{{.T.Get "No files in the Trash."}}</b></div></section>
 <!-- END templates/files/filemanager/empty_trash.html -->
 {{end}}
 

@@ -3446,10 +3446,13 @@ html.dark .op-logo-light, html:not(.dark) .op-logo-dark { display: none !importa
 .op-segmented > a:hover { color: var(--color-heading); }
 .op-segmented > a[aria-current="true"] { background: var(--color-raised); color: var(--color-heading); }
 
-/* file manager: folder tree beside the list (fm_tree), hidden under 64rem or when switched off in Columns */
+/* file manager: folder tree beside the list (fm_tree). It needs room next to the table, so it shows when the
+   page content is at least 940px wide (not the window: with the sidebar open a 1024px window leaves ~730px),
+   and not when it's switched off in Columns */
+.op-content:has(> .op-fm-layout) { container: fmpage / inline-size; }
 .op-fm-layout { display: block; }
 .op-fm-tree { display: none; }
-@media (width >= 64rem) {
+@container fmpage (width >= 940px) {
   .op-fm-layout.has-tree { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
   .op-fm-layout.has-tree .op-fm-tree { display: block; position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow-y: auto; padding: 8px 8px 12px; }
 }
@@ -3477,3 +3480,8 @@ li[aria-expanded="true"] > .op-fm-tree-row .op-fm-tree-chev svg { transform: rot
 .op-fm-deep a { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--op-radius-sm); color: var(--color-heading); text-decoration: none; font-size: 13px; }
 .op-fm-deep a:hover { background: var(--color-inset); }
 .op-fm-deep a .op-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* file manager right-click menu */
+#fmContextMenu { padding: 4px; }
+#fmContextMenu li[data-target] { border-radius: 6px; }
+#fmContextMenu .op-fm-ctx-sep { height: 1px; margin: 4px -4px; background: var(--color-raised); }

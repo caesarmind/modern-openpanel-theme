@@ -427,7 +427,8 @@ function initContextMenu() {
         const icon = btn.querySelector('i')?.className || '';
         const label = btn.querySelector('span')?.textContent.trim() || '';
         const danger = id === 'deleteButton' ? ' is-danger' : '';
-        return `<li data-target="${id}" class="flex items-center gap-x-2 px-3 py-1.5 text-sm cursor-pointer op-hover${danger}"><i class="${icon}"></i>${label}</li>`;
+        const sep = id === 'deleteButton' ? '<li role="separator" class="op-fm-ctx-sep"></li>' : '';
+        return `${sep}<li data-target="${id}" class="flex items-center gap-x-2 px-3 py-1.5 text-sm cursor-pointer op-hover${danger}"><i class="${icon}"></i>${label}</li>`;
     }).join('');
 
     const table = document.getElementById('filemanager_table');
@@ -455,7 +456,7 @@ function initContextMenu() {
             li.classList.toggle('hidden', !btn || btn.disabled);
         });
 
-        showContextMenu(event.pageX, event.pageY);
+        showContextMenu(event.clientX, event.clientY);
     });
 
     menu.addEventListener('click', event => {
@@ -474,12 +475,13 @@ function initContextMenu() {
 }
 
 function showContextMenu(x, y) {
+    // fixed to the viewport, the menu sits inside #fmCard which is position:relative
     const menu = document.getElementById('fmContextMenu');
     menu.classList.remove('hidden');
-    const maxX = window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 8;
-    const maxY = window.scrollY + document.documentElement.clientHeight - menu.offsetHeight - 8;
-    menu.style.left = Math.max(window.scrollX, Math.min(x, maxX)) + 'px';
-    menu.style.top  = Math.max(window.scrollY, Math.min(y, maxY)) + 'px';
+    const maxX = document.documentElement.clientWidth - menu.offsetWidth - 8;
+    const maxY = document.documentElement.clientHeight - menu.offsetHeight - 8;
+    menu.style.left = Math.max(8, Math.min(x, maxX)) + 'px';
+    menu.style.top  = Math.max(8, Math.min(y, maxY)) + 'px';
 }
 
 function hideContextMenu() {
