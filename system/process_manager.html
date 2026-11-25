@@ -90,7 +90,7 @@
                         <td x-show="columns.pid" data-label="{{$.T.Get "PID"}}" class="is-num" data-sort-col="pid"><span class="op-mono">{{.PID}}</span></td>
                         <td x-show="columns.ppid" data-label="{{$.T.Get "Parent PID"}}" class="is-num" data-sort-col="ppid"><span class="op-mono">{{.PPID}}</span></td>
                         <td x-show="columns.cpu" data-label="{{$.T.Get "CPU"}}" class="is-num" data-sort-col="cpu"><span class="op-mono">{{.C}}%</span></td>
-                        <td x-show="columns.stime" data-label="{{$.T.Get "Started"}}" data-sort-col="stime"><span class="op-mono" style="white-space:nowrap" title="{{.STIME}}">{{replace .STIME " +0000 UTC" ""}}</span></td>
+                        <td x-show="columns.stime" data-label="{{$.T.Get "Started"}}" data-sort-col="stime"><span class="op-mono" style="white-space:nowrap" title="{{.STIME}}">{{replace (replace .STIME " +0000 UTC" "") " +0000 GMT" ""}}</span></td>
                         <td x-show="columns.tty" data-label="{{$.T.Get "Terminal"}}" data-sort-col="tty"><span class="op-mono">{{.TTY}}</span></td>
                         <td x-show="columns.time" data-label="{{$.T.Get "CPU time"}}" class="is-num" data-sort-col="time"><span class="op-mono">{{.TIME}}</span></td>
                         <td data-label="{{$.T.Get "Command"}}" data-sort-col="cmd" data-sort-value="{{.CMD}}"><div class="op-proc-cmd"><span class="op-mono" :class="full &amp;&amp; 'is-full'" title="{{.CMD}}">{{.CMD}}</span>{{if gt (len .CMD) 60}}<button type="button" class="op-proc-more" @click="full = !full" x-text="full ? {{toJSON ($.T.Get "Shorten command")}} : {{toJSON ($.T.Get "Show full command")}}">{{$.T.Get "Show full command"}}</button>{{end}}</div></td>

@@ -221,45 +221,23 @@ document.addEventListener('DOMContentLoaded', function () {
 #activity-table { min-width: 40rem; }
 /* action column soaks up the spare width and truncates instead of pushing the table wider */
 .activity-action-cell { width: 100%; max-width: 0; }
-.activity-kind { display: inline-flex; width: 1.75rem; height: 1.75rem; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 9999px; }
-.activity-kind--danger { background: #fef2f2; color: #dc2626; }
-.activity-kind--create { background: #ecfdf5; color: #059669; }
-.activity-kind--edit { background: #fffbeb; color: #d97706; }
-.activity-kind--security { background: #f5f3ff; color: #7c3aed; }
-.activity-kind--command { background: #f0f9ff; color: #0284c7; }
-.activity-kind--info { background: #f3f4f6; color: #6b7280; }
-.dark .activity-kind--danger { background: rgb(239 68 68 / 0.12); color: #f87171; }
-.dark .activity-kind--create { background: rgb(16 185 129 / 0.12); color: #34d399; }
-.dark .activity-kind--edit { background: rgb(245 158 11 / 0.12); color: #fbbf24; }
-.dark .activity-kind--security { background: rgb(139 92 246 / 0.14); color: #a78bfa; }
-.dark .activity-kind--command { background: rgb(14 165 233 / 0.12); color: #38bdf8; }
-.dark .activity-kind--info { background: rgb(107 114 128 / 0.18); color: #9ca3af; }
-.activity-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.7rem; border-radius: 9999px; border: 1px solid #e5e7eb; font-size: 0.8125rem; color: #374151; background: #fff; text-decoration: none; transition: background-color .15s, border-color .15s; }
-.activity-chip:hover { background: #f9fafb; border-color: #d1d5db; }
-.activity-chip.is-active { background: #111827; border-color: #111827; color: #fff; }
-.activity-chip-count { font-variant-numeric: tabular-nums; color: #6b7280; font-size: 0.75rem; }
-.activity-chip.is-active .activity-chip-count { color: #d1d5db; }
-.activity-chip-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: currentColor; }
-.activity-chip--danger .activity-chip-dot { color: #dc2626; }
-.activity-chip--create .activity-chip-dot { color: #059669; }
-.activity-chip--edit .activity-chip-dot { color: #d97706; }
-.activity-chip--security .activity-chip-dot { color: #7c3aed; }
-.activity-chip--command .activity-chip-dot { color: #0284c7; }
-.activity-chip--info .activity-chip-dot { color: #9ca3af; }
-.activity-clear { color: #6b7280; text-decoration: underline; text-underline-offset: 2px; }
-.activity-clear:hover { color: #111827; }
-.dark .activity-chip { border-color: #1f2937; color: #d1d5db; background: #030712; }
-.dark .activity-chip:hover { background: #111827; border-color: #374151; }
-.dark .activity-chip.is-active { background: #f9fafb; border-color: #f9fafb; color: #111827; }
-.dark .activity-chip-count { color: #9ca3af; }
-.dark .activity-chip.is-active .activity-chip-count { color: #4b5563; }
-.dark .activity-chip--danger .activity-chip-dot { color: #f87171; }
-.dark .activity-chip--create .activity-chip-dot { color: #34d399; }
-.dark .activity-chip--edit .activity-chip-dot { color: #fbbf24; }
-.dark .activity-chip--security .activity-chip-dot { color: #a78bfa; }
-.dark .activity-chip--command .activity-chip-dot { color: #38bdf8; }
-.dark .activity-clear { color: #9ca3af; }
-.dark .activity-clear:hover { color: #f9fafb; }
+.activity-kind { display: inline-flex; width: 1.75rem; height: 1.75rem; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 9999px; color: var(--k); background: color-mix(in srgb, var(--k) 12%, transparent); }
+/* one hue per kind, from the kit's status and category tokens so both themes follow the brand */
+.activity-kind--danger, .activity-chip--danger { --k: var(--color-danger); }
+.activity-kind--create, .activity-chip--create { --k: var(--color-success); }
+.activity-kind--edit, .activity-chip--edit { --k: var(--color-warning); }
+.activity-kind--security, .activity-chip--security { --k: var(--color-hue-purple, var(--color-accent)); }
+.activity-kind--command, .activity-chip--command { --k: var(--color-accent-text); }
+.activity-kind--info, .activity-chip--info { --k: var(--color-muted); }
+/* filter chips are kit pills: active = accent-soft with accent text */
+.activity-chip { display: inline-flex; align-items: center; gap: 0.4rem; height: 32px; padding: 0 12px; border-radius: 9999px; font-size: 13px; color: var(--color-body); background: var(--color-raised); text-decoration: none; transition: background-color .15s, color .15s; }
+.activity-chip:hover { color: var(--color-heading); }
+.activity-chip.is-active { background: var(--color-accent-soft); color: var(--color-accent-text); font-weight: 600; }
+.activity-chip-count { font-variant-numeric: tabular-nums; color: var(--color-muted); font-size: 12px; font-weight: 500; }
+.activity-chip.is-active .activity-chip-count { color: inherit; }
+.activity-chip-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--k, currentColor); }
+.activity-clear { color: var(--color-muted); text-decoration: underline; text-underline-offset: 2px; }
+.activity-clear:hover { color: var(--color-heading); }
 
 </style>
 <script src="{{static "js/table-sort.js"}}"></script>

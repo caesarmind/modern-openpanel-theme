@@ -139,8 +139,8 @@
                                     <a href="{{.Href}}">{{template "op_icon" "settings"}} {{$root.T.Get "Manage"}}</a>
                                     <a href="https://{{.Name}}" target="_blank" rel="noopener">{{template "op_icon" "out"}} {{$root.T.Get "Open site"}}</a>
                                     {{if $root.UserAllowed.filemanager}}<a href="/files/{{.Name}}">{{template "op_icon" "folder"}} {{$root.T.Get "File Manager"}}</a>{{end}}
-                                    {{if $root.UserAllowed.dns}}<a href="/domains/edit-dns-zone/{{.Name}}">{{template "op_icon" "dns"}} {{$root.T.Get "DNS zone"}}</a>{{end}}
-                                    {{if $root.UserAllowed.ssl}}<a href="/domains/ssl?domain_name={{.Name}}">{{template "op_icon" "lock"}} {{$root.T.Get "SSL"}}</a>{{end}}
+                                    {{if $root.UserAllowed.dns}}<a href="/domains/edit-dns-zone/{{index (split .Name "/") 0}}">{{template "op_icon" "dns"}} {{$root.T.Get "DNS zone"}}</a>{{end}}
+                                    {{if $root.UserAllowed.ssl}}<a href="/domains/ssl?domain_name={{index (split .Name "/") 0}}">{{template "op_icon" "lock"}} {{$root.T.Get "SSL"}}</a>{{end}}
                                 </div>
                             </td>
                         </tr>

@@ -83,7 +83,7 @@
                 <div class="op-wp-card-facts"><span class="op-version">WordPress&nbsp;<span id="version-{{$site.SiteName}}">{{$site.Version}}</span></span><span class="op-hint">{{$.T.Get "Created"}} {{replace (replace $site.CreatedDate "T" " ") "Z" ""}}</span></div>
                 <div class="op-wp-card-acts">
                     <a href="#" class="op-btn op-btn-secondary op-btn-sm" onclick="handleLoginClick({{toJSON $site.SiteName}}); return false;">{{template "op_icon" "login"}} {{$.T.Get "Login as Admin"}}</a>
-                    <a href="/website?domain={{$site.SiteName}}" class="op-btn op-btn-primary op-btn-sm">{{$.T.Get "Manage"}}</a>
+                    <a href="/website?domain={{$site.SiteName}}" class="op-btn op-btn-secondary op-btn-sm">{{$.T.Get "Manage"}}</a>
                 </div>
             </div>
         </article>

@@ -12,7 +12,7 @@
             <p class="op-meta punycode">{{.Quota.Address}}</p>
         </div>
     <div class="op-actions">
-            <a href="/emails/delete/{{.Quota.Address}}" class="op-btn op-btn-danger"><i class="bi bi-trash3"></i> {{.T.Get "Delete"}}</a>
+            <a href="/emails/delete/{{.Quota.Address}}" class="op-btn op-btn-danger">{{template "op_icon" "trash"}} {{.T.Get "Delete"}}</a>
     </div>
 </div>
 <!-- END page header -->
@@ -20,7 +20,7 @@
 
 <!-- form -->
 <div class="op-card op-block-card CrawlerStatusCard" id="toAddActive">
-    <form class="mt-8" id="email-settings-form" action="/emails/edit/{{.Quota.Address}}" method="post">
+    <form id="email-settings-form" action="/emails/edit/{{.Quota.Address}}" method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
 
         <div class="op-form-grid">
@@ -45,32 +45,18 @@
 
 
 <div class="op-field-wrap">
-  <label for="gb" class="op-label op-label-row">
-    {{.T.Get "Change allocated storage space"}}<span class="is-danger">*</span>
+  <label for="gb" class="op-label">
+    {{.T.Get "Change allocated storage space"}} <span class="is-danger">*</span>
   </label>
 
-  <div class="op-join">
-    <input
-      type="number"
-      min="0"
-      name="gb"
-      value="{{.Quota.AllocatedQuota}}"
-      step="any"
-      class="op-input op-join-l"
-    >
-
-    <div class="input-group-append">
-      <select
-        class="op-input"
-        name="format"
-        id="format"
-      >
-        <option value="k" {{if eq .Quota.AllocatedValue "k"}}selected{{end}}>KiB</option>
-        <option value="M" {{if eq .Quota.AllocatedValue "M"}}selected{{end}}>MiB</option>
-        <option value="G" {{if eq .Quota.AllocatedValue "G"}}selected{{end}}>GiB</option>
-        <option value="T" {{if eq .Quota.AllocatedValue "T"}}selected{{end}}>TiB</option>
-      </select>
-    </div>
+  <div class="op-em-custom">
+    <input type="number" min="0" name="gb" id="gb" value="{{.Quota.AllocatedQuota}}" step="any" class="op-input op-mono">
+    <select class="op-select" name="format" id="format" aria-label="{{.T.Get "Unit"}}">
+      <option value="k" {{if eq .Quota.AllocatedValue "k"}}selected{{end}}>KiB</option>
+      <option value="M" {{if eq .Quota.AllocatedValue "M"}}selected{{end}}>MiB</option>
+      <option value="G" {{if eq .Quota.AllocatedValue "G"}}selected{{end}}>GiB</option>
+      <option value="T" {{if eq .Quota.AllocatedValue "T"}}selected{{end}}>TiB</option>
+    </select>
   </div>
 
   <p class="op-hint">
@@ -126,51 +112,21 @@ limitQuotaInput();
 </script>
 
 
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6 mb-2 col-span-full">
-  <div class="col-span">
-    <label for="incoming" class="op-label op-label-row">{{.T.Get "Receiving Incoming Mail"}}<span class="is-danger">*</span></label>
-    <div class="flex">
-    <div class="form-field" id="incoming">
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="incoming" id="allow_incoming" value="allow"
-                {{if eq .ReceiveRestriction "ACCEPT"}}
-                    checked
-                {{end}}>&nbsp;
-            <label class="form-check-label" for="allow_incoming"> {{.T.Get "Allow"}}</label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="incoming" id="suspend_incoming" value="suspend"
-                {{if eq .ReceiveRestriction "REJECT"}}
-                    checked
-                {{end}}>&nbsp;
-            <label class="form-check-label" for="suspend_incoming"> {{.T.Get "Suspend"}}</label>
-        </div>
-    </div>
+  <div class="op-field-wrap">
+    <span class="op-label op-block" id="incoming-label">{{.T.Get "Receiving Incoming Mail"}} <span class="is-danger">*</span></span>
+    <div class="op-radio-seg" role="radiogroup" aria-labelledby="incoming-label" id="incoming">
+      <label><input class="sr-only" type="radio" name="incoming" id="allow_incoming" value="allow"{{if eq .ReceiveRestriction "ACCEPT"}} checked{{end}}><span class="op-radio-seg-opt">{{.T.Get "Allow"}}</span></label>
+      <label><input class="sr-only" type="radio" name="incoming" id="suspend_incoming" value="suspend"{{if eq .ReceiveRestriction "REJECT"}} checked{{end}}><span class="op-radio-seg-opt">{{.T.Get "Suspend"}}</span></label>
     </div>
   </div>
 
-  <div class="col-span">
-    <label for="incoming" class="op-label op-label-row">{{.T.Get "Sending Outgoing Mail"}}<span class="is-danger">*</span></label>
-    <div class="flex">
-    <div class="form-field" id="outgoing">
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="outgoing" id="allow_outgoing" value="allow"
-                {{if eq .SendRestriction "ACCEPT"}}
-                    checked
-                {{end}}>
-            <label class="form-check-label" for="allow_outgoing">{{.T.Get "Allow"}}</label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="outgoing" id="suspend_outgoing" value="suspend"
-                {{if eq .SendRestriction "REJECT"}}
-                    checked
-                {{end}}>
-            <label class="form-check-label" for="suspend_outgoing">{{.T.Get "Suspend"}}</label>
-        </div>
-    </div>
+  <div class="op-field-wrap">
+    <span class="op-label op-block" id="outgoing-label">{{.T.Get "Sending Outgoing Mail"}} <span class="is-danger">*</span></span>
+    <div class="op-radio-seg" role="radiogroup" aria-labelledby="outgoing-label" id="outgoing">
+      <label><input class="sr-only" type="radio" name="outgoing" id="allow_outgoing" value="allow"{{if eq .SendRestriction "ACCEPT"}} checked{{end}}><span class="op-radio-seg-opt">{{.T.Get "Allow"}}</span></label>
+      <label><input class="sr-only" type="radio" name="outgoing" id="suspend_outgoing" value="suspend"{{if eq .SendRestriction "REJECT"}} checked{{end}}><span class="op-radio-seg-opt">{{.T.Get "Suspend"}}</span></label>
     </div>
   </div>
-</div>
 
 
 <div
@@ -185,43 +141,19 @@ limitQuotaInput();
 >
   <label
     for="email_password"
-    class="op-label op-label-row"
+    class="op-label"
   >
-    {{.T.Get "Password"}}<span class="is-danger">*</span>
+    {{.T.Get "Password"}} <span class="is-danger">*</span>
   </label>
-  <div class="flex">
-    <input
-      type="text"
-      name="email_password"
-      id="email_password"
-      maxlength="30"
-      minlength="8"
-      title="{{.T.Get "Password must be between 8 and 30 characters."}}"
-      placeholder=" {{.T.Get "New Password"}}"
-      class="op-input op-join-l"
-      x-model="password"
-      x-ref="input"
-      @input="checkStrength()"
-    />
-
-    <div class="input-group-append">
-      <button
-        type="button"
-        id="generatePassword"
-        class="op-btn op-btn-secondary op-join-btn"
-      >
-        <i class="bi bi-shuffle"></i>
-      </button>
+  <div class="op-em-pass">
+    <div>
+      <input type="text" name="email_password" id="email_password" maxlength="30" minlength="8" autocomplete="new-password" spellcheck="false"
+        title="{{.T.Get "Password must be between 8 and 30 characters."}}" placeholder="{{.T.Get "New Password"}}"
+        class="op-input op-mono" x-model="password" x-ref="input" @input="checkStrength()" />
+      <button class="op-icon-btn" type="button" id="togglePassword" aria-label="{{.T.Get "Show password"}}" title="{{.T.Get "Show password"}}">{{template "op_icon" "eye"}}</button>
     </div>
-
-    <div class="input-group-append">
-      <button
-        class="op-btn op-btn-secondary op-join-btn is-last"
-        type="button"
-        id="togglePassword"
-      >
-        <i class="bi bi-eye"></i>
-      </button>
+    <div>
+      <button class="op-btn op-btn-secondary" type="button" id="generatePassword">{{template "op_icon" "shuffle"}} {{.T.Get "Generate"}}</button>
     </div>
   </div>
 
@@ -252,17 +184,10 @@ limitQuotaInput();
 
         </div>
 
-        <div class="op-sep"><div class="op-divider"></div></div>
-
-<div class="op-actions op-actions-end">
-    <a href="/emails" class="op-btn op-btn-secondary">
-        {{.T.Get "Back to Emails"}}
-    </a>
-    <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Update Email Settings"}}<svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
-            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
-        </svg>
-    </button>
-</div>
+        <div class="op-savebar">
+            <a href="/emails" class="op-btn op-btn-secondary">{{.T.Get "Back to Emails"}}</a>
+            <button type="submit" class="op-btn op-btn-primary">{{.T.Get "Update Email Settings"}}</button>
+        </div>
 
     </form>
 </div>

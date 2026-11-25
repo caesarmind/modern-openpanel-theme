@@ -63,6 +63,8 @@
     <link rel="stylesheet" href="{{static "vendor/bootstrap-icons/bootstrap-icons.css"}}">
     <link rel="stylesheet" href="{{static "dist/output.css"}}">
     <link rel="stylesheet" href="{{static "css/op.css"}}">
+    <link rel="stylesheet" href="{{static "vendor/remixicon/remixicon.css"}}">
+    <link rel="stylesheet" href="{{static "css/op-icons-bi.css"}}">
     <script src="{{static "js/op-kit.js"}}"></script>
     <link rel="stylesheet" href="{{static "vendor/driverjs/driver.min.css"}}">
     <script>
@@ -511,6 +513,15 @@ document.addEventListener('submit', (e) => {
 {{end}}
             </div>
         </nav>
+        <script>
+        /* keep the current page's menu item in view: the nav scrolls on its own and long groups pushed it under the footer */
+        (function () {
+            var nav = document.querySelector('.op-sidebar-nav'); if (!nav) return;
+            var on = nav.querySelectorAll('[data-active="true"]'); var el = on[on.length - 1]; if (!el) return;
+            var n = nav.getBoundingClientRect(), r = el.getBoundingClientRect();
+            if (r.bottom > n.bottom - 8 || r.top < n.top) nav.scrollTop += r.top - n.top - nav.clientHeight / 2 + r.height / 2;
+        })();
+        </script>
 
         {{template "footer" .}}
     </aside>
@@ -699,6 +710,24 @@ document.addEventListener('submit', (e) => {
 <script>window.TourLocale = '{{.T.Locale}}';</script>
 <script defer src="{{static "js/tour-steps.js"}}"></script>
 <script defer src="{{static "js/tour.js"}}"></script>
+<script>
+/* customizable selects: give each one a <selectedcontent> so a long label ends in an ellipsis and the arrow stays visible */
+(function () {
+    if (!window.CSS || !CSS.supports('appearance', 'base-select')) return;
+    var Q = 'select.op-select:not([multiple]):not([size])';
+    function fix(s) {
+        if (s.querySelector(':scope > button')) return;
+        var b = document.createElement('button'); b.appendChild(document.createElement('selectedcontent')); s.prepend(b);
+    }
+    function scan(root) { if (root.matches && root.matches(Q)) fix(root); if (root.querySelectorAll) root.querySelectorAll(Q).forEach(fix); }
+    scan(document);
+    new MutationObserver(function (ms) { ms.forEach(function (m) {
+        if (m.target.matches && m.target.matches(Q)) fix(m.target); /* options rebuilt with innerHTML */
+        m.addedNodes.forEach(function (n) { if (n.nodeType === 1) scan(n); });
+    }); })
+        .observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 
 </div>
 </div>

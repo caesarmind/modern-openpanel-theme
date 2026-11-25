@@ -68,8 +68,8 @@
     <input type="hidden" id="csrf_token" value="{{.CSRFToken}}"/>
 
     <div class="col-span-full mb-4">
-        <label for="new-target" class="op-label op-label-row">
-            {{.T.Get "New destination address"}}<span class="is-danger">*</span>
+        <label for="new-target" class="op-label op-block" style="margin-bottom:6px">
+            {{.T.Get "New destination address"}} <span class="is-danger">*</span>
         </label>
         <input
             type="email"
@@ -86,16 +86,13 @@
     <div class="md:flex items-center md:justify-end md:space-x-4 mt-6">
         <button type="button" id="add-destination-btn" class="op-btn op-btn-primary">
             {{.T.Get "Add Destination"}}
-            <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
-                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
-            </svg>
         </button>
     </div>
 
     <!-- Danger zone -->
     <div class="op-sep">
         <div class="op-divider"></div>
-        <span class="shrink-0 text-red-400">{{.T.Get "Danger zone"}}</span>
+        <span class="shrink-0">{{.T.Get "Danger zone"}}</span>
         <div class="op-divider"></div>
     </div>
 
@@ -104,7 +101,7 @@
             <p class="op-strong">{{.T.Get "Delete this alias"}}</p>
             <p class="op-hint">{{.T.Get "Removes the alias address and all its destinations permanently."}}</p>
         </div>
-        <a href="/emails/aliases/delete/{{.Email}}" class="op-btn op-btn-secondary"><i class="bi bi-trash3"></i> {{.T.Get "Delete Alias"}}</a>
+        <a href="/emails/aliases/delete/{{.Email}}" class="op-btn op-btn-danger">{{template "op_icon" "trash"}} {{.T.Get "Delete Alias"}}</a>
     </div>
 
 </div>

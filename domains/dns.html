@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="op-page-head">
         <div>
             <div class="op-eyebrow"><span id="total_records_count">{{.TotalRecords}}</span> {{.T.Get "records"}}</div>
-            <h1 class="op-title">{{.T.Get "Edit DNS for"}} <span class="punycode">{{.Domain}}</span></h1>
+            <h1 class="op-title">{{.T.Get "Edit DNS for"}} <span class="punycode op-title-domain">{{.Domain}}</span></h1>
             <p class="op-meta">{{.T.Get "Changes go live once the old record's TTL runs out."}}</p>
         </div>
         <div class="op-actions">
@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="op-page-head">
         <div>
             <div class="op-eyebrow">{{.T.Get "Zone file"}}</div>
-            <h1 class="op-title">{{.T.Get "Edit DNS File for"}} <span class="punycode">{{.Domain}}</span></h1>
+            <h1 class="op-title">{{.T.Get "Edit DNS File for"}} <span class="punycode op-title-domain">{{.Domain}}</span></h1>
         </div>
         <div class="op-actions">
             <a class="op-btn op-btn-secondary" href="/domains/edit-dns-zone/{{.Domain}}?view=table">{{template "op_icon" "table"}} {{.T.Get "Table View"}}</a>

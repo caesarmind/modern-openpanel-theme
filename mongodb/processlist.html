@@ -39,14 +39,14 @@
                     {{range .ProcessList}}
                     <tr x-show="searchQuery === '' || {{toJSON .User}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .NS}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .Op}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .Command}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
 {{$skip := ""}}{{if not .Killable}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" (toString .OpID) "Label" (toString .OpID) "Skip" $skip)}}
-                        <td>{{.OpID}}</td>
-                        <td>{{.User}}</td>
-                        <td>{{.Client}}</td>
-                        <td>{{.AppName}}</td>
-                        <td>{{if .Op}}{{.Op}}{{else}}{{.Desc}}{{end}}{{if .WaitingForLock}} <span class="text-xs is-warning">({{$.T.Get "waiting for lock"}})</span>{{end}}</td>
-                        <td>{{.NS}}</td>
-                        <td>{{.SecsRunning}}s</td>
-                        <td class="op-col-wide"><code class="op-mono" style="font-size:12px;overflow-wrap:anywhere">{{.Command}}</code></td>
+                        <td class="op-mono" data-label="{{$.T.Get "ID"}}">{{.OpID}}</td>
+                        <td class="op-cell-title" data-label="{{$.T.Get "User"}}">{{.User}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Client"}}">{{.Client}}</td>
+                        <td data-label="{{$.T.Get "Application"}}">{{.AppName}}</td>
+                        <td data-label="{{$.T.Get "Operation"}}">{{if .Op}}{{.Op}}{{else}}{{.Desc}}{{end}}{{if .WaitingForLock}} <span class="text-xs is-warning">({{$.T.Get "waiting for lock"}})</span>{{end}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Namespace"}}">{{.NS}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Time"}}">{{.SecsRunning}}s</td>
+                        <td class="op-col-wide" data-label="{{$.T.Get "Command"}}"><code class="op-mono" style="font-size:12px;overflow-wrap:anywhere">{{.Command}}</code></td>
                         <td class="is-shrink op-cell-menu" style="position:relative">
                             {{if .Killable}}
                             <form method="POST" action="/mongodb/processlist/kill" hidden>

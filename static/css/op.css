@@ -45,7 +45,7 @@
   --shadow-float: 0 2.27px 2.21px 0 #00000005, 0 5.45px 5.32px 0 #0000000a, 0 10.27px 10.02px 0 #0000000a, 0 18.32px 17.87px 0 #0000000d, 0 34.26px 33.42px 0 #0000000f, 0 82px 80px 0 #00000017;
 }
 
-.dark {
+html.dark, .dark {
   --color-page: #14141f;
   --color-panel: #1d1e30;
   --color-inset: #14141f;
@@ -1601,8 +1601,8 @@ div:has(> main.op-scope) { min-width: 0; }
   .op-svc-mem { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 5px; }
   .op-svc-mem .op-progress { width: 64px; height: 4px; }
   .op-svc-mem .op-progress[hidden] { display: none; }
-  .op-proc-cmd { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
-  .op-proc-cmd .op-mono { display: block; max-width: min(56ch, 100%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--color-heading); }
+  .op-proc-cmd { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; max-width: 46ch; }
+  .op-proc-cmd .op-mono { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--color-heading); }
   .op-proc-cmd .op-mono.is-full { white-space: normal; word-break: break-all; }
   @media (width < 48rem) { .op-table td[data-label] > .op-proc-cmd { align-items: flex-end; } }
   /* Software Versions: repo link, the tag picker inside the sheet and the old -> new line */
@@ -3485,3 +3485,106 @@ li[aria-expanded="true"] > .op-fm-tree-row .op-fm-tree-chev svg { transform: rot
 #fmContextMenu { padding: 4px; }
 #fmContextMenu li[data-target] { border-radius: 6px; }
 #fmContextMenu .op-fm-ctx-sep { height: 1px; margin: 4px -4px; background: var(--color-raised); }
+
+/* ---------- brandbook audit (2026-11-25) ----------
+   Unlayered on purpose: these win over the component layer above and over the panel's built-in output.css. */
+
+/* progress and stepper tracks sit on inset rows, so the track itself is raised (it vanished on inset in dark) */
+.op-progress { background: var(--color-raised); }
+/* native radios and checkboxes take the brand accent, not the browser blue */
+.op-scope input[type="radio"], .op-scope input[type="checkbox"]:not([role="switch"]) { accent-color: var(--color-accent); }
+/* chosen option cards: fills separate, borders don't */
+.op-option:has(input:checked), .op-option.is-selected, .op-role-opts .op-option:has(input:checked) { box-shadow: none; background: var(--color-accent-soft); }
+.op-choice { box-shadow: none; background: var(--color-inset); }
+.op-choice.is-on { box-shadow: none; background: var(--color-accent-soft); }
+/* the zone file editor lost its height to textarea.op-input's 96px */
+textarea.op-input.op-code-area { min-height: 60vh; }
+/* single-form pages line up with the page head instead of floating centred */
+@media (width >= 80rem) { .op-block-card { margin-inline: 24px; } }
+/* "Add destination" style separators: label between two fading lines */
+.op-sep { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 600; color: var(--color-muted); }
+.op-sep .op-divider { flex: 1 1 0; width: auto; }
+/* DNS record types: one neutral chip, colour is for the accent and status */
+.op-type { color: var(--color-heading); background: var(--color-raised); }
+/* eyebrows are quiet labels; accent stays on the main action */
+.op-eyebrow a, .op-eyebrow a[style] { color: inherit !important; }
+.op-iw-title .op-eyebrow a { color: inherit; }
+/* sidebar sits on page with no border, just space */
+.op-panel-sidebar { box-shadow: none; }
+@media (width < 64rem) { .sidebar-open .op-panel-sidebar, .op-panel-sidebar { box-shadow: var(--shadow-float); } }
+/* status in tables is a dot plus a word, not a filled pill */
+.op-table td .op-badge:is(.is-success, .is-warning, .is-danger, .is-info, .is-accent) { gap: 6px; padding: 0; background: none; font-size: 13px; font-weight: 500; }
+.op-table td .op-badge:is(.is-success, .is-warning, .is-danger, .is-info, .is-accent)::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+/* phone: long filter strips scroll instead of being cut at the edge */
+@media (width < 48rem) { .op-sites-chips { flex-wrap: nowrap; padding-bottom: 2px; overflow-x: auto; scrollbar-width: none; } }
+/* paths are case-sensitive data, never uppercased */
+.op-eyebrow.is-path { text-transform: none; letter-spacing: 0; font-weight: 500; overflow-wrap: anywhere; }
+/* summary counts fill their row: 3 cards take 3 columns, a 5th doesn't sit alone on a second row */
+@media (width >= 64rem) { .op-kpis:not(.op-kpis-3) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); } }
+/* app cards inside a card are set in, not outlined */
+:is(.op-card, .op-surface) .op-app-card { border: 0; background: var(--color-inset); }
+.op-table td .op-badge.is-info { color: var(--color-accent-text); }
+/* date range picker (built-in partials/_date_range.html): kit pills and tokens. .op-scope prefix beats the partial's own <style>. */
+.op-scope .dr, .dark .op-scope .dr { --dr-border: var(--color-raised); --dr-bg: var(--color-raised); --dr-bg-hover: var(--color-raised); --dr-text: var(--color-heading); --dr-muted: var(--color-muted); --dr-accent: var(--color-accent); --dr-accent-text: var(--color-on-accent); --dr-range: var(--color-accent-soft); --dr-range-text: var(--color-accent-text); --dr-shadow: none; --dr-pop-shadow: var(--shadow-float); font-family: var(--op-font-sans); }
+.op-scope .dr-quick { gap: 2px; padding: 3px; border-radius: 9999px; background: var(--color-inset); box-shadow: none; }
+.op-scope .dr-quick-btn, .op-scope .dr-quick-btn:first-child, .op-scope .dr-quick-btn:last-child { height: 30px; margin: 0; padding: 0 12px; border: 0; border-radius: 9999px; background: transparent; color: var(--color-muted); }
+.op-scope .dr-quick-btn:hover { color: var(--color-heading); background: transparent; }
+.op-scope .dr-quick-btn.is-active { border: 0; background: var(--color-accent-soft); color: var(--color-accent-text); font-weight: 600; }
+.op-scope .dr-trigger, .op-scope .dr-trigger.is-set { height: 36px; padding: 0 14px; border: 0; border-radius: 9999px; background: var(--color-raised); color: var(--color-heading); box-shadow: none; }
+.op-scope .dr-trigger.is-set { padding-right: 2rem; }
+.op-scope .dr-trigger-value { color: var(--color-accent-text); }
+.op-scope .dr-clear { border-radius: 9999px; }
+.op-scope .dr-pop { border: 0; border-radius: var(--op-radius-md); background: var(--color-panel); box-shadow: var(--shadow-float); }
+.op-scope .dr-presets { border-color: var(--color-raised); }
+.op-scope .dr-preset, .op-scope .dr-day { border-radius: 9999px; }
+.op-scope .dr-nav-btn { border: 0; border-radius: 9999px; background: var(--color-raised); }
+.op-scope .dr-day:hover:not(:disabled) { outline: 0; background: var(--color-raised); }
+.op-scope .dr-pop-foot { border-color: var(--color-raised); }
+.op-scope .dr-btn { height: 32px; padding: 0 14px; border: 0; border-radius: 9999px; background: var(--color-raised); color: var(--color-heading); box-shadow: none; }
+.op-scope .dr-btn--primary { background: var(--color-accent); color: var(--color-on-accent); }
+
+/* 2.0.28 output.css hides ::picker-icon on every select (unlayered); bring Modern's chevron back */
+@supports (appearance: base-select) {
+  select.op-select:not([multiple]):not([size]) { background-image: none; padding-right: 10px; }
+  select.op-select:not([multiple]):not([size])::picker-icon { display: block; flex: none; }
+  /* base.html adds <button><selectedcontent> so long labels end in an ellipsis instead of pushing the arrow out */
+  select.op-select > button { flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+}
+
+/* domain names in page titles wrap as one piece, not at their hyphens (phones still break anywhere) */
+.op-title-domain { white-space: nowrap; }
+@media (width < 48rem) { .op-title-domain { white-space: normal; overflow-wrap: anywhere; } }
+
+/* phones: long snippets scroll under a floating Copy button, so put the button below the snippet */
+@media (width < 48rem) {
+  .op-snippet { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .op-snippet pre { align-self: stretch; padding-right: 14px; }
+  .op-snippet .op-btn { position: static; }
+}
+
+/* usage rings in a narrow column (dashboard side card): smaller ring so the label and "x of y" fit beside it */
+.op-card:has(> .op-rings) { container: rings / inline-size; }
+@container rings (width < 520px) {
+  .op-ring-tile { gap: 10px; }
+  .op-ring > svg:first-child { width: 44px; height: 44px; }
+  .op-ring > svg + svg { width: 14px; height: 14px; }
+  .op-ring-text .op-mono { font-size: 16px; line-height: 22px; }
+  .op-ring-text small { overflow-wrap: normal; }
+}
+
+/* segmented radios driven by the checked input (no Alpine needed) */
+.op-radio-seg:has(> label) { display: inline-flex; gap: 2px; }
+.op-radio-seg > label { cursor: pointer; }
+.op-radio-seg > label:has(input:checked) .op-radio-seg-opt { background: var(--color-raised); color: var(--color-heading); }
+.op-radio-seg > label input:focus-visible + .op-radio-seg-opt { outline: 2px solid var(--color-accent-text); outline-offset: 1px; }
+.op-field-wrap > .op-label.op-block { margin-bottom: 6px; }
+
+/* danger zones are separated by their tint, no outline */
+.op-danger-zone { box-shadow: none; }
+/* key/value rows on an inset band (connect devices) */
+.op-dl.op-dl-rows { gap: 0; font-size: 14px; line-height: 20px; }
+.op-dl.op-dl-rows > :is(dt, dd) { padding: 12px 0; box-shadow: inset 0 -1px 0 var(--color-raised); }
+.op-dl.op-dl-rows > :is(dt, dd):nth-last-child(-n+2) { box-shadow: none; }
+.op-dl.op-dl-rows dd { white-space: normal; overflow-wrap: anywhere; }
+/* phones: a row's button group keeps its width instead of collapsing over its label */
+@media (width < 48rem) { .op-table td[data-label] > [role="group"] { flex: none; } .op-table td[data-label].is-shrink { width: auto; } }

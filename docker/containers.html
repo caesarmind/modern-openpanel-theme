@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <td>
         <div class="op-row-title">
             <span class="op-ico-tile is-sm" style="--hue:var(--color-hue-{{$row.Hue}})">{{template "op_icon" $row.Icon}}</span>
-            <div><b>{{$row.DisplayName}}</b><span class="op-sub op-mono">{{$row.Image}}{{if $row.ImageTrusted}} <span class="is-success" title="{{$t.Get "Verified image"}}">✓</span>{{end}}</span></div>
+            <div><b>{{$row.DisplayName}}</b><span class="op-sub op-mono">{{$row.Image}}{{if $row.ImageTrusted}} <span class="is-success" title="{{$t.Get "Verified image"}}" style="display:inline-flex;vertical-align:-2px;width:14px;height:14px">{{template "op_icon" "shieldcheck"}}</span>{{end}}</span></div>
         </div>
     </td>
 

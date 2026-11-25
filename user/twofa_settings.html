@@ -45,7 +45,7 @@
     <div x-data="{ step: 1 }">
         <ol class="op-stepper" style="margin-bottom:20px">
             <li :class="step >= 1 && 'is-done'" :aria-current="step === 1 ? 'step' : null"><b>{{.T.Get "Step"}} 1</b>{{.T.Get "Scan QR Code"}}</li>
-            <li :class="step >= 2 && 'is-done'" :aria-current="step === 2 ? 'step' : null"><b>{{.T.Get "Step"}} 2</b>{{.T.Get "Remove OTP code"}}</li>
+            <li :class="step >= 2 && 'is-done'" :aria-current="step === 2 ? 'step' : null"><b>{{.T.Get "Step"}} 2</b>{{.T.Get "Confirm setup"}}</li>
         </ol>
 
         <div class="op-section" x-show="step === 1">
@@ -84,7 +84,7 @@
 
         <div class="op-section" x-show="step === 2" x-cloak>
             <div>
-                <h3>{{.T.Get "Remove OTP code"}}</h3>
+                <h3>{{.T.Get "Confirm setup"}}</h3>
                 <p>{{.T.Get "I confirm that the OTP code is configured in my application and confirm to permanently delete the OTP secret."}}</p>
             </div>
             <form method="POST" action="/account/2fa" class="op-col" style="gap:12px;max-width:360px">

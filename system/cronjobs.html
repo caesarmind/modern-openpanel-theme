@@ -13,9 +13,9 @@
 
 {{end}}
 
+<script src="{{static "js/editor-draft.js"}}"></script>
 {{if eq .View "table"}}
 <script src="{{static "js/cron-times.js"}}"></script>
-<script src="{{static "js/editor-draft.js"}}"></script>
 <script>
 // the jobs table: search, filters, run times in the cron time zone and last-run failures from ofelia's log lines
 function cronPage(locale, timeZone, jobs) {

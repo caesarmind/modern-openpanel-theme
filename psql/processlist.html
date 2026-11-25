@@ -24,14 +24,14 @@
                 <thead>
                     <tr>
 {{template "bulk_head_checkbox" .}}
-                        <th scope="col">{{.T.Get "Datname"}}</th>
-                        <th scope="col">{{.T.Get "Pid"}}</th>
-                        <th scope="col">{{.T.Get "Usename"}}</th>
-                        <th scope="col">{{.T.Get "Client_addr"}}</th>
-                        <th scope="col">{{.T.Get "Xact_start"}}</th>
-                        <th scope="col">{{.T.Get "Query_start"}}</th>
-                        <th scope="col">{{.T.Get "Wait_event_type"}}</th>
-                        <th scope="col">{{.T.Get "Wait_event"}}</th>
+                        <th scope="col">{{.T.Get "Database"}}</th>
+                        <th scope="col">{{.T.Get "PID"}}</th>
+                        <th scope="col">{{.T.Get "User"}}</th>
+                        <th scope="col">{{.T.Get "Client"}}</th>
+                        <th scope="col">{{.T.Get "Transaction start"}}</th>
+                        <th scope="col">{{.T.Get "Query start"}}</th>
+                        <th scope="col">{{.T.Get "Wait type"}}</th>
+                        <th scope="col">{{.T.Get "Wait event"}}</th>
                         <th scope="col">{{.T.Get "State"}}</th>
                         <th scope="col">{{.T.Get "Query"}}</th>
                         <th scope="col" class="is-shrink"><span class="sr-only">{{.T.Get "Actions"}}</span></th>
@@ -41,16 +41,16 @@
                     {{range .ProcessList}}
                     <tr x-show="searchQuery === '' || {{toJSON .DB}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .User}}.toLowerCase().includes(searchQuery.toLowerCase()) || {{toJSON .Query}}.toLowerCase().includes(searchQuery.toLowerCase())" class="domain_row">
 {{$skip := ""}}{{if not .Killable}}{{$skip = "*"}}{{end}}{{template "bulk_row_checkbox" (dict "T" $.T "Key" (toString .PID) "Label" (toString .PID) "Skip" $skip)}}
-                        <td>{{.DB}}</td>
-                        <td>{{.PID}}</td>
-                        <td>{{.User}}</td>
-                        <td>{{.ClientAddr}}</td>
-                        <td>{{.XactStart}}</td>
-                        <td>{{.QueryStart}}</td>
-                        <td>{{.WaitEventType}}</td>
-                        <td>{{.WaitEvent}}</td>
-                        <td>{{.State}}</td>
-                        <td>{{.Query}}</td>
+                        <td class="op-cell-title" data-label="{{$.T.Get "Database"}}">{{.DB}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "PID"}}">{{.PID}}</td>
+                        <td data-label="{{$.T.Get "User"}}">{{.User}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Client"}}">{{.ClientAddr}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Transaction start"}}">{{.XactStart}}</td>
+                        <td class="op-mono" data-label="{{$.T.Get "Query start"}}">{{.QueryStart}}</td>
+                        <td data-label="{{$.T.Get "Wait type"}}">{{.WaitEventType}}</td>
+                        <td data-label="{{$.T.Get "Wait event"}}">{{.WaitEvent}}</td>
+                        <td data-label="{{$.T.Get "State"}}">{{.State}}</td>
+                        <td class="op-mono" style="overflow-wrap:anywhere" data-label="{{$.T.Get "Query"}}">{{.Query}}</td>
                         <td class="is-shrink op-cell-menu" style="position:relative">
                             {{if .Killable}}
                             <form method="POST" action="/postgresql/processlist/kill" hidden>

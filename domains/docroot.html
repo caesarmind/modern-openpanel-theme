@@ -75,14 +75,14 @@
 
 <div class="op-page-head op-cms-head">
     <header>
-        <h1 class="op-title">{{.T.Get "Select Domain to change docroot"}}</h1>
+        <h1 class="op-title">{{.T.Get "Change docroot"}}</h1>
         <p class="op-meta">{{.T.Get "Change docroot (directory) for domain"}}</p>
     </header>
 </div>
 
 
 {{if .Domains}}
-    {{template "domain_selector" (dict "T" .T "Domains" .Domains "RedirectBase" "/domains/docroot?domain_name=")}}
+    {{template "op_domain_picker" (dict "T" .T "Domains" .Domains "RedirectBase" "/domains/docroot?domain_name=" "Label" (.T.Get "Domain"))}}
 {{else}}
     {{template "no_domain" .}}
 {{end}}
