@@ -873,3 +873,119 @@ window.FM_PERM = {
 </div>
 <!-- END templates/files/filemanager/perm_sheet.html -->
 {{end}}
+
+{{define "fm_tree"}}
+<!-- START templates/files/filemanager/tree.html (Modern) -->
+{{/* folder tree beside the list like the built-in theme, folders load from /json/folders as they open; the Folder tree switch in Columns hides it */}}
+<aside id="fmTree" class="op-card op-fm-tree" aria-label="{{.T.Get "Folders"}}"
+       data-current="{{.PathParam}}" data-view="{{.View}}" data-error="{{.T.Get "Couldn't load folders"}}">
+   <div class="op-fm-tree-head">
+      <span>{{.T.Get "Folders"}}</span>
+      <button type="button" id="fmTreeCollapse" class="op-icon-btn" title="{{.T.Get "Collapse all"}}" aria-label="{{.T.Get "Collapse all"}}">{{template "op_icon" "up"}}</button>
+   </div>
+   <ul id="fmTreeRoot" role="tree" class="op-fm-tree-list"></ul>
+   <template id="fmTreeIcons"><span data-i="chev">{{template "op_icon" "chevright"}}</span><span data-i="folder">{{template "op_icon" "folder"}}</span><span data-i="home">{{template "op_icon" "server"}}</span></template>
+</aside>
+<script>
+(function () {
+    const tree = document.getElementById('fmTree');
+    if (!tree) return;
+    const KEY = 'fm-tree';
+    const view = tree.dataset.view;
+    const current = (tree.dataset.current || '').replace(/^\/+|\/+$/g, '');
+    const icons = {};
+    document.getElementById('fmTreeIcons').content.querySelectorAll('[data-i]').forEach(el => { icons[el.dataset.i] = el.innerHTML; });
+    const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const href = p => (p ? '/files/' + p.split('/').map(encodeURIComponent).join('/') : '/files') + (view ? '?view=' + encodeURIComponent(view) : '');
+
+    // shown unless switched off in the Columns menu, same storage key as the built-in theme
+    let shown = true;
+    try { shown = localStorage.getItem(KEY) !== 'off'; } catch (e) {}
+    const layout = tree.closest('.op-fm-layout');
+    // the switch sits in the Columns menu further down the page, so wire it once the page is parsed
+    const apply = () => { layout?.classList.toggle('has-tree', shown); const t = document.getElementById('fmTreeToggle'); if (t) t.checked = shown; };
+    apply();
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.getElementById('fmTreeToggle');
+        if (!toggle) return;
+        toggle.checked = shown;
+        toggle.addEventListener('change', () => {
+            shown = toggle.checked;
+            try { localStorage.setItem(KEY, shown ? 'on' : 'off'); } catch (e) {}
+            apply();
+        });
+    });
+
+    function node(path, name, depth, hasChildren, icon) {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'treeitem');
+        li.dataset.path = path;
+        li.dataset.depth = depth;
+        const here = path === current;
+        if (here) li.setAttribute('aria-current', 'page');
+        li.innerHTML = `<div class="op-fm-tree-row${here ? ' is-here' : ''}" style="padding-left:${depth * 14}px">
+            ${hasChildren ? `<button type="button" data-toggle class="op-fm-tree-chev" aria-label="${esc(name)}">${icons.chev}</button>` : '<span class="op-fm-tree-chev"></span>'}
+            <a href="${href(path)}" title="${esc(name)}"><span class="op-fm-tree-ico${icon === 'home' ? ' is-home' : ''}">${icons[icon]}</span><span class="truncate">${esc(name)}</span></a>
+        </div><ul role="group" hidden></ul>`;
+        return li;
+    }
+
+    async function expand(li) {
+        const group = li.querySelector(':scope > ul');
+        if (!li.dataset.loaded) {
+            const path = li.dataset.path;
+            let folders = [];
+            try {
+                const res = await fetch('/json/folders/' + path.split('/').map(encodeURIComponent).join('/'));
+                if (!res.ok) throw new Error();
+                folders = (await res.json()).folders || [];
+            } catch (e) {
+                group.innerHTML = `<li class="op-hint" style="padding:4px 0 4px ${(+li.dataset.depth + 1) * 14 + 26}px">${esc(tree.dataset.error)}</li>`;
+            }
+            // the malware scanner's quarantine isn't somewhere to browse
+            if (!path) folders = folders.filter(f => f.name !== '.quarantine');
+            folders.sort((x, y) => x.name.localeCompare(y.name)).forEach(f => {
+                group.appendChild(node(path ? path + '/' + f.name : f.name, f.name, +li.dataset.depth + 1, f.has_subfolders, 'folder'));
+            });
+            li.dataset.loaded = '1';
+        }
+        group.hidden = false;
+        li.setAttribute('aria-expanded', 'true');
+    }
+
+    function collapse(li) {
+        li.querySelector(':scope > ul').hidden = true;
+        li.setAttribute('aria-expanded', 'false');
+    }
+
+    const rootList = document.getElementById('fmTreeRoot');
+    const root = node('', '/var/www/html', 0, true, 'home');
+    rootList.appendChild(root);
+
+    rootList.addEventListener('click', e => {
+        const btn = e.target.closest('[data-toggle]');
+        if (!btn) return;
+        const li = btn.closest('li[role="treeitem"]');
+        li.getAttribute('aria-expanded') === 'true' ? collapse(li) : expand(li);
+    });
+    document.getElementById('fmTreeCollapse').addEventListener('click', () => {
+        rootList.querySelectorAll('li[aria-expanded="true"]').forEach(li => { if (li !== root) collapse(li); });
+    });
+
+    // open the way down to the folder on screen
+    (async () => {
+        await expand(root);
+        let li = root;
+        const parts = current ? current.split('/') : [];
+        for (let i = 0; i < parts.length; i++) {
+            const path = parts.slice(0, i + 1).join('/');
+            li = [...li.querySelector(':scope > ul').children].find(c => c.dataset.path === path);
+            if (!li) return;
+            if (li.querySelector('[data-toggle]')) await expand(li);
+        }
+        li.querySelector(':scope > div')?.scrollIntoView({ block: 'nearest' });
+    })();
+})();
+</script>
+<!-- END templates/files/filemanager/tree.html -->
+{{end}}

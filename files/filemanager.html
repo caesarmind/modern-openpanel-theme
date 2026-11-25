@@ -74,6 +74,8 @@
 
     {{template "drag_and_drop" .}}
 
+    <div class="op-fm-layout">
+    {{template "fm_tree" .}}
     <section class="op-card op-fm is-compact" id="fmCard" aria-label="{{.T.Get "Files"}}">
         <div class="op-toolbar">
             <!-- filemanager_breadcrumbs.js looks for this nav's ol, its li items and the svg separators; the fixed height keeps its copy button's taller li from stretching the row -->
@@ -95,6 +97,7 @@
             </nav>
 {{if $hasRows}}
             <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" id="searchFilesInput" placeholder="{{.T.Get "Search files and folders"}}" aria-label="{{.T.Get "Search files and folders"}}" autocomplete="off"></label>
+            <div id="fmDeepSearch" class="op-menu op-fm-deep" hidden role="listbox" aria-label="{{.T.Get "In other folders"}}"><p class="op-fm-deep-head">{{.T.Get "In other folders"}}</p><ul></ul><template id="fmDeepIcons"><span data-i="folder">{{template "op_icon" "folder"}}</span><span data-i="file">{{template "op_icon" "file"}}</span></template></div>
             <div class="relative" id="FilterSearchButton" :class="open && 'z-40'" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
                 <button id="dropdownSearchToggleButton" class="op-filter" type="button" :aria-expanded="open.toString()" @click="open = !open">{{.T.Get "Type"}} {{template "op_icon" "chev"}}</button>
                 <div id="dropdownSearchToggle" class="op-menu op-columns" x-show="open" x-cloak style="right:0;top:40px">
@@ -113,6 +116,8 @@
                     {{template "column_toggle" (dict "Key" "links" "Label" (.T.Get "Links"))}}
                     {{template "column_toggle" (dict "Key" "link_target" "Label" (.T.Get "Link Target"))}}
                     {{template "column_toggle" (dict "Key" "type" "Label" (.T.Get "Type"))}}
+                    <hr class="op-fm-menu-sep">
+                    <label class="op-fm-tree-switch"><input type="checkbox" class="op-check" id="fmTreeToggle" checked> {{.T.Get "Folder tree"}}</label>
                 </div>
             </div>
 {{end}}
@@ -151,6 +156,7 @@
         </div>
 {{end}}
     </section>
+    </div>
 
 {{if .HasReadme}}
     <section class="op-card readme-content" aria-label="README.md">
@@ -194,6 +200,35 @@
             enableDisableButtons();
             updateSelectedOptionsDisplay();
         }
+
+        // the box also searches every folder (like the built-in theme), up to 10 files and 10 folders, the current folder's own rows stay in the table
+        const deep = document.getElementById('fmDeepSearch');
+        const here = {{toJSON .PathParam}}.replace(/^\/+|\/+$/g, '');
+        const view = {{toJSON .View}};
+        const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const link = p => '/files/' + String(p || '').split('/').filter(Boolean).map(encodeURIComponent).join('/') + (view ? '?view=' + encodeURIComponent(view) : '');
+        const ico = {};
+        document.getElementById('fmDeepIcons').content.querySelectorAll('[data-i]').forEach(el => { ico[el.dataset.i] = el.innerHTML; });
+        let timer = null, seq = 0;
+        async function deepSearch() {
+            const q = input.value.trim();
+            const my = ++seq;
+            if (q.length < 2) { deep.hidden = true; return; }
+            const get = (what, on) => on ? fetch('/json/search/' + what + '?q=' + encodeURIComponent(q)).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]);
+            const [fileHits, folderHits] = await Promise.all([get('files', files.checked), get('folders', folders.checked)]);
+            if (my !== seq) return;
+            const rowsOut = [];
+            (Array.isArray(folderHits) ? folderHits : []).forEach(f => { if ((f.path || '') !== here) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico is-dir">${ico.folder}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
+            (Array.isArray(fileHits) ? fileHits : []).forEach(f => { if ((f.path || '') !== here) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico">${ico.file}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
+            deep.querySelector('ul').innerHTML = rowsOut.join('');
+            deep.hidden = !rowsOut.length;
+        }
+        input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(deepSearch, 300); });
+        input.addEventListener('keydown', e => { if (e.key === 'Escape') deep.hidden = true; });
+        document.addEventListener('click', e => { if (!deep.contains(e.target) && e.target !== input) deep.hidden = true; });
+        input.addEventListener('focus', () => { if (deep.querySelector('li')) deep.hidden = false; });
+        files.addEventListener('change', deepSearch);
+        folders.addEventListener('change', deepSearch);
 
         input.addEventListener('input', filterRows);
         files.addEventListener('change', filterRows);
