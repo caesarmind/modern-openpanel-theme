@@ -574,6 +574,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                         // still measuring: say so in the card (no toast over the page) and look again a few times
                         showNoData(apiMessage, true);
                         if (++psTries < 4) setTimeout(() => fetchDataAndUpdateUI(true), 15000);
+                    } else if (!['desktop', 'mobile'].some(t => data[`${t}_speed`] && data[`${t}_speed`].performance_score != null)) {
+                        // Google answered with empty results (new or unreachable site): no NaN rings, the plain no-data line
+                        showNoData();
                     } else {
                         updateUI(data);
                         document.querySelector('#partials_pagespeed_loading').classList.add('hidden');
