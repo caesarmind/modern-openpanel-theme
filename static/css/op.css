@@ -3588,3 +3588,7 @@ textarea.op-input.op-code-area { min-height: 60vh; }
 .op-dl.op-dl-rows dd { white-space: normal; overflow-wrap: anywhere; }
 /* phones: a row's button group keeps its width instead of collapsing over its label */
 @media (width < 48rem) { .op-table td[data-label] > [role="group"] { flex: none; } .op-table td[data-label].is-shrink { width: auto; } }
+
+/* CMS cache cards are narrow: keep "Rebuild X cache" on one line and let the button drop below */
+[x-data*="CacheComponent"] .op-setting-row { flex-wrap: wrap; }
+[x-data*="CacheComponent"] .op-setting-label { white-space: nowrap; }

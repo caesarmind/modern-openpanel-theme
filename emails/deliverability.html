@@ -100,17 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
             set('deliv-bad', badDomains.length);
             set('deliv-server-ip', serverIP ? {{toJSON (.T.Get "server IP")}} + ' ' + serverIP : '');
 
-            if (typeof reportHealthIssues === 'function' && badDomains.length) {
-                let issue;
-                if (badDomains.length === 1) {
-                    issue = { id: 'deliverability:' + badDomains[0], severity: 'warning', message: {{toJSON (.T.Get "Domain")}} + " " + badDomains[0] + " " + {{toJSON (.T.Get "has SPF/DKIM/DMARC problems.")}} };
-                } else if (badDomains.length === 2) {
-                    issue = { id: 'deliverability:' + badDomains.join(','), severity: 'warning', message: {{toJSON (.T.Get "Domains")}} + " " + badDomains.join(', ') + " " + {{toJSON (.T.Get "have SPF/DKIM/DMARC problems.")}} };
-                } else {
-                    issue = { id: 'deliverability:multiple', severity: 'warning', message: badDomains.length + " " + {{toJSON (.T.Get "domains have SPF/DKIM/DMARC problems.")}} };
-                }
-                reportHealthIssues('emails-deliverability', [issue], 24);
-            }
+            // no health toast here: the Need attention tile and the table already show every problem
         })
         .catch(function (err) {
             console.error('Failed to load deliverability status', err);

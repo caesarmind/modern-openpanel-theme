@@ -534,23 +534,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.querySelector('#timestamp').textContent = data.timestamp;
         }
 
-        let toastDisplayed = false;
+        let psTries = 0;
         const psQuotaMsg = {{toJSON (.T.Get "Quota limit exceeded for Google PageSpeed API. Please add an API Key.")}};
         const psErrorMsg = {{toJSON (.T.Get "Error fetching Google PageSpeed data for the domain. Please refresh the page. If the issue continues, contact support for assistance.")}};
 
-        function showNoData(msg) {
+        function showNoData(msg, pending) {
             document.querySelector('#partials_pagespeed_loading').classList.add('hidden');
             document.querySelector('#partials_pagespeed_no_data').classList.remove('hidden');
             const el = document.querySelector('#partials_pagespeed_msg');
-            if (msg && el) { el.textContent = msg; el.classList.add('is-error'); }
+            if (msg && el) { el.textContent = msg; el.classList.toggle('is-error', !pending); }
         }
 
-        function fetchDataAndUpdateUI() {
+        function fetchDataAndUpdateUI(retry) {
             const currentDomain = {{toJSON .CurrentDomain}};
 
-            document.querySelector('#partials_pagespeed_loading').classList.remove('hidden');
-            document.querySelector('#partials_pagespeed_data').classList.add('hidden');
-            document.querySelector('#partials_pagespeed_no_data').classList.add('hidden');
+            if (!retry) {
+                document.querySelector('#partials_pagespeed_loading').classList.remove('hidden');
+                document.querySelector('#partials_pagespeed_data').classList.add('hidden');
+                document.querySelector('#partials_pagespeed_no_data').classList.add('hidden');
+            }
 
             fetch(`/json/page_speed/${currentDomain}`, {
                 method: "GET",
@@ -569,16 +571,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                         if (apiMessage.toLowerCase().includes('exceeded for quota metric')) return showNoData(psQuotaMsg);
                         if (apiMessage.includes('Aborting')) return showNoData(apiMessage);
 
-                        showToast(apiMessage, 'loading');
-                        toastDisplayed = true;
-                        setTimeout(fetchDataAndUpdateUI, 15000);
+                        // still measuring: say so in the card (no toast over the page) and look again a few times
+                        showNoData(apiMessage, true);
+                        if (++psTries < 4) setTimeout(() => fetchDataAndUpdateUI(true), 15000);
                     } else {
                         updateUI(data);
                         document.querySelector('#partials_pagespeed_loading').classList.add('hidden');
+                        document.querySelector('#partials_pagespeed_no_data').classList.add('hidden');
                         document.querySelector('#partials_pagespeed_data').classList.remove('hidden');
-                        if (toastDisplayed) {
-                            showToast({{toJSON (.T.Get "The site's Google PageSpeed data has been successfully collected.")}}, 'success');
-                        }
                     }
                 })
                 .catch(function () { showNoData(psErrorMsg); });

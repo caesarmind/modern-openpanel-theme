@@ -317,7 +317,7 @@ function confirmDetachOpenCart() {
   {{template "cms_block_32" .}}
     <div class="grid grid-cols-1 gap-2">
         <div class="op-setting-row">
-            <span class="op-setting-label">{{.T.Get "Rebuild OpenCart cache:"}}</span>
+            <span class="op-setting-label">{{replace (.T.Get "Rebuild OpenCart cache:") ":" ""}}</span>
             <span class="font-medium">
 
         <button
