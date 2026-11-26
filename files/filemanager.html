@@ -57,7 +57,7 @@
 
     <div class="op-page-head">
         <div>
-            <div class="op-eyebrow is-path">/var/www/html/{{range .Breadcrumbs}}{{.Name}}{{if not .Last}}/{{end}}{{end}}</div>
+            <div class="op-eyebrow is-path" id="fmEyebrow">/var/www/html/{{range .Breadcrumbs}}{{.Name}}{{if not .Last}}/{{end}}{{end}}</div>
             <h1 class="op-title">{{.T.Get "File Manager"}}</h1>
             <p class="op-meta">{{.T.Get "Browse, edit and upload files."}}</p>
         </div>
@@ -95,7 +95,8 @@
                     {{end}}
                 </ol>
             </nav>
-{{if $hasRows}}
+            <style>#fmTools{display:contents}#fmTools.is-off{display:none}</style>
+            <div id="fmTools"{{if not $hasRows}} class="is-off"{{end}}>
             <label class="op-search">{{template "op_icon" "search"}}<input class="op-input" type="search" id="searchFilesInput" placeholder="{{.T.Get "Search files and folders"}}" aria-label="{{.T.Get "Search files and folders"}}" autocomplete="off"></label>
             <div id="fmDeepSearch" class="op-menu op-fm-deep" hidden role="listbox" aria-label="{{.T.Get "In other folders"}}"><p class="op-fm-deep-head">{{.T.Get "In other folders"}}</p><ul></ul><template id="fmDeepIcons"><span data-i="folder">{{template "op_icon" "folder"}}</span><span data-i="file">{{template "op_icon" "file"}}</span></template></div>
             <div class="relative" id="FilterSearchButton" :class="open && 'z-40'" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
@@ -120,19 +121,21 @@
                     <label class="op-fm-tree-switch"><input type="checkbox" class="op-check" id="fmTreeToggle" checked> {{.T.Get "Folder tree"}}</label>
                 </div>
             </div>
-{{end}}
+            </div>
         </div>
 
-{{if not $hasRows}}
-        <table class="op-table hidden" id="fm_new_table"><tbody>{{template "fm_new_rows" .}}</tbody></table>
-        {{template "empty_directory" .}}
-{{else}}
     {{if eq .View "classic"}}
         {{template "actions_buttons" .}}
     {{else}}
         {{template "new_actions_buttons" .}}
     {{end}}
 
+        <!-- filemanager.js swaps this block when the folder changes, everything around it stays loaded -->
+        <div id="fmListing" data-path="{{.PathParam}}">
+{{if not $hasRows}}
+        <table class="op-table hidden" id="fm_new_table"><tbody>{{template "fm_new_rows" .}}</tbody></table>
+        {{template "empty_directory" .}}
+{{else}}
         {{template "files_table" .}}
 
         <div class="op-empty hidden" id="fmNoMatch">
@@ -155,9 +158,11 @@
     {{end}}
         </div>
 {{end}}
+        </div>
     </section>
     </div>
 
+<div id="fmReadme">
 {{if .HasReadme}}
     <section class="op-card readme-content" aria-label="README.md">
         <div class="op-card-head">
@@ -167,8 +172,8 @@
         <pre class="op-mono whitespace-pre-wrap">{{.ReadmeContent}}</pre>
     </section>
 {{end}}
+</div>
 
-{{if $hasRows}}
     {{template "fm_row_menu" .}}
     {{template "fm_perm_sheet" .}}
 
@@ -179,11 +184,12 @@
         const files = document.getElementById('toggleFiles');
         const folders = document.getElementById('toggleFolders');
         const typeButton = document.getElementById('dropdownSearchToggleButton');
-        const noMatch = document.getElementById('fmNoMatch');
-        const rows = Array.from(document.querySelectorAll('#filemanager_table tbody tr[data-file]'));
-        if (!input || !rows.length) return;
+        if (!input) return;
 
         function filterRows() {
+            const noMatch = document.getElementById('fmNoMatch');
+            const rows = Array.from(document.querySelectorAll('#filemanager_table tbody tr[data-file]'));
+            if (!rows.length) return;
             const q = input.value.trim().toLowerCase();
             let shown = 0;
             rows.forEach(function (row) {
@@ -203,7 +209,7 @@
 
         // the box also searches every folder (like the built-in theme), up to 10 files and 10 folders, the current folder's own rows stay in the table
         const deep = document.getElementById('fmDeepSearch');
-        const here = {{toJSON .PathParam}}.replace(/^\/+|\/+$/g, '');
+        const here = () => (typeof FM !== 'undefined' ? FM.pathParam : {{toJSON .PathParam}}).replace(/^\/+|\/+$/g, '');
         const view = {{toJSON .View}};
         const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const link = p => '/files/' + String(p || '').split('/').filter(Boolean).map(encodeURIComponent).join('/') + (view ? '?view=' + encodeURIComponent(view) : '');
@@ -218,8 +224,8 @@
             const [fileHits, folderHits] = await Promise.all([get('files', files.checked), get('folders', folders.checked)]);
             if (my !== seq) return;
             const rowsOut = [];
-            (Array.isArray(folderHits) ? folderHits : []).forEach(f => { if ((f.path || '') !== here) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico is-dir">${ico.folder}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
-            (Array.isArray(fileHits) ? fileHits : []).forEach(f => { if ((f.path || '') !== here) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico">${ico.file}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
+            (Array.isArray(folderHits) ? folderHits : []).forEach(f => { if ((f.path || '') !== here()) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico is-dir">${ico.folder}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
+            (Array.isArray(fileHits) ? fileHits : []).forEach(f => { if ((f.path || '') !== here()) rowsOut.push(`<li><a href="${link(f.path)}"><span class="op-fm-deep-ico">${ico.file}</span><b>${esc(f.name)}</b><span class="op-mono op-hint">/${esc(f.path)}</span></a></li>`); });
             deep.querySelector('ul').innerHTML = rowsOut.join('');
             deep.hidden = !rowsOut.length;
         }
@@ -233,30 +239,18 @@
         input.addEventListener('input', filterRows);
         files.addEventListener('change', filterRows);
         folders.addEventListener('change', filterRows);
+
+        // a new folder starts unfiltered, the Type choice stays
+        document.addEventListener('fm:swap', function () {
+            input.value = '';
+            deep.hidden = true;
+            filterRows();
+        });
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
-        if (typeof reportHealthIssues !== 'function') return;
-        const noPermFiles = [];
-        document.querySelectorAll('#filemanager_table tbody tr[data-file]').forEach(function (row) {
-            const perms = row.getAttribute('data-permissions') || '';
-            if (/^.-{9}$/.test(perms)) noPermFiles.push(row.getAttribute('data-file'));
-        });
-        if (!noPermFiles.length) return;
-        let issue;
-        if (noPermFiles.length === 1) {
-            issue = { id: 'perms0000:' + noPermFiles[0], severity: 'error', message: "{{.T.Get "File"}} " + noPermFiles[0] + " {{.T.Get "has no permissions (0000) and cannot be accessed."}}" };
-        } else if (noPermFiles.length === 2) {
-            issue = { id: 'perms0000:' + noPermFiles.join(','), severity: 'error', message: "{{.T.Get "Files"}} " + noPermFiles.join(', ') + " {{.T.Get "have no permissions (0000) and cannot be accessed."}}" };
-        } else {
-            issue = { id: 'perms0000:multiple', severity: 'error', message: noPermFiles.length + " {{.T.Get "files have no permissions (0000) and cannot be accessed."}}" };
-        }
-        reportHealthIssues('files:' + window.location.pathname, [issue], 24);
-    });
     </script>
     {{template "fm_inline_js" .}}
     {{template "fm_picker_modal" .}}
-{{end}}
 
 {{template "fm_new_file" .}}
 {{template "fm_new_folder" .}}

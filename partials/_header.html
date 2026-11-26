@@ -13,7 +13,7 @@
                     </button>
                     <span class="op-topbar-sep" aria-hidden="true"></span>
                     {{if eq .MenuStyle "modern"}}
-                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs">
+                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs" id="headerTrail">
                         {{if .NavTrail}}
                         <ol role="list">
                             {{$last := sub (len .NavTrail) 1}}
@@ -32,7 +32,7 @@
                         {{end}}
                     </nav>
                     {{else}}
-                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs">
+                    <nav aria-label="{{.T.Get "Breadcrumb"}}" class="op-crumbs" id="headerTrail">
                         <ol role="list" x-data="navMenu('{{.RequestPath}}')">
 
                         <ul>
@@ -185,8 +185,9 @@
                     document.addEventListener('DOMContentLoaded', () => {
                         const btn = document.getElementById('addFavoriteBtn');
                         if (!btn) return;
-                        const here = window.location.pathname + window.location.search + window.location.hash;
-                        const isFav = () => (window.userFavorites || []).some(f => '/' + f.link === here);
+                        // read when used, the file manager changes the address without loading a new page
+                        const here = () => window.location.pathname + window.location.search + window.location.hash;
+                        const isFav = () => (window.userFavorites || []).some(f => '/' + f.link === here());
                         const paint = () => {
                             const on = isFav();
                             btn.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -195,12 +196,13 @@
                             btn.setAttribute('aria-label', btn.title);
                         };
                         window.addEventListener('favorites-loaded', paint);
+                        window.opSyncFavorite = paint;
                         paint();
                         // right-click only removes, like the classic star
                         btn.addEventListener('contextmenu', e => { if (isFav()) { e.preventDefault(); btn.click(); } });
                         btn.addEventListener('click', () => {
                             const on = isFav();
-                            const body = on ? { link: here } : { link: here, title: document.title.split(' - ')[0] };
+                            const body = on ? { link: here() } : { link: here(), title: document.title.split(' - ')[0] };
                             fetch('/json/favorites', {
                                 method: on ? 'DELETE' : 'PUT',
                                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf_token },
