@@ -40,7 +40,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const uploadConfirm = document.getElementById('uploadConfirm');
     const progress = document.getElementById('upload-progress-container');
     const defaultText = uploadText.innerHTML;
-    const pathParam = "{{.PathParam}}";
+    // the folder on screen changes without a reload, so ask for it each time
+    const currentPath = () => (typeof FM !== 'undefined' ? FM.pathParam : "{{.PathParam}}");
     // the limit is per file, one request can carry a few files and the rest waits for the next request
     const MAX_FILE_MB = {{.FilemanagerUploadSize}};
     const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -53,6 +54,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // every file shown in the list, status is pending | queued | uploading | done | error
     let items = [];
     let errors = [];
+    // where this round of uploads goes, kept so a queue started in one folder doesn't follow the user into the next
+    let uploadPath = null;
 
     function getCsrfToken() {
         const el = uploadSection.querySelector('input[name="csrf_token"]');
@@ -98,6 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
         state = 'idle';
         items = [];
         errors = [];
+        uploadPath = null;
         fileInput.value = '';
         uploadText.innerHTML = defaultText;
         uploadConfirm.classList.add('hidden');
@@ -163,6 +167,8 @@ document.addEventListener("DOMContentLoaded", function () {
             <div class="w-full h-2 op-inset-box"><div id="uploadBar" class="h-2 transition-all" style="width:0%"></div></div>
         `;
 
+        if (uploadPath === null) uploadPath = currentPath();
+        const pathParam = uploadPath;
         const formData = new FormData();
         formData.append('path_param', pathParam);
         batch.forEach(it => formData.append('files', it.file));
@@ -217,7 +223,13 @@ document.addEventListener("DOMContentLoaded", function () {
             state = 'idle';
             progress.innerHTML = `<p class="text-sm is-success">{{.T.Get "Upload complete."}}</p>`;
             showToast("{{.T.Get "Upload successful!"}}", "success");
-            setTimeout(() => window.location.reload(), 500);
+            setTimeout(() => {
+                if (typeof fmRefresh !== 'function') return window.location.reload();
+                resetSection();
+                pinned = false;
+                uploadSection.classList.add('hidden');
+                fmRefresh();
+            }, 500);
             return;
         }
         state = 'error';
@@ -295,7 +307,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 {{define "empty_directory"}}
 <!-- START templates/files/filemanager/empty_directory.html -->
-<div class="op-empty">
+<div class="op-empty" id="fmEmpty">
    <span class="op-ico-tile">{{template "op_icon" "folder"}}</span>
    <b>{{.T.Get "No items found."}}</b>
    <span class="op-hint">{{.T.Get "Start creating new folders or uploading a new file!"}}</span>
@@ -313,7 +325,7 @@ document.addEventListener("DOMContentLoaded", function () {
   #mainButtons [role="group"] > button > i.md\:hidden { display: inline-block; }
 }
 </style>
-<div class="flex sticky top-16 z-30 op-surface" id="mainButtons">
+<div class="flex sticky top-16 z-30 op-surface" id="mainButtons"{{if and (eq (len .Directories) 0) (eq (len .Files) 0)}} style="display:none"{{end}}>
     <div class="w-full" role="group" aria-label="{{.T.Get "Actions"}}">
         {{template "fm_action_buttons" .}}
     </div>
@@ -593,6 +605,11 @@ const FM = {
         folderSizeError: '{{.T.Get "Error fetching folder size:"}}',
         deleteError:  '{{.T.Get "Error deleting"}}',
         downloadStarted: '{{.T.Get "Download for {file} started."}}',
+        file:         '{{.T.Get "File"}}',
+        files:        '{{.T.Get "Files"}}',
+        noPermsOne:   '{{.T.Get "has no permissions (0000) and cannot be accessed."}}',
+        noPermsTwo:   '{{.T.Get "have no permissions (0000) and cannot be accessed."}}',
+        noPermsMany:  '{{.T.Get "files have no permissions (0000) and cannot be accessed."}}',
     },
     // the floating bar of the modern view styles plain op-btn itself
     btn: {{if eq .View "classic"}}{
@@ -723,18 +740,15 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') fmHideOpenNewRows();
 });
 
-// swap the browser's "this field is required" bubble for just a red border
-['filename', 'foldername'].forEach(function (id) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    input.addEventListener('invalid', function (e) {
-        e.preventDefault();
-        input.style.borderColor = '#ef4444';
-        input.focus();
-    });
-    input.addEventListener('input', function () {
-        input.style.borderColor = '';
-    });
+// swap the browser's "this field is required" bubble for just a red border, the inputs get replaced with the listing so listen from the document
+document.addEventListener('invalid', function (e) {
+    if (!e.target.matches || !e.target.matches('#filename, #foldername')) return;
+    e.preventDefault();
+    e.target.style.borderColor = '#ef4444';
+    e.target.focus();
+}, true);
+document.addEventListener('input', function (e) {
+    if (e.target.matches && e.target.matches('#filename, #foldername')) e.target.style.borderColor = '';
 });
 
 // click anywhere outside the row (or the buttons that open it) cancels
@@ -892,7 +906,8 @@ window.FM_PERM = {
     if (!tree) return;
     const KEY = 'fm-tree';
     const view = tree.dataset.view;
-    const current = (tree.dataset.current || '').replace(/^\/+|\/+$/g, '');
+    const clean = p => (p || '').replace(/^\/+|\/+$/g, '');
+    let current = clean(tree.dataset.current);
     const icons = {};
     document.getElementById('fmTreeIcons').content.querySelectorAll('[data-i]').forEach(el => { icons[el.dataset.i] = el.innerHTML; });
     const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -930,24 +945,30 @@ window.FM_PERM = {
         return li;
     }
 
+    async function load(li, group) {
+        const path = li.dataset.path;
+        let folders = [];
+        try {
+            const res = await fetch('/json/folders/' + path.split('/').map(encodeURIComponent).join('/'));
+            if (!res.ok) throw new Error();
+            folders = (await res.json()).folders || [];
+        } catch (e) {
+            group.innerHTML = `<li class="op-hint" style="padding:4px 0 4px ${(+li.dataset.depth + 1) * 14 + 26}px">${esc(tree.dataset.error)}</li>`;
+        }
+        // the malware scanner's quarantine isn't somewhere to browse
+        if (!path) folders = folders.filter(f => f.name !== '.quarantine');
+        folders.sort((x, y) => x.name.localeCompare(y.name)).forEach(f => {
+            group.appendChild(node(path ? path + '/' + f.name : f.name, f.name, +li.dataset.depth + 1, f.has_subfolders, 'folder'));
+        });
+        li.dataset.loaded = '1';
+    }
+
     async function expand(li) {
         const group = li.querySelector(':scope > ul');
         if (!li.dataset.loaded) {
-            const path = li.dataset.path;
-            let folders = [];
-            try {
-                const res = await fetch('/json/folders/' + path.split('/').map(encodeURIComponent).join('/'));
-                if (!res.ok) throw new Error();
-                folders = (await res.json()).folders || [];
-            } catch (e) {
-                group.innerHTML = `<li class="op-hint" style="padding:4px 0 4px ${(+li.dataset.depth + 1) * 14 + 26}px">${esc(tree.dataset.error)}</li>`;
-            }
-            // the malware scanner's quarantine isn't somewhere to browse
-            if (!path) folders = folders.filter(f => f.name !== '.quarantine');
-            folders.sort((x, y) => x.name.localeCompare(y.name)).forEach(f => {
-                group.appendChild(node(path ? path + '/' + f.name : f.name, f.name, +li.dataset.depth + 1, f.has_subfolders, 'folder'));
-            });
-            li.dataset.loaded = '1';
+            // two callers at once would each add the children
+            li.loading = li.loading || load(li, group).finally(() => { li.loading = null; });
+            await li.loading;
         }
         group.hidden = false;
         li.setAttribute('aria-expanded', 'true');
@@ -973,7 +994,7 @@ window.FM_PERM = {
     });
 
     // open the way down to the folder on screen
-    (async () => {
+    async function reveal() {
         await expand(root);
         let li = root;
         const parts = current ? current.split('/') : [];
@@ -984,7 +1005,35 @@ window.FM_PERM = {
             if (li.querySelector('[data-toggle]')) await expand(li);
         }
         li.querySelector(':scope > div')?.scrollIntoView({ block: 'nearest' });
-    })();
+    }
+    reveal();
+
+    const find = path => [...rootList.querySelectorAll('li[role="treeitem"]')].find(n => n.dataset.path === path);
+
+    // filemanager.js moves the highlight when a folder opens without a reload
+    window.fmTreeSetCurrent = function (path) {
+        current = clean(path);
+        rootList.querySelectorAll('li[role="treeitem"]').forEach(li => {
+            const here = li.dataset.path === current;
+            if (here) li.setAttribute('aria-current', 'page');
+            else li.removeAttribute('aria-current');
+            li.querySelector(':scope > div')?.classList.toggle('is-here', here);
+        });
+        return reveal();
+    };
+
+    // and asks for a folder's children again after something was created, moved or deleted in it
+    window.fmTreeReload = async function (path) {
+        let li = find(clean(path));
+        // a folder that had no subfolders has no arrow yet, so redraw it from its parent
+        if (li && li !== root && !li.querySelector(':scope > div [data-toggle]')) li = li.parentElement.closest('li[role="treeitem"]');
+        if (!li || !li.dataset.loaded) return;
+        const open = li.getAttribute('aria-expanded') === 'true';
+        li.querySelector(':scope > ul').innerHTML = '';
+        delete li.dataset.loaded;
+        if (open) await expand(li);
+        return reveal();
+    };
 })();
 </script>
 <!-- END templates/files/filemanager/tree.html -->

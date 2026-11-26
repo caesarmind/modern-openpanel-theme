@@ -55,7 +55,7 @@ function disableButtons() {
 function enableDisableButtons() {
     syncTextSelect();
     const table = document.getElementById('filemanager_table');
-    const row = table.querySelector('tbody tr.selected-row');
+    const row = table ? table.querySelector('tbody tr.selected-row') : null;
     const fileName = row ? row.dataset.file : undefined;
     const fileType = row ? row.dataset.type : undefined;
     const fileSize = row ? (parseInt(row.getAttribute('data-size'), 10) || 0) : 0;
@@ -263,8 +263,10 @@ function toggleClasses(el, classString) {
     classString.split(/\s+/).filter(Boolean).forEach(c => el.classList.toggle(c));
 }
 
-function initTableSelection() {
+// the table is replaced whenever the folder changes, so its listeners go on again each time
+function bindTable() {
     const table = document.getElementById('filemanager_table');
+    if (!table) return;
 
     // click row
     table.querySelectorAll('tbody tr.clickable-row').forEach(row => {
@@ -383,6 +385,16 @@ function initTableSelection() {
         document.addEventListener('mouseup', onMouseUp);
     });
 
+    table.addEventListener('contextmenu', onTableContextMenu);
+    // runs after the row's own click handler has selected it
+    table.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-fm-perm]');
+        if (btn) openPermSheet([btn.closest('tr')]);
+    });
+    initDirectorySizeCalculate();
+}
+
+function initTableSelection() {
     // click outside to deselect, a target its own handler already removed (the permissions sheet's Cancel) doesn't count
     document.addEventListener('click', event => {
         const t = event.target;
@@ -398,7 +410,7 @@ function initTableSelection() {
             !t.closest('#fmPickerModal') &&
             !wasSelecting
         ) {
-            table.querySelectorAll('tbody tr.selected-row').forEach(r =>
+            document.querySelectorAll('#filemanager_table tbody tr.selected-row').forEach(r =>
                 r.classList.remove('selected-row')
             );
             selectedRows = [];
@@ -431,34 +443,6 @@ function initContextMenu() {
         return `${sep}<li data-target="${id}" class="flex items-center gap-x-2 px-3 py-1.5 text-sm cursor-pointer op-hover${danger}"><i class="${icon}"></i>${label}</li>`;
     }).join('');
 
-    const table = document.getElementById('filemanager_table');
-
-    table.addEventListener('contextmenu', event => {
-        const row = event.target.closest('tr.clickable-row');
-        if (!row) return;
-        event.preventDefault();
-
-        if (!row.classList.contains('selected-row')) {
-            table.querySelectorAll('tbody tr.selected-row').forEach(r =>
-                r.classList.remove('selected-row')
-            );
-            row.classList.add('selected-row');
-            selectedRows = [row.dataset.rowIndex];
-            sveselect = 0;
-            setSelectAllLabel(false);
-        }
-
-        enableDisableButtons();
-        updateSelectedOptionsDisplay();
-
-        menu.querySelectorAll('li[data-target]').forEach(li => {
-            const btn = document.getElementById(li.dataset.target);
-            li.classList.toggle('hidden', !btn || btn.disabled);
-        });
-
-        showContextMenu(event.clientX, event.clientY);
-    });
-
     menu.addEventListener('click', event => {
         const li = event.target.closest('li[data-target]');
         if (!li || li.classList.contains('hidden')) return;
@@ -472,6 +456,36 @@ function initContextMenu() {
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape') hideContextMenu();
     });
+}
+
+// right-click on a row, the menu only exists in the classic view
+function onTableContextMenu(event) {
+    const menu = document.getElementById('fmContextMenu');
+    const table = event.currentTarget;
+    if (!menu || !menu.childElementCount) return;
+    const row = event.target.closest('tr.clickable-row');
+    if (!row) return;
+    event.preventDefault();
+
+    if (!row.classList.contains('selected-row')) {
+        table.querySelectorAll('tbody tr.selected-row').forEach(r =>
+            r.classList.remove('selected-row')
+        );
+        row.classList.add('selected-row');
+        selectedRows = [row.dataset.rowIndex];
+        sveselect = 0;
+        setSelectAllLabel(false);
+    }
+
+    enableDisableButtons();
+    updateSelectedOptionsDisplay();
+
+    menu.querySelectorAll('li[data-target]').forEach(li => {
+        const btn = document.getElementById(li.dataset.target);
+        li.classList.toggle('hidden', !btn || btn.disabled);
+    });
+
+    showContextMenu(event.clientX, event.clientY);
 }
 
 function showContextMenu(x, y) {
@@ -493,6 +507,7 @@ function hideContextMenu() {
 function initSelectAll() {
     document.getElementById('SelectAll-button').addEventListener('click', () => {
         const table = document.getElementById('filemanager_table');
+        if (!table) return;
         const rows  = table.querySelectorAll('tbody tr.clickable-row');
 
         if (!sveselect) {
@@ -603,7 +618,7 @@ function initActionButtons() {
                     } else {
                         showToast(permanent ? FM.i18n.deleted : FM.i18n.movedToTrash, 'success');
                     }
-                    setTimeout(() => location.reload(), failedCount ? 1500 : 500);
+                    fmRefresh({ changed: true });
                 });
                 return;
             }
@@ -624,7 +639,7 @@ function initActionButtons() {
                     } else {
                         showToast(permanent ? FM.i18n.deleted : FM.i18n.movedToTrash, 'success');
                     }
-                    setTimeout(() => location.reload(), failed ? 1500 : 500);
+                    fmRefresh({ changed: true });
                 });
             });
         }, {
@@ -657,7 +672,7 @@ function initActionButtons() {
 
     // the editor tab tells us after a save so sizes and dates in the list are current
     window.addEventListener('message', (e) => {
-        if (e.origin === location.origin && e.data && e.data.type === 'op-file-saved') location.reload();
+        if (e.origin === location.origin && e.data && e.data.type === 'op-file-saved') fmRefresh({ keepSelection: true });
     });
 
     // VIEW FILE
@@ -691,7 +706,7 @@ function initActionButtons() {
             const newName = input.value.trim();
             if (!newName) return false;
             if (newName === name) return true;
-            postForm('/file-manager/rename', [['path_param', FM.pathParam], ['old_name', name], ['new_name', newName]]);
+            fmSubmit('/file-manager/rename', [['path_param', FM.pathParam], ['old_name', name], ['new_name', newName]]);
         });
         input.value = name;
         // preselect the name without its extension, like most file managers do
@@ -702,11 +717,6 @@ function initActionButtons() {
     // PERMISSIONS: the toolbar/selection bar button and the row menu edit the selection, a mode in the Permissions column edits its own row
     document.getElementById('permButton').addEventListener('click', () => {
         openPermSheet(Array.from(document.querySelectorAll('#filemanager_table tbody tr.selected-row')));
-    });
-    // runs after the row's own click handler has selected it
-    document.getElementById('filemanager_table').addEventListener('click', e => {
-        const btn = e.target.closest('button[data-fm-perm]');
-        if (btn) openPermSheet([btn.closest('tr')]);
     });
 }
 
@@ -1050,6 +1060,7 @@ function openPicker(action, items) {
         confirmBtn.disabled = true;
         modal.querySelectorAll('[data-picker-close]').forEach(b => b.disabled = true);
         const errors = [];
+        let landed = null;
 
         if (action === 'copy' || action === 'move') {
             if (items.length > 1 && window.opPanelAtLeast && opPanelAtLeast('2.0.29')) {
@@ -1081,7 +1092,7 @@ function openPicker(action, items) {
                 ));
             }
         } else {
-            // compress and extract answer with a redirect + flash, so just wait and reload to show it
+            // compress and extract answer with a redirect + flash, the page it ends on is the new listing
             const body = new URLSearchParams({ csrf_token });
             if (action === 'compress') {
                 body.append('archiveName', joinPath(dest, nameInput.value.trim()));
@@ -1097,21 +1108,26 @@ function openPicker(action, items) {
             await fetch(action === 'compress' ? '/file-manager/create-archive' : '/file-manager/extract-archive', {
                 method: 'POST', headers: { 'X-CSRF-Token': csrf_token }, body
             })
-            .then(async r => { if (!r.ok) throw new Error((await r.text()).trim() || 'HTTP ' + r.status); })
+            .then(async r => { if (!r.ok) throw new Error((await r.text()).trim() || 'HTTP ' + r.status); landed = r; })
             .catch(e => errors.push(e.message));
         }
 
         busy = false;
         if (!errors.length) {
             showStatus('info', FM.i18n.doneReloading);
-            setTimeout(() => location.reload(), 400);
+            setTimeout(() => {
+                modal.querySelectorAll('[data-picker-close]').forEach(b => b.disabled = false);
+                close();
+                (landed ? fmShow(landed, { post: true, keepScroll: true, changed: true }) : fmRefresh({ changed: true }))
+                    .then(() => { if (dest !== joinPath(FM.pathParam)) window.fmTreeReload?.(dest); });
+            }, 400);
             return;
         }
         modal.querySelectorAll('[data-picker-close]').forEach(b => b.disabled = false);
         showStatus('error', `<ul class="list-disc pl-5">${errors.map(e => `<li>${escHTML(e)}</li>`).join('')}</ul>`);
         // some items may have gone through, so closing should show the new state
         $('fmPickerCancel').textContent = FM.i18n.close;
-        $('fmPickerCancel').onclick = () => location.reload();
+        $('fmPickerCancel').onclick = () => { close(); fmRefresh({ changed: true }); };
     }
 
     list.onclick = $('fmPickerCrumbs').onclick = e => {
@@ -1146,7 +1162,204 @@ function openPicker(action, items) {
 
 // UTILITIES
 
-// plain form POST so the server's redirect + flash work as usual
+// IN-PLACE NAVIGATION
+
+let fmNavAbort = null;
+let fmHere = location.pathname + location.search;
+
+// needs the listing wrapper, a theme with older markup keeps plain links and reloads
+const fmLive = () => typeof FM !== 'undefined' && !!document.getElementById('fmListing');
+
+const fmIsListingURL = url => url.origin === location.origin && (url.pathname === '/files' || url.pathname.startsWith('/files/'));
+
+function formatSizeCells() {
+    document.querySelectorAll('span.file-size-bytes').forEach(span => {
+        const text = span.textContent.trim();
+        if (/^\d+$/.test(text)) span.textContent = formatBytes(parseInt(text, 10));
+    });
+}
+
+// files with mode 0000 can't be opened at all, so they go to the health panel
+function reportNoPermFiles() {
+    if (typeof reportHealthIssues !== 'function' || !FM.i18n.noPermsOne) return;
+    const names = Array.from(document.querySelectorAll('#filemanager_table tbody tr[data-file]'))
+        .filter(row => /^.-{9}$/.test(row.dataset.permissions || ''))
+        .map(row => row.dataset.file);
+    if (!names.length) return;
+    let issue;
+    if (names.length === 1) {
+        issue = { id: 'perms0000:' + names[0], severity: 'error', message: `${FM.i18n.file} ${names[0]} ${FM.i18n.noPermsOne}` };
+    } else if (names.length === 2) {
+        issue = { id: 'perms0000:' + names.join(','), severity: 'error', message: `${FM.i18n.files} ${names.join(', ')} ${FM.i18n.noPermsTwo}` };
+    } else {
+        issue = { id: 'perms0000:multiple', severity: 'error', message: `${names.length} ${FM.i18n.noPermsMany}` };
+    }
+    reportHealthIssues('files:' + window.location.pathname, [issue], 24);
+}
+
+// runs on load and after every swap, keep is the file names to select again
+function fmAfterSwap(keep = []) {
+    selectedRows = [];
+    anchorRow = null;
+    sveselect = 0;
+    sortState.columnIndex = -1;
+    sortState.dir = 'none';
+
+    const table = document.getElementById('filemanager_table');
+    // an empty folder has nothing to select, search or sort
+    const mainButtons = document.getElementById('mainButtons');
+    if (mainButtons) mainButtons.style.display = table ? '' : 'none';
+    document.getElementById('fmTools')?.classList.toggle('is-off', !table);
+    formatSizeCells();
+    bindTable();
+    setSelectAllLabel(false);
+
+    if (table && keep.length) {
+        table.querySelectorAll('tbody tr.clickable-row').forEach(row => {
+            if (!keep.includes(row.dataset.file)) return;
+            row.classList.add('selected-row');
+            selectedRows.push(row.dataset.rowIndex);
+        });
+    }
+    if (selectedRows.length) enableDisableButtons();
+    else disableButtons();
+    updateSelectedOptionsDisplay();
+    reportNoPermFiles();
+    // the page's own search box resets for the new folder
+    document.dispatchEvent(new Event('fm:swap'));
+}
+
+// puts a fetched file manager page on screen: listing, path, breadcrumbs, README, title, address and flash messages
+async function fmShow(res, opts = {}) {
+    const target = new URL(res.url || location.href, location.href);
+    let doc = null;
+    if (res.ok && fmIsListingURL(target)) {
+        doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    }
+    const fresh = doc && doc.getElementById('fmListing');
+    if (!fresh) {
+        // a failed POST has no page of its own to show
+        if (!res.ok && opts.post) {
+            const text = (await res.text().catch(() => '')).trim();
+            showToast(text && text.length < 200 && !text.startsWith('<') ? text : 'HTTP ' + res.status, 'error');
+            return false;
+        }
+        // login page, another module or an error page, a real navigation shows those properly
+        location.assign(res.redirected || !opts.post ? target.href : location.href);
+        return false;
+    }
+
+    if (closeInlineEdit) closeInlineEdit();
+    hideContextMenu();
+    const keep = opts.keepSelection ? getSelectedItems().map(it => it.fileName) : [];
+
+    const listing = document.getElementById('fmListing');
+    const hadFocus = listing.contains(document.activeElement);
+    listing.replaceWith(document.adoptNode(fresh));
+    // the path line, the folder's breadcrumbs, the trail in the top bar and the README all belong to the folder
+    ['fmEyebrow', 'tour-fm-breadcrumbs', 'headerTrail', 'fmReadme'].forEach(id => {
+        const old = document.getElementById(id);
+        const now = doc.getElementById(id);
+        if (old && now) old.replaceWith(document.adoptNode(now));
+    });
+
+    const oldPath = FM.pathParam;
+    FM.pathParam = fresh.dataset.path || '';
+    document.title = doc.title;
+    document.querySelectorAll('#newFileForm input[name="path_param"], #newFolderForm input[name="path_param"]').forEach(input => {
+        input.value = FM.pathParam;
+    });
+
+    const here = target.pathname + target.search;
+    if (opts.push && here !== fmHere) {
+        // remember how far down this entry was scrolled for when Back returns to it
+        history.replaceState({ ...(history.state || {}), fmScroll: window.scrollY }, '');
+        history.pushState({}, '', here);
+    } else if (here !== location.pathname + location.search) {
+        history.replaceState(history.state, '', here);
+    }
+    fmHere = here;
+    // the star in the top bar is per address
+    window.opSyncFavorite?.();
+    if (!opts.keepScroll) window.scrollTo(0, opts.scroll || 0);
+    if (hadFocus) {
+        fresh.tabIndex = -1;
+        fresh.focus({ preventScroll: true });
+    }
+
+    doc.querySelectorAll('#alert-stack [role="alert"] > div').forEach(el => showToast(el.textContent.trim(), 'info'));
+
+    fmAfterSwap(keep);
+    if (window.ClipboardJS && typeof fmInitCrumbs === 'function') fmInitCrumbs();
+    if (window.fmTreeSetCurrent && FM.pathParam !== oldPath) await window.fmTreeSetCurrent(FM.pathParam);
+    if (window.fmTreeReload && opts.changed) await window.fmTreeReload(FM.pathParam);
+    return true;
+}
+
+// opens a folder or page of the listing without loading the whole page again
+function fmGo(href, opts = {}) {
+    const url = new URL(href, location.href);
+    if (!fmLive() || !fmIsListingURL(url)) {
+        location.assign(url.href);
+        return Promise.resolve(false);
+    }
+    if (fmNavAbort) fmNavAbort.abort();
+    const ctl = fmNavAbort = new AbortController();
+    const listing = document.getElementById('fmListing');
+    listing.setAttribute('aria-busy', 'true');
+    // only dim when the server takes a moment, a fast answer would just flicker
+    const dim = setTimeout(() => { listing.style.opacity = '0.5'; }, 150);
+    const settle = () => {
+        clearTimeout(dim);
+        if (fmNavAbort !== ctl) return;
+        fmNavAbort = null;
+        listing.removeAttribute('aria-busy');
+        listing.style.opacity = '';
+    };
+    return fetch(url.href, { credentials: 'same-origin', signal: ctl.signal })
+        .then(res => fmShow(res, opts))
+        .then(ok => { settle(); return ok; })
+        .catch(e => {
+            settle();
+            if (e.name !== 'AbortError') location.assign(url.href);
+            return false;
+        });
+}
+
+// same folder again, for after an action changed it
+function fmRefresh(opts = {}) {
+    if (!fmLive()) {
+        location.reload();
+        return Promise.resolve(false);
+    }
+    return fmGo(location.href, { keepScroll: true, ...opts });
+}
+
+// while a change is on its way to the server nothing else should start from the listing it's about to replace
+function fmBusy(on) {
+    document.querySelectorAll('#newFileButton, #newFolderButton, #uploadButton, #fmListing').forEach(el => { el.inert = on; });
+    // the empty-folder card has its own New folder button and is about to be wrong anyway
+    const empty = document.getElementById('fmEmpty');
+    if (empty) empty.style.display = on ? 'none' : '';
+}
+
+// posts like a form would, then shows the page the server redirects to
+async function fmSubmit(action, fields) {
+    if (!fmLive()) return postForm(action, fields);
+    const body = new URLSearchParams([['csrf_token', csrf_token], ...fields]);
+    fmBusy(true);
+    try {
+        const res = await fetch(action, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf_token }, body });
+        return await fmShow(res, { post: true, keepScroll: true, changed: true });
+    } catch (e) {
+        showToast(e.message, 'error');
+        return false;
+    } finally {
+        fmBusy(false);
+    }
+}
+
+// plain form POST for pages without the listing wrapper, the server's redirect + flash work as usual
 function postForm(action, fields) {
     const form = document.createElement('form');
     form.method = 'POST';
@@ -1161,6 +1374,41 @@ function postForm(action, fields) {
     });
     document.body.appendChild(form);
     form.submit();
+}
+
+function fmInitNav() {
+    if (!fmLive()) return;
+
+    // folder, breadcrumb, tree, pagination and search links
+    document.addEventListener('click', event => {
+        if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const link = event.target.closest('#fmListing a[href], #tour-fm-breadcrumbs a[href], #fmTreeRoot a[href], #fmDeepSearch a[href]');
+        if (!link || link.target || link.hasAttribute('download') || link.getAttribute('href').startsWith('#')) return;
+        const url = new URL(link.href, location.href);
+        if (!fmIsListingURL(url)) return;
+        event.preventDefault();
+        fmGo(url.href, { push: true });
+    });
+
+    // Back and Forward, a hash-only change keeps the same listing
+    window.addEventListener('popstate', event => {
+        if (location.pathname + location.search === fmHere) return;
+        fmGo(location.href, { scroll: event.state?.fmScroll || 0 });
+    });
+
+    // new file and new folder rows post through their hidden forms
+    document.addEventListener('submit', event => {
+        const form = event.target;
+        if (form.id !== 'newFileForm' && form.id !== 'newFolderForm') return;
+        const data = new FormData(form);
+        // "open in the editor" leaves for the editor page, so let that one submit normally
+        if (data.get('open') === 'true') return;
+        event.preventDefault();
+        if (form.dataset.busy) return;
+        form.dataset.busy = '1';
+        const fields = Array.from(data.entries()).filter(([name]) => name !== 'csrf_token');
+        fmSubmit(form.action, fields).finally(() => { delete form.dataset.busy; });
+    });
 }
 
 function getSelectedItems() {
@@ -1290,19 +1538,14 @@ document.addEventListener('alpine:init', () => {
 
 // INIT
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('span.file-size-bytes').forEach(span => {
-        const text = span.textContent.trim();
-        if (/^\d+$/.test(text)) {
-            span.textContent = formatBytes(parseInt(text, 10));
-        }
-    });
+    formatSizeCells();
 
     if (typeof FM === 'undefined') return;
 
-    disableButtons();
     initTableSelection();
     initSelectAll();
-    initDirectorySizeCalculate();
     initActionButtons();
     initContextMenu();
+    fmInitNav();
+    fmAfterSwap();
 });
