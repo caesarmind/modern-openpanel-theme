@@ -32,12 +32,15 @@
           "key": "sidebar_light_text",
           "label": "Text",
           "default": "#d3d7e6",
+          "readable_on": "sidebar_light_bg",
           "css": ":where(html:not(.dark)) :is(.op-sidebar, .op-panel-sidebar) { --color-body: {{sidebar_light_text}}; --color-heading: color-mix(in oklab, {{sidebar_light_text}} 55%, {{sidebar_light_bg.on}}); --color-muted: color-mix(in oklab, {{sidebar_light_text}} 72%, {{sidebar_light_bg}}); --color-faint: color-mix(in oklab, {{sidebar_light_text}} 45%, {{sidebar_light_bg}}); --color-panel: color-mix(in oklab, {{sidebar_light_text}} 9%, {{sidebar_light_bg}}); --color-raised: color-mix(in oklab, {{sidebar_light_text}} 20%, {{sidebar_light_bg}}); }"
         },
         {
           "key": "sidebar_light_active",
           "label": "Selected item",
           "default": "#8b85ff",
+          "readable_on": "sidebar_light_bg",
+          "min_contrast": 3,
           "css": ":where(html:not(.dark)) :is(.op-sidebar, .op-panel-sidebar) { --color-accent: {{sidebar_light_active}}; --color-accent-text: {{sidebar_light_active}}; --color-on-accent: {{sidebar_light_active.on}}; --color-accent-soft: color-mix(in srgb, {{sidebar_light_active}} 16%, transparent); }"
         }
       ]
@@ -56,12 +59,15 @@
           "key": "sidebar_dark_text",
           "label": "Text",
           "default": "#cfd7e2",
+          "readable_on": "sidebar_dark_bg",
           "css": ":where(html.dark) :is(.op-sidebar, .op-panel-sidebar) { --color-body: {{sidebar_dark_text}}; --color-heading: color-mix(in oklab, {{sidebar_dark_text}} 55%, {{sidebar_dark_bg.on}}); --color-muted: color-mix(in oklab, {{sidebar_dark_text}} 72%, {{sidebar_dark_bg}}); --color-faint: color-mix(in oklab, {{sidebar_dark_text}} 45%, {{sidebar_dark_bg}}); --color-panel: color-mix(in oklab, {{sidebar_dark_text}} 9%, {{sidebar_dark_bg}}); --color-raised: color-mix(in oklab, {{sidebar_dark_text}} 20%, {{sidebar_dark_bg}}); }"
         },
         {
           "key": "sidebar_dark_active",
           "label": "Selected item",
           "default": "#47ebeb",
+          "readable_on": "sidebar_dark_bg",
+          "min_contrast": 3,
           "css": ":where(html.dark) :is(.op-sidebar, .op-panel-sidebar) { --color-accent: {{sidebar_dark_active}}; --color-accent-text: {{sidebar_dark_active}}; --color-on-accent: {{sidebar_dark_active.on}}; --color-accent-soft: color-mix(in srgb, {{sidebar_dark_active}} 16%, transparent); }"
         }
       ]
