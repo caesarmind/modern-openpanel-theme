@@ -19,6 +19,23 @@
     .CodeMirror { height: 100% !important; font-size: 14px; }
     #editor-ace { width: 100%; }
     #editorcontentvalue.is-busy { opacity: .6; cursor: progress; }
+    /* the editor covers the page at z-index 60, toasts (save, Reopen errors) have to sit above it */
+    #toast-container { z-index: 70; }
+
+    /* the tools row under the header, with the same edges: editor tools left, file path + encoding + Reopen right (static/js/file-editor.js fills the selects) */
+    #editor-container .fe-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 8px 16px; border-bottom: 1px solid var(--color-raised); background: var(--color-panel); }
+    @media (width >= 48rem) { #editor-container .fe-tools { padding: 8px 24px; } }
+    #editor-container .fe-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    #editor-container .fe-file { flex: 0 1 34rem; }
+    @media (width < 40rem) { #editor-container .fe-file { flex-basis: 100%; } }
+    #editor-container .fe-tools .op-select { flex: none; width: auto; height: 32px; font-size: 13px; }
+    #editor-container .fe-tools .op-input { flex: 1 1 auto; min-width: 8rem; width: 100%; height: 32px; font-size: 12px; }
+    #editor-container .fe-tools .op-btn { flex: none; height: 32px; }
+    #editor-container .fe-tools .op-icon-btn { width: 32px; height: 32px; border-radius: var(--op-radius-sm); }
+    #editor-container .fe-sep { width: 1px; height: 20px; background: var(--color-raised); }
+    #editor-container [data-fe-notice] { flex: none; margin: 8px 16px 0; }
+    #editor-container [data-op-draft] { flex: none; margin: 8px 16px 0; }
+    #editor-container [data-op-draft] [data-op-draft-body] { max-height: 40vh; }
 </style>
 
 {{if eq .Editor "monaco"}}
@@ -27,6 +44,7 @@
 {{else if eq .Editor "ace"}}
     <script src="{{static "vendor/ace/ace.min.js"}}"></script>
     <script src="{{static "vendor/ace/ext-language_tools.min.js"}}"></script>
+    <script src="{{static "vendor/ace/ext-modelist.js"}}"></script>
 {{else if eq .Editor "codemirror"}}
     <link rel="stylesheet" href="{{static "vendor/codemirror/codemirror.min.css"}}">
     <link rel="stylesheet" href="{{static "vendor/codemirror/theme/dracula.min.css"}}">
@@ -36,6 +54,7 @@
     <script src="{{static "vendor/codemirror/mode/css/css.min.js"}}"></script>
     <script src="{{static "vendor/codemirror/mode/javascript/javascript.min.js"}}"></script>
     <script src="{{static "vendor/codemirror/mode/htmlmixed/htmlmixed.min.js"}}"></script>
+    <script src="{{static "vendor/codemirror/mode/clike/clike.min.js"}}"></script>
     <script src="{{static "vendor/codemirror/mode/php/php.min.js"}}"></script>
     <script src="{{static "vendor/codemirror/mode/python/python.min.js"}}"></script>
     <script src="{{static "vendor/codemirror/mode/shell/shell.min.js"}}"></script>
@@ -47,6 +66,9 @@
 {{end}}
 
 
+
+<script src="{{static "js/editor-draft.js"}}"></script>
+<script src="{{static "js/file-editor.js"}}"></script>
 
 <form method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
@@ -75,9 +97,6 @@
                         <h1 class="op-title">{{.T.Get "Edit File"}}</h1>
                     </div>
 
-      <!-- START breadcrumbs -->
-      <p class="op-meta op-mono" style="overflow-wrap:anywhere">/var/www/html/{{range .Breadcrumbs}}{{if .Last}}<b style="color:var(--color-heading)">{{.Name}}</b>{{else}}{{.Name}}/{{end}}{{end}}</p>
-      <!-- END breadcrumbs -->
 
                 {{end}}
 
@@ -113,13 +132,34 @@
             </div>
         </div>
 
+        <div class="fe-tools">
+            <div class="fe-group" role="toolbar" aria-label="{{.T.Get "Editor tools"}}">
+                <button type="button" data-fe-undo class="op-icon-btn" title="{{.T.Get "Undo"}} (Ctrl+Z)" aria-label="{{.T.Get "Undo"}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg></button>
+                <button type="button" data-fe-redo class="op-icon-btn" title="{{.T.Get "Redo"}} (Ctrl+Y)" aria-label="{{.T.Get "Redo"}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg></button>
+                <span class="fe-sep" aria-hidden="true"></span>
+                <span data-fe-mode-wrap><select data-fe-mode class="op-select" aria-label="{{.T.Get "Syntax"}}" title="{{.T.Get "Syntax"}}"></select></span>
+                <select data-fe-size class="op-select" aria-label="{{.T.Get "Text size"}}" title="{{.T.Get "Text size"}}"></select>
+            </div>
+            {{if not (or (eq .FilePath "wpcli_themes.txt") (eq .FilePath "wpcli_plugins.txt") (eq .FilePath "pagespeed_api_key.txt"))}}
+            <!-- path and encoding: change either and Reopen, like the file was opened that way -->
+            <div class="fe-group fe-file">
+                <input type="text" data-fe-path class="op-input op-mono" value="/var/www/html/{{.FilePath}}" title="/var/www/html/{{.FilePath}}" spellcheck="false" autocomplete="off" aria-label="{{.T.Get "File path"}}">
+                <select data-fe-encoding class="op-select" aria-label="{{.T.Get "Encoding"}}" title="{{.T.Get "Encoding"}}"></select>
+                <button type="button" data-fe-reopen class="op-btn op-btn-secondary" title="{{.T.Get "Open the path with the selected encoding"}}">{{template "op_icon" "refresh"}} {{.T.Get "Reopen"}}</button>
+            </div>
+            {{end}}
+        </div>
+
+        <div data-fe-notice class="op-alert is-warning" role="status" hidden>{{template "op_icon" "warn"}}<span>{{.T.Get "This file isn't UTF-8, so it opened byte for byte as ISO-8859-1 and saving keeps its bytes. If letters look wrong, pick its encoding and click Reopen."}}</span></div>
+
+        {{template "editor_draft" (dict "T" .T "Class" "")}}
+
         <input type="hidden" name="editor_content" id="editor_content">
 
         <div id="editor-body">
         {{if eq .Editor "text"}}
-            <textarea id="editor-text" aria-label="{{.T.Get "Edit file"}}" spellcheck="false" autocorrect="off" autocapitalize="off">{{.FileContent}}</textarea>
+            <textarea id="editor-text" aria-label="{{.T.Get "Edit file"}}" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
         {{else if eq .Editor "codemirror"}}
-            <textarea id="editor-codemirror" style="display:none;">{{.FileContent}}</textarea>
             <div id="editor-codemirror-mount"></div>
         {{else if eq .Editor "ace"}}
             <div id="editor-ace"></div>
@@ -133,210 +173,7 @@
 
 
 <script>
-(function () {
-    const filePath    = {{.FilePathJSON}};
-    const fileContent = {{.FileContentJSON}};
-    const editorType  = '{{.Editor}}';
-    const isDark      = document.documentElement.classList.contains('dark');
-    const i18n = {
-        unsavedChanges: "{{.T.Get "You have unsaved changes. Leave anyway?"}}",
-        leave: "{{.T.Get "Leave"}}",
-        saved: "{{.T.Get "File saved successfully"}}",
-        saveFailed: "{{.T.Get "Error saving file."}}"
-    };
-
-    function getExtension(name) {
-        return name.split('.').pop().toLowerCase();
-    }
-
-    const hiddenInput     = document.getElementById('editor_content');
-    const saveBtn         = document.getElementById('editorcontentvalue');
-
-
-    let editor = null;   // used by Monaco and Ace
-    let cm     = null;   // used by CodeMirror
-    let getContent = () => fileContent;   // each backend swaps in its own getter
-
-
-    // opened from the file manager as its own window: offer Close, and tell the file manager after a save
-    const opener = (() => { try { return window.opener && window.opener !== window && window.opener.location.origin === location.origin ? window.opener : null; } catch (e) { return null; } })();
-    if (opener) {
-        const closeBtn = document.getElementById('closeWindowButton');
-        closeBtn.hidden = false;
-        closeBtn.addEventListener('click', () => window.close());
-    }
-
-    // Ctrl/Cmd+S to save, regardless of which editor backend is active
-    document.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
-            e.preventDefault();
-            saveBtn.click();
-        }
-    });
     if (window.registerShortcut) registerShortcut(['Ctrl', 'S'], "{{.T.Get "Save file"}}");
-
-    function getHashLine() {
-        const h = window.location.hash;
-        if (h && h.startsWith('#')) {
-            const n = parseInt(h.substring(1));
-            if (!isNaN(n)) return n;
-        }
-        return null;
-    }
-    function setHashLine(n) {
-        const newHash = '#' + n;
-        if (window.location.hash !== newHash) history.replaceState(null, null, newHash);
-    }
-
-    // MONACO
-    if (editorType === 'monaco') {
-        const languageMap = {
-            'py':'python','js':'javascript','html':'html','css':'css','scss':'scss',
-            'java':'java','c':'c','cpp':'cpp','php':'php','sql':'sql','sh':'shell',
-            'md':'markdown','ini':'ini','gitconfig':'ini','less':'less','xml':'xml',
-            'yaml':'yaml','yml':'yaml','json':'json','ts':'typescript','rb':'ruby',
-            'rs':'rust','swift':'swift','perl':'perl','twig':'twig',
-        };
-
-        require.config({ paths: { vs: '{{static "vendor/monaco/vs"}}' } });
-        require(['vs/editor/editor.main'], function () {
-            const lang   = languageMap[getExtension(filePath)] || 'plaintext';
-            const editor = monaco.editor.create(document.getElementById('editor'), {
-                value: fileContent, language: lang,
-                theme: isDark ? 'vs-dark' : 'vs', automaticLayout: true, lineNumbers: 'on',
-            });
-
-            window._editorLayout = () => editor.layout();
-
-            const line = getHashLine();
-            if (line) {
-                editor.revealLineInCenter(line);
-                editor.setPosition({ lineNumber: line, column: 1 });
-                editor.focus();
-            }
-
-            editor.onDidChangeCursorPosition(() => {
-                const pos = editor.getPosition();
-                if (pos) setHashLine(pos.lineNumber);
-            });
-
-            getContent = () => editor.getValue();
-
-            editor.onDidChangeModelContent(() => { isDirty = true; });
-        });
-    }
-
-    // ACE
-    else if (editorType === 'ace') {
-        const aceModMap = {
-            'py':'python','js':'javascript','html':'html','css':'css','scss':'scss',
-            'java':'java','c':'c','cpp':'c_cpp','php':'php','sql':'sql','sh':'sh',
-            'md':'markdown','ini':'ini','xml':'xml','yaml':'yaml','yml':'yaml',
-            'json':'json','ts':'typescript','rb':'ruby','rs':'rust','swift':'swift',
-            'perl':'perl',
-        };
-
-        const aceEl  = document.getElementById('editor-ace');
-        editor = ace.edit(aceEl);
-        editor.setTheme(isDark ? 'ace/theme/monokai' : 'ace/theme/chrome');
-
-        const mode = aceModMap[getExtension(filePath)] || 'text';
-        editor.session.setMode('ace/mode/' + mode);
-        editor.setValue(fileContent, -1);   // -1 = move cursor to start
-        editor.setOptions({ fontSize: '14px', showPrintMargin: false, enableLiveAutocompletion: true });
-
-        window._editorLayout = () => editor.resize();
-
-        const line = getHashLine();
-        if (line) { editor.gotoLine(line, 0, true); }
-
-        editor.selection.on('changeCursor', () => {
-            setHashLine(editor.getCursorPosition().row + 1);
-        });
-
-        getContent = () => editor.getValue();
-    }
-
-    // CODEMIRROR
- else if (editorType === 'codemirror') {
-    const cmModeMap = {
-        'py':   'text/x-python',
-        'js':   'text/javascript',
-        'html': 'text/html',
-        'css':  'text/css',
-        'php':  'text/x-php',
-        'sh':   'text/x-sh',
-        'sql':  'text/x-sql',
-        'xml':  'application/xml',
-        'yaml': 'text/x-yaml',
-        'yml':  'text/x-yaml',
-        'md':   'text/x-markdown',
-        'json': 'application/json',
-    };
-    const mode    = cmModeMap[getExtension(filePath)] || 'null';
-    const mountEl = document.getElementById('editor-codemirror-mount');
-
-    cm = CodeMirror(mountEl, {
-        value: fileContent,
-        mode: mode,
-        theme: isDark ? 'dracula' : 'default',
-        lineNumbers: true,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        indentUnit: 4,
-        tabSize: 4,
-        indentWithTabs: false,
-        lineWrapping: false,
-        extraKeys: { Tab: (cm) => cm.replaceSelection('    ') },
-    });
-
-    // refresh once laid out or the cursor goes missing
-    requestAnimationFrame(() => requestAnimationFrame(() => cm.refresh()));
-
-    const line = getHashLine();
-    if (line) {
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            cm.scrollIntoView({ line: line - 1, ch: 0 }, 200);
-            cm.setCursor({ line: line - 1, ch: 0 });
-        }));
-    }
-
-    cm.on('cursorActivity', () => {
-        setHashLine(cm.getCursor().line + 1);
-    });
-
-    getContent = () => cm.getValue();
-}
-
-    // PLAIN TEXT
-    else {
-        const ta = document.getElementById('editor-text');
-
-        ta.addEventListener('keydown', (e) => {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const start = ta.selectionStart;
-                const end   = ta.selectionEnd;
-                ta.value = ta.value.substring(0, start) + '    ' + ta.value.substring(end);
-                ta.selectionStart = ta.selectionEnd = start + 4;
-            }
-        });
-
-        getContent = () => ta.value;
-    }
-
-    // UNSAVED CHANGES
-    let isDirty = false;
-
-    if (editorType === 'monaco') {
-        // monaco is async — the listener is set inside the require() callback
-    } else if (editorType === 'ace') {
-        editor.session.on('change', () => { isDirty = true; });
-    } else if (editorType === 'codemirror') {
-        cm.on('change', () => { isDirty = true; });
-    } else {
-        document.getElementById('editor-text').addEventListener('input', () => { isDirty = true; });
-    }
 
     // the editor covers the page, so a flash from a form post (panels before 2.0.29) comes back as a toast instead
     document.querySelectorAll('#alert-stack [role="alert"] .ms-3').forEach((el) => {
@@ -344,64 +181,35 @@
         if (text) showToast(text, /error|fail|could not|invalid/i.test(text) ? 'error' : 'success');
     });
 
-    // save over fetch instead of a form post so the page doesn't reload and undo/redo history stays
-    const form = saveBtn.closest('form');
-    let saving = false;
-    form.addEventListener('submit', async (e) => {
+    opFileEditor({
+        backend: '{{.Editor}}',
+        filePath: {{.FilePathJSON}},
+        content: {{.FileContentJSON}},
+        homePrefix: '/var/www/html/',
+        locale: '{{.T.Locale}}',
+        root: document.getElementById('editor-container'),
+        busyClass: 'is-busy',
         // panels before 2.0.29 answer the save with a redirect, not JSON, so post the form the old way
-        if (!(window.opPanelAtLeast && opPanelAtLeast('2.0.29'))) { hiddenInput.value = getContent(); isDirty = false; return; }
-        e.preventDefault();
-        if (saving) return;
-        saving = true;
-        saveBtn.disabled = true;
-        saveBtn.classList.add('is-busy');
-        const sent = getContent();
-        hiddenInput.value = sent;
-        const url = new URL(location.href);
-        url.hash = '';
-        url.searchParams.set('output', 'json');
-        try {
-            const res = await fetch(url, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || i18n.saveFailed);
-            // only clean if nothing was typed while the request was out
-            if (getContent() === sent) isDirty = false;
-            showToast(data.message || i18n.saved, 'success');
-            if (opener) { try { opener.postMessage({ type: 'op-file-saved', path: filePath }, location.origin); } catch (err) {} }
-        } catch (err) {
-            showToast(err.message || i18n.saveFailed, 'error');
-        } finally {
-            saving = false;
-            saveBtn.disabled = false;
-            saveBtn.classList.remove('is-busy');
-        }
+        legacySave: () => !(window.opPanelAtLeast && opPanelAtLeast('2.0.29')),
+        // the encoding select needs a panel that reads ?encoding=, this theme also runs on older ones
+        probe: true,
+        urls: {
+            monacoVs: '{{static "vendor/monaco/vs"}}',
+            ace: '{{static "vendor/ace"}}',
+        },
+        i18n: {
+            unsavedChanges: "{{.T.Get "You have unsaved changes. Leave anyway?"}}",
+            leave: "{{.T.Get "Leave"}}",
+            saved: "{{.T.Get "File saved successfully"}}",
+            saveFailed: "{{.T.Get "Error saving file."}}",
+            reopen: "{{.T.Get "Reopen"}}",
+            reopenUnsaved: "{{.T.Get "You have unsaved changes. Reopen anyway?"}}",
+            reopenFailed: "{{.T.Get "The file could not be opened."}}",
+            createFile: "{{.T.Get "Create file"}}",
+            outsideHome: "{{.T.Get "Only files in /var/www/html/ can be opened."}}",
+            plainText: "{{.T.Get "Plain text"}}",
+        },
     });
-
-    window.addEventListener('beforeunload', (e) => {
-        if (!isDirty) return;
-        e.preventDefault();
-        e.returnValue = '';
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!isDirty) return;
-        const anchor = e.target.closest('a[href]');
-        if (!anchor) return;
-        const href = anchor.getAttribute('href');
-        if (!href || href.startsWith('#')) return;
-        if (anchor.closest('[x-data]')) return;
-        e.preventDefault();
-        const ask = window.opConfirm ? window.opConfirm(i18n.unsavedChanges, { ok: i18n.leave, danger: true }) : Promise.resolve(window.confirm(i18n.unsavedChanges));
-        ask.then((ok) => {
-            if (!ok) return;
-            isDirty = false;
-            if (anchor.target === '_blank') window.open(anchor.href, '_blank');
-            else window.location.href = anchor.href;
-        });
-    });
-
-
-})();
 </script>
 
 <!-- END templates/files/edit_file.html -->
