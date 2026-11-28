@@ -19,6 +19,8 @@ The theme runs on OpenPanel 2.0.28 and later. A few things only turn on when the
 
 When the admin locks WordPress auto-update preferences (a panel with stefanpejcic/OpenPanel#1398), the WordPress Updates tab shows the lock and disables those controls. The panel reports the lock in the JSON the tab already loads, so older panels show the tab as before.
 
+On a panel that can connect GitHub accounts in the Git module, the Git page and the Git tab of the Site Manager show the accounts and let you pick a repository from a list. The theme reads them from `/git/github/accounts.json`; on a panel without that route the GitHub controls stay hidden and the pages work as before.
+
 ## Colours and logos
 
 With an OpenAdmin that supports theme settings, the Modern card under **OpenAdmin > Settings > OpenPanel > Theme** has a **Customize colours** link. It sets:

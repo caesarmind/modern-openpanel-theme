@@ -10,7 +10,7 @@
 {{$primary := "op-btn op-btn-primary"}}
 
 <script src="{{static "js/data-table.js"}}"></script>
-<div class="op-content" x-data="gitRepos()" x-init="init()">
+<div class="op-content" x-data="gitRepos()" x-init="init(); loadGh()">
 
   {{if .LogView}}
   {{template "git_log" .}}
@@ -23,6 +23,7 @@
         <p class="op-meta">{{.T.Get "Deploy websites from Git repositories, cloned from a Git host or pushed straight to this server."}}</p>
       </div>
       <div class="op-actions">
+        <button id="github-accounts" type="button" x-show="gh.ready" x-cloak @click="panel = panel === 'accounts' ? null : 'accounts'" :aria-expanded="(panel === 'accounts').toString()" class="op-btn op-btn-secondary"><span class="op-btn-ico">{{template "git_github_icon"}}</span>{{.T.Get "GitHub accounts"}}<span class="op-badge" x-show="gh.accounts.length" x-text="gh.accounts.length"></span></button>
         <button id="add-repository" type="button" @click="toggleCreate()" :aria-expanded="(panel === 'create').toString()" :class="panel === 'create' ? 'op-btn-secondary' : 'op-btn-primary'" class="op-btn">
           <span class="op-btn-ico" x-show="panel !== 'create'">{{template "op_icon" "plus"}}</span><span x-text="panel === 'create' ? {{toJSON (.T.Get "Cancel")}} : {{toJSON (.T.Get "Add Repository")}}"></span>
         </button>
@@ -43,6 +44,44 @@
   </section>
   {{end}}
 
+  <!-- connected GitHub accounts, drawn from /git/github/accounts.json so the page still renders on panels without the feature -->
+  <section id="git-accounts" class="op-card" x-show="panel === 'accounts'" x-cloak x-transition aria-labelledby="git-accounts-title">
+    <div class="op-card-head"><h2 id="git-accounts-title">{{.T.Get "GitHub accounts"}}</h2></div>
+    <div class="op-col" style="gap:16px">
+      <p class="op-hint">{{.T.Get "Connect a GitHub account with an access token to pick its repositories from a list. Private repositories then need no deploy key or password, and the push webhook is added for you."}}</p>
+      <template x-for="a in gh.accounts" :key="a.id">
+        <div class="op-check-row op-git-key" :id="'account-' + a.id">
+          <span class="op-git-key-ico">{{template "git_github_icon"}}</span>
+          <div>
+            <div class="flex flex-wrap items-center gap-2"><b x-text="a.title"></b><span class="op-muted" x-show="a.title !== a.login" x-text="a.login"></span>
+              <span class="op-badge is-danger" x-show="a.token_expired">{{.T.Get "Token expired"}}</span><span class="op-badge is-warning" x-show="a.token_expires_soon">{{.T.Get "Token expires soon"}}</span></div>
+            <p class="op-hint">{{.T.Get "Repositories using it:"}} <span x-text="a.repos"></span> &middot; {{.T.Get "connected"}} <span x-text="a.added_at"></span><span x-show="a.token_expires"> &middot; {{.T.Get "token expires"}} <span x-text="a.token_expires"></span></span></p>
+          </div>
+          <form method="POST" action="/git" x-data="{ armed: false }" @submit="if (!armed) { $event.preventDefault(); armed = true; setTimeout(() => armed = false, 5000) }">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><input type="hidden" name="action" value="account_remove"><input type="hidden" name="account" :value="a.id">
+            <button type="submit" class="op-btn op-btn-sm" :class="armed ? 'op-btn-danger' : 'op-btn-secondary'">{{template "op_icon" "unlink"}} <span x-text="armed ? {{toJSON (.T.Get "Confirm")}} : {{toJSON (.T.Get "Disconnect")}}"></span></button>
+          </form>
+        </div>
+      </template>
+      <p class="op-hint" x-show="gh.accounts.length">{{.T.Get "Disconnecting removes the token from this server and the webhooks it added. Repositories that used the account stay, but cannot pull until you pick another account in their settings. Revoke the token on GitHub as well if you no longer need it."}}</p>
+
+      <form method="POST" action="/git" autocomplete="off" class="op-col" style="gap:14px">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="action" value="account_add">
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="op-field"><label class="op-label" for="account_token">{{.T.Get "Access token"}} <span class="is-danger">*</span></label>
+            <input id="account_token" type="password" name="token" required autocomplete="off" spellcheck="false" placeholder="github_pat_..." class="op-input op-mono">
+          </div>
+          <div class="op-field"><label class="op-label" for="account_label">{{.T.Get "Name (optional)"}}</label>
+            <input id="account_label" type="text" name="label" maxlength="60" placeholder="{{.T.Get "for example Work"}}" class="op-input">
+          </div>
+        </div>
+        <span class="op-hint">{{.T.Get "Create a fine-grained token on GitHub and give it these repository permissions: Contents (read-only), Metadata (read-only) and Webhooks (read and write). A classic token with the repo scope works too."}} {{.T.Get "A fine-grained token covers one user or one organization, so connect a separate token for each owner you deploy from."}} <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" class="op-link">{{.T.Get "Create a token on GitHub"}}</a></span>
+        <div class="op-form-foot"><button type="button" @click="panel = null" class="op-btn op-btn-secondary">{{.T.Get "Close"}}</button><button type="submit" class="op-btn op-btn-primary">{{.T.Get "Connect"}}</button></div>
+      </form>
+    </div>
+  </section>
+
   <!-- add repository, same checks as createRepo -->
   <section class="op-card" x-show="panel === 'create'" x-cloak x-transition aria-labelledby="git-create-title">
     <div class="op-card-head"><h2 id="git-create-title">{{.T.Get "Add Repository"}}</h2></div>
@@ -59,19 +98,47 @@
       </div>
 
       <div x-show="source === 'remote'" class="op-col" style="gap:14px">
-        <div class="op-field"><label class="op-label" for="remote_url">{{.T.Get "Repository URL"}} <span class="is-danger">*</span></label>
-          <input id="remote_url" type="text" name="remote_url" x-model.trim="url" @blur="guessName()" :disabled="source !== 'remote'" data-no-live-validate placeholder="https://github.com/user/repo.git" autocomplete="off" spellcheck="false" class="op-input op-mono" :class="urlErr() && 'is-invalid'" :aria-invalid="(!!urlErr()).toString()">
+        <div class="op-segmented" role="group" aria-label="{{.T.Get "Where the repository is picked from"}}" x-show="gh.ready" x-cloak style="align-self:flex-start">
+          <button type="button" :aria-pressed="(via === 'url').toString()" @click="via = 'url'">{{template "op_icon" "link"}} {{.T.Get "Repository URL"}}</button>
+          <button id="via-github" type="button" :aria-pressed="(via === 'github').toString()" @click="pickVia('github')">{{template "git_github_icon"}} {{.T.Get "GitHub account"}}</button>
+        </div>
+        <div class="op-field" x-show="via === 'url'"><label class="op-label" for="remote_url">{{.T.Get "Repository URL"}} <span class="is-danger">*</span></label>
+          <input id="remote_url" type="text" name="remote_url" x-model.trim="url" @blur="guessName()" :disabled="source !== 'remote' || via === 'github'" data-no-live-validate placeholder="https://github.com/user/repo.git" autocomplete="off" spellcheck="false" class="op-input op-mono" :class="urlErr() && 'is-invalid'" :aria-invalid="(!!urlErr()).toString()">
           <span class="op-hint" x-show="!urlErr()">{{.T.Get "An https:// URL, or an SSH one like git@github.com:user/repo.git."}}</span>
           <span class="op-hint is-invalid" x-show="urlErr()" x-cloak x-text="urlErr()" role="alert"></span>
         </div>
-        <div class="op-check-row op-git-key" x-show="isSSH(url)" x-cloak>
+        <div class="op-check-row op-git-key" x-show="via === 'url' && isSSH(url)" x-cloak>
           <span class="op-git-key-ico">{{template "op_icon" "key"}}</span>
           <div><b>{{.T.Get "SSH public key"}}</b><p>{{.T.Get "Add this key to the repository as a deploy key (read-only is enough) before clicking Create."}}</p><code class="op-mono">{{.PublicKey}}</code></div>
           <button type="button" class="op-btn op-btn-secondary op-btn-sm" @click="copyToClipboard({{toJSON .PublicKey}}).then(() => showToast({{toJSON (.T.Get "Copied!")}}, 'success'))">{{template "op_icon" "copy"}} {{.T.Get "Copy"}}</button>
         </div>
-        <div class="grid gap-4 md:grid-cols-2" x-show="url !== '' && !isSSH(url)" x-cloak>
-          <div class="op-field"><label class="op-label" for="remote_user">{{.T.Get "Username (private repositories only)"}}</label><input id="remote_user" type="text" name="remote_user" :disabled="source !== 'remote' || isSSH(url)" autocomplete="off" class="op-input"></div>
-          <div class="op-field"><label class="op-label" for="remote_pass">{{.T.Get "Password or access token"}}</label><input id="remote_pass" type="password" name="remote_pass" :disabled="source !== 'remote' || isSSH(url)" autocomplete="new-password" class="op-input"></div>
+        <div class="grid gap-4 md:grid-cols-2" x-show="via === 'url' && url !== '' && !isSSH(url)" x-cloak>
+          <div class="op-field"><label class="op-label" for="remote_user">{{.T.Get "Username (private repositories only)"}}</label><input id="remote_user" type="text" name="remote_user" :disabled="source !== 'remote' || via === 'github' || isSSH(url)" autocomplete="off" class="op-input"></div>
+          <div class="op-field"><label class="op-label" for="remote_pass">{{.T.Get "Password or access token"}}</label><input id="remote_pass" type="password" name="remote_pass" :disabled="source !== 'remote' || via === 'github' || isSSH(url)" autocomplete="new-password" class="op-input"></div>
+        </div>
+        <div x-show="via === 'github'" x-cloak class="op-col" style="gap:14px">
+          <div class="grid gap-4 md:grid-cols-2" x-show="gh.accounts.length">
+            <div class="op-field"><label class="op-label" for="account">{{.T.Get "GitHub account"}}</label>
+              <select id="account" name="account" data-gh-select @change="account = $event.target.value; loadRepos(false)" :disabled="source !== 'remote' || via !== 'github'" class="op-select">
+                <template x-for="a in gh.accounts" :key="a.id"><option :value="a.id" :selected="a.id === account" x-text="a.title === a.login ? a.title : a.title + ' (' + a.login + ')'"></option></template>
+              </select>
+            </div>
+            <div class="op-field"><label class="op-label" for="github_repo">{{.T.Get "Repository"}} <span class="is-danger">*</span></label>
+              <div class="flex items-center gap-2">
+                <input id="github_repo" type="text" name="github_repo" list="github-repos" x-model.trim="ghRepo" @change="loadBranches()" :disabled="source !== 'remote' || via !== 'github'" data-no-live-validate autocomplete="off" spellcheck="false" :placeholder="ghLoading ? {{toJSON (.T.Get "Loading repositories...")}} : {{toJSON (.T.Get "type to search, owner/repository")}}" class="op-input op-mono" :class="repoErr() && 'is-invalid'" :aria-invalid="(!!repoErr()).toString()">
+                <button type="button" class="op-btn op-btn-secondary op-btn-sm" @click="loadRepos(true)" :disabled="ghLoading" title="{{.T.Get "Reload the list from GitHub"}}" aria-label="{{.T.Get "Reload the list from GitHub"}}">{{template "op_icon" "refresh"}}</button>
+              </div>
+              <datalist id="github-repos"><template x-for="r in ghRepos" :key="r.full_name"><option :value="r.full_name" x-text="r.private ? {{toJSON (.T.Get "private")}} : {{toJSON (.T.Get "public")}}"></option></template></datalist>
+              <span class="op-hint is-invalid" x-show="repoErr() || ghError" x-cloak x-text="repoErr() || ghError" role="alert"></span>
+              <span class="op-hint" x-show="!repoErr() && !ghError && !ghLoading"><span x-text="ghRepos.length"></span> {{.T.Get "repositories this account can reach."}} <span x-show="ghTruncated" x-cloak>{{.T.Get "Only the 1000 most recently pushed are listed, type the full owner/repository name for others."}}</span></span>
+            </div>
+          </div>
+          <div class="op-check-row op-git-key" x-show="!gh.accounts.length">
+            <span class="op-git-key-ico">{{template "git_github_icon"}}</span>
+            <div><b>{{.T.Get "No GitHub account is connected yet."}}</b><p>{{.T.Get "Connect one with an access token, then pick its repositories here."}}</p></div>
+            <button type="button" class="op-btn op-btn-secondary op-btn-sm" @click="panel = 'accounts'">{{.T.Get "Connect a GitHub account"}}</button>
+          </div>
+          <span class="op-hint is-invalid" x-show="!gh.accounts.length && repoErr()" x-cloak x-text="repoErr()" role="alert"></span>
         </div>
       </div>
 
@@ -82,7 +149,8 @@
           <span class="op-hint is-invalid" x-show="nameErr()" x-cloak x-text="nameErr()" role="alert"></span>
         </div>
         <div class="op-field"><label class="op-label" for="branch">{{.T.Get "Branch"}}</label>
-          <input id="branch" type="text" name="branch" x-model.trim="branch" maxlength="200" data-no-live-validate :placeholder="source === 'remote' ? {{toJSON (.T.Get "default branch")}} : 'main'" autocomplete="off" spellcheck="false" class="op-input op-mono" :class="branchErr() && 'is-invalid'" :aria-invalid="(!!branchErr()).toString()">
+          <datalist id="github-branches"><template x-for="b in (source === 'remote' && via === 'github' ? ghBranches : [])" :key="b"><option :value="b"></option></template></datalist>
+          <input id="branch" type="text" name="branch" list="github-branches" x-model.trim="branch" maxlength="200" data-no-live-validate :placeholder="source === 'remote' ? (via === 'github' && ghDefault ? ghDefault : {{toJSON (.T.Get "default branch")}}) : 'main'" autocomplete="off" spellcheck="false" class="op-input op-mono" :class="branchErr() && 'is-invalid'" :aria-invalid="(!!branchErr()).toString()">
           <span class="op-hint is-invalid" x-show="branchErr()" x-cloak x-text="branchErr()" role="alert"></span>
         </div>
         <div class="op-field"><label class="op-label" for="domain">{{.T.Get "Website"}}</label>
@@ -121,7 +189,7 @@
   </section>
 
   {{if not .Repos}}
-  <section class="op-card" x-show="panel !== 'create'"><div class="op-empty">
+  <section class="op-card" x-show="!panel"><div class="op-empty">
     <span class="op-ico-tile">{{template "op_icon" "code"}}</span>
     <b>{{.T.Get "No repositories yet"}}</b>
     <span class="op-hint">{{.T.Get "Add a repository to deploy a website from Git."}}</span>
@@ -205,14 +273,16 @@ function gitRepos() {
       dupName: {{toJSON (.T.Get "A repository with this name already exists.")}},
       badBranch: {{toJSON (.T.Get "Invalid branch name.")}},
       badTarget: {{toJSON (.T.Get "Target directory must be inside /var/www/html/.")}},
+      noRepo: {{toJSON (.T.Get "Select a repository from the list.")}},
+      noAccount: {{toJSON (.T.Get "Connect a GitHub account first.")}},
     },
     toggleCreate() { this.panel = this.panel === 'create' ? null : 'create'; this.tried = false; },
     // the same rules as isValidRemoteURL, isValidRepoName, isValidBranch and cleanTargetDir
     validURL(u) { return !!u && !u.startsWith('-') && !u.includes('..') && (/^https?:\/\/[A-Za-z0-9.-]+(:[0-9]{1,5})?\/[A-Za-z0-9._~\/%+-]+$/.test(u) || /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._~\/+-]+$/.test(u) || /^ssh:\/\/[A-Za-z0-9._-]+@[A-Za-z0-9.-]+(:[0-9]{1,5})?\/[A-Za-z0-9._~\/+-]+$/.test(u)); },
     repoNameFromURL(u) { if (!u) return ''; if (u.includes(':') && !u.includes('://')) u = u.slice(u.lastIndexOf(':') + 1); return u.replace(/\/+$/, '').split('/').pop().replace(/\.git$/, ''); },
     guessName() { if (this.source === 'remote' && !this.name && this.validURL(this.url)) { const n = this.repoNameFromURL(this.url); if (/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(n)) this.name = n; } },
-    finalName() { return this.name || (this.source === 'remote' ? this.repoNameFromURL(this.url) : this.domain); },
-    urlErr() { if (this.source !== 'remote') return ''; if (!this.url) return this.tried ? this.t.noURL : ''; return this.validURL(this.url) ? '' : this.t.badURL; },
+    finalName() { return this.name || (this.source === 'remote' ? (this.via === 'github' ? this.ghRepo.split('/').pop() : this.repoNameFromURL(this.url)) : this.domain); },
+    urlErr() { if (this.source !== 'remote' || this.via === 'github') return ''; if (!this.url) return this.tried ? this.t.noURL : ''; return this.validURL(this.url) ? '' : this.t.badURL; },
     nameErr() {
       const n = this.finalName();
       if (!n || (!this.name && !this.tried)) return '';
@@ -224,7 +294,7 @@ function gitRepos() {
     targetErr() { const d = this.target; if (!d) return ''; return d.includes('..') || (d.startsWith('/') && d !== '/var/www/html' && !d.startsWith('/var/www/html/')) ? this.t.badTarget : ''; },
     submitCreate(e) {
       this.tried = true;
-      if (this.urlErr() || this.nameErr() || this.branchErr() || this.targetErr()) {
+      if (this.urlErr() || this.repoErr() || this.nameErr() || this.branchErr() || this.targetErr()) {
         e.preventDefault();
         this.$nextTick(() => { const el = this.$root.querySelector('.op-git-create .is-invalid'); if (el) el.focus(); });
         return;
@@ -239,10 +309,57 @@ function gitRepos() {
     target: docroots[first] || '',
     docroots: docroots,
     isSSH(u) { return /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:/.test(u) || u.startsWith('ssh://'); },
+    // connected GitHub accounts, gh.ready stays false on a panel that doesn't have them
+    gh: { ready: false, accounts: [], repos: {} },
+    via: 'url', account: '',
+    ghRepos: [], ghRepo: '', ghBranches: [], ghDefault: '', ghLoading: false, ghError: '', ghTruncated: false,
+    async loadGh() {
+      try {
+        const res = await fetch('/git/github/accounts.json', { headers: { Accept: 'application/json' } });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d || !Array.isArray(d.accounts)) return;
+        this.gh = { ready: true, accounts: d.accounts, repos: d.repos || {} };
+        if (d.accounts.length) this.account = d.accounts[0].id;
+        this.$nextTick(() => this.syncGhSelects());
+      } catch (e) {}
+    },
+    // the theme's custom selects copy the chosen label once, before Alpine has filled the options in
+    syncGhSelects() { this.$root.querySelectorAll('select[data-gh-select]').forEach(s => { const i = s.selectedIndex; s.selectedIndex = -1; s.selectedIndex = i; }); },
+    link(name) { return this.gh.repos[name] || null; },
+    pickVia(v) { this.via = v; if (v === 'github' && this.account && !this.ghRepos.length) this.loadRepos(false); },
+    repoErr() {
+      if (this.source !== 'remote' || this.via !== 'github') return '';
+      if (!this.gh.accounts.length) return this.tried ? this.t.noAccount : '';
+      if (!this.ghRepo) return this.tried ? this.t.noRepo : '';
+      return /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}\/[A-Za-z0-9._-]{1,100}$/.test(this.ghRepo) ? '' : this.t.noRepo;
+    },
+    async loadRepos(refresh) {
+      if (!this.account) return;
+      this.ghLoading = true; this.ghError = ''; this.ghRepo = ''; this.ghBranches = []; this.ghDefault = '';
+      try {
+        const res = await fetch('/git/github/repos.json?account=' + encodeURIComponent(this.account) + (refresh ? '&refresh=1' : ''));
+        const data = await res.json();
+        if (data.error) { this.ghError = data.error; this.ghRepos = []; return; }
+        this.ghRepos = data.repos || []; this.ghTruncated = !!data.truncated;
+      } catch (e) { this.ghError = String(e); } finally { this.ghLoading = false; }
+    },
+    async loadBranches() {
+      this.ghBranches = []; this.ghDefault = '';
+      if (this.repoErr() || !this.ghRepo) return;
+      try {
+        const res = await fetch('/git/github/branches.json?account=' + encodeURIComponent(this.account) + '&repo=' + encodeURIComponent(this.ghRepo));
+        const data = await res.json();
+        if (data.error) { this.ghError = data.error; return; }
+        this.ghError = ''; this.ghBranches = data.branches || []; this.ghDefault = data.default_branch || '';
+      } catch (e) { this.ghError = String(e); }
+    },
   });
 }
 </script>
 {{end}}
+
+{{define "git_github_icon"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5"/></svg>{{end}}
 
 {{define "git_deploy_modes"}}
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -298,6 +415,7 @@ function gitRepos() {
       <span class="op-strong">{{$r.Name}}</span>
       <span class="op-badge">{{if eq $r.Source "local"}}{{$T.Get "Local"}}{{else}}{{$T.Get "Remote"}}{{end}}</span>
       {{if $r.LastError}}<span class="op-badge is-danger" title="{{$r.LastError}}">{{$T.Get "Error"}}</span>{{end}}
+      {{if eq $r.Source "remote"}}<span class="op-badge" x-show="link({{toJSON $r.Name}}) && !link({{toJSON $r.Name}}).account_gone" x-cloak>{{template "git_github_icon"}}<span x-text="link({{toJSON $r.Name}}) ? link({{toJSON $r.Name}}).account : ''"></span></span><span class="op-badge is-danger" x-show="link({{toJSON $r.Name}}) && link({{toJSON $r.Name}}).account_gone" x-cloak>{{$T.Get "Account disconnected"}}</span>{{end}}
     </div>
     {{if $r.RemoteURL}}<div class="mt-0.5 text-xs truncate op-muted" style="max-width: 10rem;" title="{{$r.RemoteURL}}">{{$r.RemoteURL}}</div>{{end}}
     </div></div>
@@ -351,7 +469,8 @@ function gitRepos() {
       <div class="flex flex-wrap items-center gap-2">
         {{template "git_copy_field" (dict "Value" $r.WebhookURL "T" $T)}}
       </div>
-      <p class="mt-1.5 text-xs op-muted">{{$T.Get "Add this URL as a push webhook in GitHub, GitLab or Bitbucket so changes are pulled automatically."}}</p>
+      <p class="mt-1.5 text-xs op-muted" x-show="!(link({{toJSON $r.Name}}) && link({{toJSON $r.Name}}).hook_added)">{{$T.Get "Add this URL as a push webhook in GitHub, GitLab or Bitbucket so changes are pulled automatically."}}</p>
+      <p class="mt-1.5 text-xs op-muted" x-show="link({{toJSON $r.Name}}) && link({{toJSON $r.Name}}).hook_added" x-cloak>{{$T.Get "This webhook was added to the repository on GitHub for you, pushes are pulled automatically."}}</p>
     </div>
     {{end}}
 
@@ -372,14 +491,25 @@ function gitRepos() {
           <label class="{{.Lbl}}">{{$T.Get "Deploy to directory"}}</label>
           <input type="text" name="target_dir" value="{{$r.TargetDir}}" class="{{.In}}">
         </div>
+        {{if eq $r.Source "remote"}}
+        <template x-if="link({{toJSON $r.Name}})">
+          <div>
+            <label class="{{.Lbl}}">{{$T.Get "GitHub account"}}</label>
+            <select name="account" data-gh-select class="{{.In}}">
+              <template x-if="link({{toJSON $r.Name}}).account_gone"><option value="" selected>{{$T.Get "Disconnected, pick an account"}}</option></template>
+              <template x-for="a in gh.accounts" :key="a.id"><option :value="a.id" :selected="a.id === link({{toJSON $r.Name}}).account_id" x-text="a.title === a.login ? a.title : a.title + ' (' + a.login + ')'"></option></template>
+            </select>
+          </div>
+        </template>
+        {{end}}
         {{if and (eq $r.Source "remote") (not $r.IsSSH)}}
-        <div>
+        <div x-show="!link({{toJSON $r.Name}})">
           <label class="{{.Lbl}}">{{$T.Get "Username (private repositories only)"}}</label>
-          <input type="text" name="remote_user" value="{{$r.RemoteUser}}" autocomplete="off" class="{{.In}}">
+          <input type="text" name="remote_user" value="{{$r.RemoteUser}}" :disabled="!!link({{toJSON $r.Name}})" autocomplete="off" class="{{.In}}">
         </div>
-        <div>
+        <div x-show="!link({{toJSON $r.Name}})">
           <label class="{{.Lbl}}">{{$T.Get "Password or access token"}}</label>
-          <input type="password" name="remote_pass" autocomplete="new-password" placeholder="{{if $r.HasRemotePass}}{{$T.Get "unchanged"}}{{end}}" class="{{.In}}">
+          <input type="password" name="remote_pass" :disabled="!!link({{toJSON $r.Name}})" autocomplete="new-password" placeholder="{{if $r.HasRemotePass}}{{$T.Get "unchanged"}}{{end}}" class="{{.In}}">
         </div>
         {{end}}
       </div>
