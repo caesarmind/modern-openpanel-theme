@@ -17,6 +17,8 @@ The command restarts the panel so the theme loads right away. You can also pick 
 
 The theme runs on OpenPanel 2.0.28 and later. A few things only turn on when the panel is new enough: on 2.0.29+ the file editor saves without reloading, and bulk delete, copy, move and trash actions go out as one request. `base.html` sets `window.opPanelVersion` and `opPanelAtLeast()` for that check.
 
+When the admin locks WordPress auto-update preferences (a panel with stefanpejcic/OpenPanel#1398), the WordPress Updates tab shows the lock and disables those controls. The panel reports the lock in the JSON the tab already loads, so older panels show the tab as before.
+
 ## Colours and logos
 
 With an OpenAdmin that supports theme settings, the Modern card under **OpenAdmin > Settings > OpenPanel > Theme** has a **Customize colours** link. It sets:
