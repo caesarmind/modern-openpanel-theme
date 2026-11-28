@@ -63,8 +63,8 @@
         </div>
         <div class="op-actions">
             <div class="op-segmented" role="group" aria-label="{{.T.Get "Row density"}}" x-data="{ d: (() => { try { return new URLSearchParams(location.search).get('density') || localStorage.getItem('fm-density') || 'compact'; } catch (e) { return 'compact'; } })(), set(v) { this.d = v; try { localStorage.setItem('fm-density', v); } catch (e) {} const c = document.getElementById('fmCard'); if (c) c.classList.toggle('is-compact', v === 'compact'); } }" x-init="set(d)">
-                <button type="button" :aria-pressed="(d === 'comfortable').toString()" @click="set('comfortable')" title="{{.T.Get "Comfortable"}}">{{template "op_icon" "table"}}<span class="op-fm-dlabel">{{.T.Get "Comfortable"}}</span></button>
-                <button type="button" :aria-pressed="(d === 'compact').toString()" @click="set('compact')" title="{{.T.Get "Compact"}}">{{template "op_icon" "menu"}}<span class="op-fm-dlabel">{{.T.Get "Compact"}}</span></button>
+                <button type="button" :aria-pressed="(d === 'comfortable').toString()" @click="set('comfortable')" title="{{.T.Get "Comfortable"}}">{{template "op_icon" "rows"}}<span class="op-fm-dlabel">{{.T.Get "Comfortable"}}</span></button>
+                <button type="button" :aria-pressed="(d === 'compact').toString()" @click="set('compact')" title="{{.T.Get "Compact"}}">{{template "op_icon" "density"}}<span class="op-fm-dlabel">{{.T.Get "Compact"}}</span></button>
             </div>
             <button class="op-btn op-btn-secondary" id="newFolderButton" title="{{.T.Get "New Folder"}}" type="button" onclick="fmShowNewRow('newfoDrawer')" aria-controls="newfoDrawer">{{template "op_icon" "folder"}} {{.T.Get "New Folder"}}</button>
             <button class="op-btn op-btn-secondary" id="newFileButton" title="{{.T.Get "New File"}}" type="button" onclick="fmShowNewRow('newfiDrawer')" aria-controls="newfiDrawer">{{template "op_icon" "plus"}} {{.T.Get "New File"}}</button>

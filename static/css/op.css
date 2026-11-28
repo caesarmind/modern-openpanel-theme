@@ -1738,6 +1738,11 @@ div:has(> main.op-scope) { min-width: 0; }
   .op-fm-up svg { width: 17px; height: 17px; }
   .op-fm-dlabel { display: none; }
   @media (width >= 40rem) { .op-fm-dlabel { display: inline; } }
+  /* phones: compact rows keep only the name and the actions menu */
+  @media (width < 48rem) {
+    .op-fm.is-compact .op-table tr.clickable-row { padding: 8px 12px; margin-bottom: 4px; }
+    .op-fm.is-compact .op-table tr.clickable-row td[data-label] { display: none; }
+  }
   @media (width >= 48rem) {
     .op-fm.is-compact .op-table { border-spacing: 0; margin-top: 0; }
     .op-fm.is-compact .op-table thead th { padding: 8px; box-shadow: inset 0 -1px 0 var(--color-raised); }
