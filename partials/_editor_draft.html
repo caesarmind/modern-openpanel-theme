@@ -1,5 +1,5 @@
 {{define "editor_draft"}}{{/* call with (dict "T" .T "Class" "extra classes"), static/js/editor-draft.js fills it when this browser has an unsaved copy that differs from the saved file */}}
-<div data-op-draft hidden data-locale="{{.T.Locale}}" class="op-draft {{.Class}}">
+<div data-op-draft hidden data-locale="{{.T.Locale}}" data-too-big="{{.T.Get "The file is too large to show the changes."}}" class="op-draft {{.Class}}">
     <div class="op-alert is-info" role="status">{{template "op_icon" "history"}}<span>{{.T.Get "This browser has an unsaved copy of this file from"}} <b data-op-draft-time></b>.<span data-op-draft-stale hidden> {{.T.Get "The file has changed since then, so restoring will overwrite those changes in the editor."}}</span></span>
         <span class="op-actions">
             <button type="button" data-op-draft-view aria-expanded="false" class="op-btn op-btn-secondary op-btn-sm">{{template "op_icon" "listdetails"}} {{.T.Get "View changes"}}</button>
