@@ -136,12 +136,14 @@
             </thead>
             <tbody x-ref="tbody">
 {{$root := .}}
+{{/* panels without the purge route have no purge bulk action either */}}
+{{$canPurge := false}}{{range .BulkActions}}{{if eq .Key "purge"}}{{$canPurge = true}}{{end}}{{end}}
 {{range $i, $domain := .Domains}}
 {{$onion := hasSuffix $domain.DomainURL ".onion"}}
                 <tr class="user-row" data-row-check x-show="(searchQuery === '' || '{{$domain.DomainURL}}'.toLowerCase().includes(searchQuery.toLowerCase())) && matchesFilters({{toJSON $domain.Filter}})" :aria-selected="!!bulkSelected[{{toJSON $domain.DomainURL}}]">
-{{$skip := ""}}{{if $onion}}{{$skip = "suspend,unsuspend"}}{{else if eq $domain.SuspendedBy "admin"}}{{$skip = "suspend,unsuspend,php,redirect,unredirect,waf,cloudflare,delete"}}{{else if eq $domain.Status "Suspended"}}{{$skip = "suspend"}}{{else if eq $domain.Status "Not Suspended"}}{{$skip = "unsuspend"}}{{end}}
+{{$skip := ""}}{{if $onion}}{{$skip = "suspend,unsuspend"}}{{else if eq $domain.SuspendedBy "admin"}}{{$skip = "suspend,unsuspend,php,redirect,unredirect,waf,cloudflare,purge,delete"}}{{else if eq $domain.Status "Suspended"}}{{$skip = "suspend"}}{{else if eq $domain.Status "Not Suspended"}}{{$skip = "unsuspend"}}{{end}}
 {{if not $domain.RedirectURL}}{{$skip = printf "%s,unredirect" $skip}}{{end}}
-{{if $onion}}{{$skip = printf "%s,cloudflare" $skip}}{{end}}
+{{if $onion}}{{$skip = printf "%s,cloudflare,purge" $skip}}{{end}}
                     <td class="is-shrink"><input type="checkbox" class="op-check bulk-select-box" value="{{$domain.DomainURL}}" data-bulk-skip="{{$skip}}" :checked="!!bulkSelected[{{toJSON $domain.DomainURL}}]" @change="bulkToggle($event.target)" aria-label="{{$root.T.Get "Select"}} {{$domain.DomainURL}}"></td>
 
                     <td x-show="columns.domain" data-sort-col="domain" data-sort-value="{{$domain.DomainURL}}">
@@ -273,6 +275,11 @@
                                 <input type="hidden" name="cloudflare_action" value="{{if $domain.Cloudflare}}disable{{else}}enable{{end}}">
                                 <button type="submit">{{template "op_icon" "cloud"}} {{if $domain.Cloudflare}}{{$root.T.Get "Remove Cloudflare restriction"}}{{else}}{{$root.T.Get "Restrict to Cloudflare"}}{{end}}</button>
                             </form>
+                            {{if $canPurge}}<form method="post" action="/domains/purge-cache">
+                                <input type="hidden" name="csrf_token" value="{{$root.CSRFToken}}"/>
+                                <input type="hidden" name="domain_name" value="{{$domain.DomainURL}}">
+                                <button type="submit">{{template "op_icon" "brush"}} {{$root.T.Get "Purge cache"}}</button>
+                            </form>{{end}}
                             {{if $root.UserAllowed.docroot}}<a href="/domains/docroot?domain_name={{$domain.DomainURL}}">{{template "op_icon" "folder"}} {{$root.T.Get "Change docroot"}}</a>{{end}}
                             {{if $root.UserAllowed.redirects}}<a href="/domains/redirect?domain={{$domain.DomainURL}}">{{template "op_icon" "link"}} {{if $domain.RedirectURL}}{{$root.T.Get "Edit redirect"}}{{else}}{{$root.T.Get "Redirect"}}{{end}}</a>{{end}}
                         {{end}}
