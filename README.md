@@ -44,3 +44,16 @@ The theme only holds the files it changes, every other page comes from the panel
 - `static/js/editor-draft.js`: the panel's unsaved-edits script, shipped with the theme so drafts also work on panels older than 2.0.29.
 - `static/images/apps/`: app logos for the installer.
 - `static/vendor/fonts/inter/`: Inter (SIL Open Font License).
+
+## Releasing
+
+OpenAdmin installs the version the theme list names, from that version's tag. To release:
+
+```
+./release.sh 1.3.2 --dry-run
+./release.sh 1.3.2
+```
+
+The script sets `Version:` in `readme.txt`, tags the commit `v1.3.2`, pushes both and opens the pull request that updates `themes.yml` in [openpanel-configuration](https://github.com/stefanpejcic/openpanel-configuration). `--dry-run` shows the changes and pushes nothing. It needs git and the GitHub CLI, and `HEAD` has to be `origin/main`.
+
+Servers get the **Update** button once that pull request is merged. `release.sh`, `.github/` and `.gitattributes` are left out of the downloaded archive.

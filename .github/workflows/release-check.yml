@@ -1,0 +1,25 @@
+name: Release check
+
+# A release tag has to match Version in readme.txt, OpenAdmin shows that version after install.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches readme.txt
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(sed -n 's/^Version:[[:space:]]*//p' readme.txt | tr -d '\r' | head -n1)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match Version: $version in readme.txt. Delete the tag, fix readme.txt and tag again."
+            exit 1
+          fi
+          echo "Tag $TAG matches readme.txt."
