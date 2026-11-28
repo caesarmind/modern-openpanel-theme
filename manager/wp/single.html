@@ -1011,14 +1011,14 @@
                                 <td data-label="{{.T.Get "Installed"}}"><span class="op-version" x-text="it.version || '-'"></span></td>
                                 <td data-label="{{.T.Get "Available"}}"><span class="op-version" style="color:var(--color-success)" x-show="it.has_update" x-text="it.update_version"></span><span class="op-hint" x-show="!it.has_update">{{.T.Get "Up to date"}}</span></td>
                                 <td data-label="{{.T.Get "Auto update"}}">
-                                    <button type="button" x-show="it.manageable" class="op-switch" role="switch" :aria-checked="it.auto_update.toString()" :disabled="busy" @click="setAuto(it, !it.auto_update)" :aria-label="{{toJSON (.T.Get "Auto update")}} + ' ' + it.title"></button>
+                                    <button type="button" x-show="it.manageable" class="op-switch" role="switch" :aria-checked="it.auto_update.toString()" :disabled="busy || !!(data && data.auto_update_locked)" @click="setAuto(it, !it.auto_update)" :aria-label="{{toJSON (.T.Get "Auto update")}} + ' ' + it.title"></button>
                                     <span x-show="!it.manageable" class="op-hint">-</span>
                                 </td>
                                 <td class="is-shrink op-cell-menu" style="position:relative" x-data="opMenu()" @click.outside="open = false" @keydown.escape="open = false">
                                     <button class="op-icon-btn" type="button" aria-label="{{.T.Get "Actions"}}" :aria-expanded="open.toString()" x-ref="btn" @click="toggle()" :disabled="!it.manageable" :title="it.manageable ? '' : {{toJSON (.T.Get "Must-use plugins and drop-ins are managed by files, not wp-admin.")}}">{{template "op_icon" "dots"}}</button>
                                     <div class="op-menu" x-ref="menu" x-show="open" x-cloak>
                                         <a href="#" x-show="it.has_update" @click.prevent="open = false; askItem(it)">{{template "op_icon" "refresh"}} {{.T.Get "Update now"}}</a>
-                                        <a href="#" @click.prevent="open = false; setAuto(it, !it.auto_update)">{{template "op_icon" "clock"}} <span x-text="it.auto_update ? {{toJSON (.T.Get "Turn off auto-updates")}} : {{toJSON (.T.Get "Turn on auto-updates")}}"></span></a>
+                                        <a href="#" x-show="!(data && data.auto_update_locked)" @click.prevent="open = false; setAuto(it, !it.auto_update)">{{template "op_icon" "clock"}} <span x-text="it.auto_update ? {{toJSON (.T.Get "Turn off auto-updates")}} : {{toJSON (.T.Get "Turn on auto-updates")}}"></span></a>
                                         <a :href="'https://wordpress.org/' + it.kind + 's/' + encodeURIComponent(it.name) + '/'" target="_blank" rel="noopener" @click="open = false">{{template "op_icon" "out"}} {{.T.Get "View on wordpress.org"}}</a>
                                     </div>
                                 </td>
@@ -1070,6 +1070,13 @@
                     document.getElementById('WP_AUTO_UPDATE_CORE_NO').checked = response.WP_AUTO_UPDATE_CORE === 'false';
                 }
 
+                // panels from before the lock don't send "locked", so the form stays as it was there
+                function lockUpdatePrefs(locked) {
+                    document.getElementById('updatesLockedNote').style.display = locked ? '' : 'none';
+                    document.querySelectorAll('#UpdatesForm input[type=radio]').forEach(function (el) { el.disabled = locked; });
+                    document.getElementById('saveUpdatesBtn').disabled = locked;
+                }
+
                 function fetchupdatesInfo() {
                     var selectedDomain = {{toJSON .CurrentDomain}};
                     var selectedPath = {{toJSON .Docroot}};
@@ -1081,6 +1088,7 @@
                         if (xhr.status === 200) {
                             var response = JSON.parse(xhr.responseText);
                             updateupdatesCheckboxes(response);
+                            lockUpdatePrefs(response.locked === 'true');
                         } else {
                             console.error('Error fetching updates info:', xhr.statusText);
                         }
@@ -1114,6 +1122,7 @@
             </section>
 
             <form id="UpdatesForm" class="op-card">
+                <div class="op-alert is-info" id="updatesLockedNote" style="display:none;margin-bottom:12px">{{template "op_icon" "lock"}}<span>{{.T.Get "Automatic update preferences are set by your hosting provider and can't be changed here. You can still update manually."}}</span></div>
                 <input type="hidden" name="csrf_token" value="{{.CSRFToken}}"/>
                 <input type="hidden" name="website" value="{{.CurrentDomain}}">
                 <input type="hidden" name="docroot" value="{{.Docroot}}">
